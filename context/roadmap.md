@@ -261,21 +261,17 @@ than building on it.
 
 ### S-16 Raspberry Pi deployment (`pi-deployment`)
 - Goal: install on the Pi from the README, auto-start, survive reboot, measured footprint.
-- Covers: FR-23 AC1–AC3, FR-26 AC1, NFR-01…NFR-04.
+- Covers: FR-23 AC1–AC5, FR-26 AC1, NFR-01…NFR-04.
 - Depends on: S-12, S-13, S-15
-- Acceptance: PRD FR-23 AC1–AC3, FR-26 AC1; `deploy/systemd/lead-hunter-ai.service`; README
-  install for 64-bit Raspberry Pi OS with Node 24 and Tailscale serve; "Co działa / Co wymaga
+- Acceptance: PRD FR-23 AC1–AC5, FR-26 AC1; `deploy/docker/Dockerfile` and `docker-compose.yml`;
+  CI job building the image; README install for 64-bit Raspberry Pi OS with Docker and Tailscale serve; "Co działa / Co wymaga
   kluczy / Co wymaga ręcznej weryfikacji" complete. Human checks on the Pi: install, reboot,
   scheduled run, memory and response-time measurements (NFR-01, NFR-02), offline behaviour.
-- Unknowns: better-sqlite3 prebuild on the operator's Pi OS (tech-stack).
+- Unknowns: image build time and RAM on the Pi (NFR-01 measured inside the container).
 - Decided up front:
-  - `systemd` is the supported deployment (brief §13.1). Docker Compose is an **example only**,
-    not a gate and not a human check: `deploy/docker/Dockerfile` (multi-stage,
-    `node:24-bookworm-slim`, non-root) and `docker-compose.yml` (`restart: unless-stopped`,
-    `env_file: .env`, volume for `DATA_DIR`, port published as `127.0.0.1:8080:8080`,
-    healthcheck on `/api/health`), marked "przykład, nietestowany" in the README. Inside the
-    container the app listens on `0.0.0.0`, so the FR-20 AC2 rule applies: it refuses to start
-    without a password hash. (user)
+  - Docker Compose is the only deployment; no `systemd` unit for the app (D-14). The compose file
+    publishes `127.0.0.1:8080:8080` for Tailscale serve; an optional `ollama` service sits behind a
+    compose profile. (user)
 - Size: M
 
 ## Later

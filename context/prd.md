@@ -31,8 +31,8 @@ lawful access to sources, security, a working sales process, low running cost (B
 - **C-04** Jobs: in-process scheduler with durable state in SQLite; no Redis/RabbitMQ (B-40).
 - **C-05** Tests: Vitest, API tests via Fastify inject, component tests, one end-to-end test of
   the main path (B-41).
-- **C-06** Runtime: one service on Raspberry Pi 4B 8 GB, Linux ARM64, under `systemd`; Docker
-  Compose optional (B-38, B-39).
+- **C-06** Runtime: one service on Raspberry Pi 4B 8 GB, Linux ARM64, as a Docker Compose
+  service; no `systemd` unit for the app (D-14, deviates from B-39/B-44 which name `systemd`).
 - **C-07** Monorepo per §13.3 (`apps/api`, `apps/web`, `packages/contracts`, `packages/config`,
   `deploy/`, `docs/`, `scripts/`); domain logic separate from adapters, API and UI (B-42).
 - **C-08** Commands: `pnpm install|dev|test|typecheck|build|db:migrate|discover` (B-43).
@@ -208,7 +208,9 @@ structured analysis.
 - AC2: Given a backup, When the documented restore procedure is followed, Then the instance starts with the restored data and migrations still apply.
 
 ### FR-23 Deployment on Raspberry Pi  (Must, covers B-38, B-39, B-44)
-- AC1: Given a Raspberry Pi 4B with 64-bit Linux, When the README install steps are followed, Then the service runs under `systemd`, starts after reboot, restarts on crash, and keeps the database in a persistent path outside the code directory.
+- AC1: Given a Raspberry Pi 4B with 64-bit Linux, When the README install steps are followed, Then the app runs as a Docker Compose service built for linux/arm64, starts after reboot (`restart: unless-stopped`), restarts on crash, publishes its port on 127.0.0.1 only, and keeps the database and backups in a volume that survives image updates.
+- AC4: Given the container, When it starts, Then it runs as a non-root user, applies pending migrations, and its healthcheck uses `GET /api/health`; because it listens on `0.0.0.0` inside the container, it refuses to start without a password hash (FR-20 AC2).
+- AC5: Given a new version, When the README update steps are followed (`git pull`, `docker compose up -d --build`), Then data is kept and migrations apply.
 - AC2: Given `.env.example`, When it is read, Then every variable the app reads is listed with its meaning and default, and none holds a real value.
 - AC3: Given no internet or no LLM provider, When the service runs, Then the panel, manual import (text), statuses and payments work, and failing sources/analyses are shown as errors.
 
@@ -223,7 +225,7 @@ structured analysis.
 - AC3: Given the API, When the OpenAPI document is generated, Then it matches the implemented routes (test compares them).
 
 ### FR-26 Operator documentation  (Must, covers B-44, B-46, C-12)
-- AC1: Given the README, When it is read, Then it contains install (ARM64, `systemd`, backup), configuration (incl. what data goes to the LLM and the access method/limits of each source), and the section "Co działa / Co wymaga kluczy / Co wymaga ręcznej weryfikacji", updated by each roadmap item.
+- AC1: Given the README, When it is read, Then it contains install (ARM64, Docker Compose, Tailscale serve, backup), configuration (incl. what data goes to the LLM and the access method/limits of each source), and the section "Co działa / Co wymaga kluczy / Co wymaga ręcznej weryfikacji", updated by each roadmap item.
 - AC2: Given `docs/source-policy.md`, When it is read, Then each adapter's access method, terms link and limits are listed.
 
 ### FR-27 GitHub Issues adapter  (Could — P1, covers B-16, B-47)
@@ -366,7 +368,7 @@ the repo. The 30-day targets (§20) are an experiment, not acceptance criteria.
 | B-41 §13.1 tests | – | C-05 | `/test-plan` |
 | B-42 §13.3 repo structure, domain vs adapters | – | C-07 | |
 | B-43 §23 commands | – | C-08, FR-17 | |
-| B-44 §0.8, §22 migrations, .env.example, ARM64, systemd docs | – | FR-23, FR-26 | |
+| B-44 §0.8, §22 migrations, .env.example, ARM64, systemd docs | – | FR-23, FR-26 | Docker instead of systemd (D-14) |
 | B-45 §15 API contracts, pagination, OpenAPI | – | FR-25 | |
 | B-46 §23 per-phase "what works" report | – | FR-26 | C-12 |
 | B-47 §17 P1 scope | – | FR-27…FR-30 | |

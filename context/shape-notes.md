@@ -25,6 +25,7 @@ Brief: `lead-hunter-ai-PRD.md` v1.0 (2026-10-24).
 | D-11 | UI language | Polish UI. Offer drafts follow the source's language. No i18n framework in the MVP; strings kept in one module so i18n can be added later. | Brief labels are Polish; open-source English UI deferred. | user |
 | D-12 | Notifications | Dashboard + daily brief only in the MVP; Telegram stays P1. | Brief §12. | brief |
 | D-13 | Repository visibility | Private for now; public release later. | User. | user |
+| D-14 | Deployment | The app runs on the Pi only as a Docker Compose service (ARM64 image, `restart: unless-stopped`, data volume, port published on `127.0.0.1` only, Tailscale serve in front). No `systemd` unit for the app. | Operator runs everything in Docker; deviates from brief §0.8/§13.1 (`systemd` as the base). | user |
 
 ## Assumptions
 - A-01 HN freelance threads mix "SEEKING WORK" and "SEEKING FREELANCER" comments; the

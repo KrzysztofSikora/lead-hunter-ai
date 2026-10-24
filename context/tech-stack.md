@@ -37,7 +37,7 @@ Versions verified on 2026-10-24 with `npm view` against the npm registry. Pin ex
 | Mutation testing | @stryker-mutator/core + vitest-runner | 10.1.1 | Per-module gate (configured in `/test-plan`) |
 | Lint / format | ESLint + typescript-eslint; Prettier | 10.13.0 / 8.72.0 / 3.9.10 | Layer rules via `no-restricted-imports` |
 | Dev runner | tsx | 4.23.15 | `pnpm dev` without a build step |
-| Deployment | `tsc` build + `systemd` unit; Docker Compose optional | – | C-06 |
+| Deployment | Docker Compose on the Pi; multi-stage image from `node:24-bookworm-slim` (linux/arm64) | – | C-06, D-14; native better-sqlite3 built inside the image |
 
 ## Decisions
 
@@ -66,7 +66,8 @@ Versions verified on 2026-10-24 with `npm view` against the npm registry. Pin ex
 - Strongest case against: `node:sqlite` needs no native addon, so no ARM64 build risk. We accept
   better-sqlite3 because Drizzle 0.45 has no `node:sqlite` driver; prebuilt linux-arm64 binaries
   exist, and the first install on the Pi is a human check in the scaffold item.
-- Revisit if: the Pi install needs a compiler, or Drizzle adds a `node:sqlite` driver.
+- Revisit if: Drizzle adds a `node:sqlite` driver. (Inside the Docker image the native build is
+  done in the build stage, so the host needs no compiler — D-14.)
 - Database file outside the code directory (`DATA_DIR`), WAL mode, `busy_timeout`; backups via
   the SQLite online backup API (`db.backup()`).
 
@@ -127,6 +128,20 @@ Versions verified on 2026-10-24 with `npm view` against the npm registry. Pin ex
   components; one Playwright test of the main path against the built app with the mock LLM.
 - Stryker per module; scope decided in `/test-plan`.
 - ESLint flat config + typescript-eslint + Prettier; `no-restricted-imports` enforces layers.
+
+### Deployment
+- Options considered: Docker Compose; `systemd` unit with Node on the host.
+- Chosen: Docker Compose only (D-14, user). Multi-stage `Dockerfile` (build stage: pnpm install,
+  native build, `pnpm build`; runtime stage: `dist`, production dependencies, non-root user;
+  PID 1 via `init: true` in compose). Compose: `restart: unless-stopped`, `env_file: .env`,
+  volume `./data:/data` (`DATA_DIR=/data`), `127.0.0.1:8080:8080`, healthcheck on
+  `/api/health`. Optional `ollama` service behind a compose profile.
+- Strongest case against: `systemd` (the brief's base) uses ~100–150 MB less RAM and no Docker
+  daemon. We accept Docker because the operator runs everything in Docker and the image removes
+  the better-sqlite3 build risk on the host.
+- CI builds the image (`docker build`, amd64) on every PR so a broken Dockerfile is caught; the
+  arm64 build happens on the Pi (`docker compose up -d --build`). Revisit: publish arm64 images
+  from CI if the build on the Pi is too slow.
 
 ## Architecture sketch
 ```
