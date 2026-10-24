@@ -56,7 +56,7 @@ than building on it.
     `docker-compose.yml` at the repo root: `restart: unless-stopped`, `env_file: .env`, volume
     `./data:/data`, port `127.0.0.1:8080:8080`, healthcheck on `/api/health`, `init: true`.
     `docker compose up --build` serves health and the UI shell (FR-23 AC4).
-  - CI builds the image on every PR; `make`-free gate `pnpm docker:build` (= `docker build .`).
+  - CI builds the image on every PR; gate `pnpm docker:build` (= `docker build .`).
   - CLAUDE.md *Gates* and *Commands* tables updated to the real scripts.
 - Unknowns: none blocking.
 - Decided up front:
