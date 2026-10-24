@@ -10,22 +10,22 @@ than building on it.
 | ID | Issue | change-id | Type | Covers | Depends on | Size | Status |
 |----|-------|-----------|------|--------|------------|------|--------|
 | F-01 | #1 | repo-skeleton | foundation | C-01…C-08, FR-23 AC4, FR-24 AC1–AC2, FR-25 AC3 | - | M | todo |
-| S-01 | - | operator-login | slice | FR-20 | F-01 | M | todo |
-| S-02 | - | operator-profile | slice | FR-01 | S-01 | S | todo |
-| S-03 | - | manual-text-import | slice | FR-02, FR-06, FR-11 AC1, FR-12 | S-02 | M | todo |
-| S-04 | - | analysis-and-scoring | slice | FR-07, FR-08 (mock), FR-10 | S-03 | L | todo |
-| S-05 | - | llm-providers | slice | FR-08 AC1–AC4, AC7, FR-09, FR-24 AC3 | S-04 | M | todo |
-| S-06 | - | opportunity-card | slice | FR-11 AC2–AC4 | S-04 | M | todo |
-| S-07 | - | offer-drafts | slice | FR-13 | S-05, S-06 | M | todo |
-| S-08 | - | pipeline-and-payments | slice | FR-14, FR-15 | S-06 | M | todo |
-| S-09 | - | url-import-guard | slice | FR-03 | S-03 | M | todo |
-| S-10 | - | rss-sources | slice | FR-04, FR-18 AC3 | S-04, S-09 | L | todo |
-| S-11 | - | email-alerts | slice | FR-05 | S-10 | L | todo |
-| S-12 | - | scheduler-and-jobs | slice | FR-17, FR-18 AC1–AC2 | S-10 | M | todo |
-| S-13 | - | today-brief | slice | FR-16 | S-08, S-12 | M | todo |
-| S-14 | - | insights | slice | FR-19 | S-08 | M | todo |
-| S-15 | - | data-ownership-backup | slice | FR-21, FR-22 | S-08 | M | todo |
-| S-16 | - | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13, S-15 | M | todo |
+| S-01 | #2 | operator-login | slice | FR-20 | F-01 | M | todo |
+| S-02 | #3 | operator-profile | slice | FR-01 | S-01 | S | todo |
+| S-03 | #4 | manual-text-import | slice | FR-02, FR-06, FR-11 AC1, FR-12 | S-02 | M | todo |
+| S-04 | #5 | analysis-and-scoring | slice | FR-07, FR-08 (mock), FR-10 | S-03 | L | todo |
+| S-05 | #6 | llm-providers | slice | FR-08 AC1–AC4, AC7, FR-09, FR-24 AC3 | S-04 | M | todo |
+| S-06 | #7 | opportunity-card | slice | FR-11 AC2–AC4 | S-04 | M | todo |
+| S-07 | #8 | offer-drafts | slice | FR-13 | S-05, S-06 | M | todo |
+| S-08 | #9 | pipeline-and-payments | slice | FR-14, FR-15 | S-06 | M | todo |
+| S-09 | #10 | url-import-guard | slice | FR-03 | S-03 | M | todo |
+| S-10 | #11 | rss-sources | slice | FR-04, FR-18 AC3 | S-04, S-09 | L | todo |
+| S-11 | #12 | email-alerts | slice | FR-05 | S-10 | L | todo |
+| S-12 | #13 | scheduler-and-jobs | slice | FR-17, FR-18 AC1–AC2 | S-10 | M | todo |
+| S-13 | #14 | today-brief | slice | FR-16 | S-08, S-12 | M | todo |
+| S-14 | #15 | insights | slice | FR-19 | S-08 | M | todo |
+| S-15 | #16 | data-ownership-backup | slice | FR-21, FR-22 | S-08 | M | todo |
+| S-16 | #17 | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13, S-15 | M | todo |
 
 ## Items
 
