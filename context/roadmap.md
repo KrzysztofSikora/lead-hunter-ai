@@ -268,7 +268,14 @@ than building on it.
   kluczy / Co wymaga ręcznej weryfikacji" complete. Human checks on the Pi: install, reboot,
   scheduled run, memory and response-time measurements (NFR-01, NFR-02), offline behaviour.
 - Unknowns: better-sqlite3 prebuild on the operator's Pi OS (tech-stack).
-- Decided up front: -
+- Decided up front:
+  - `systemd` is the supported deployment (brief §13.1). Docker Compose is an **example only**,
+    not a gate and not a human check: `deploy/docker/Dockerfile` (multi-stage,
+    `node:24-bookworm-slim`, non-root) and `docker-compose.yml` (`restart: unless-stopped`,
+    `env_file: .env`, volume for `DATA_DIR`, port published as `127.0.0.1:8080:8080`,
+    healthcheck on `/api/health`), marked "przykład, nietestowany" in the README. Inside the
+    container the app listens on `0.0.0.0`, so the FR-20 AC2 rule applies: it refuses to start
+    without a password hash. (user)
 - Size: M
 
 ## Later
