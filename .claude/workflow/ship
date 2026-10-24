@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+# Take one roadmap item from plan to pull request without stopping for a person.
+#
+#   .claude/workflow/ship <S-01 | change-id | #issue> [--base <branch>] [--no-mutation] [--no-pr]
+#                         [--stops none|plan|checkpoint|all]
+#   .claude/workflow/ship <S-01 | change-id | #issue> --publish-only
+#
+# Every step is a fresh headless Claude Code session running one skill. Progress lives in the
+# artifacts (context/changes/<change-id>/), so re-running the same command resumes the item.
+# Decisions the agent made on its own are collected in the PR description for review.
+# --publish-only pushes the branch and opens or updates the PR from the existing pr-body.md,
+# without any session (use it when a run finished but publishing failed).
+# --stops (default WORKFLOW_STOPS, see config.sh) opens a draft PR early: after the plan review
+# and/or after a phase marked "(checkpoint)". Run ship again, or address-pr, to continue.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+# shellcheck source=lib.sh
+source .claude/workflow/lib.sh
+
+ITEM="" BASE="" MUTATION=1 OPEN_PR=1 PUBLISH_ONLY=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --base) BASE=$2; shift 2 ;;
+    --no-mutation) MUTATION=0; shift ;;
+    --no-pr) OPEN_PR=0; shift ;;
+    --publish-only) PUBLISH_ONLY=1; shift ;;
+    --stops) WORKFLOW_STOPS=$2; shift 2 ;;
+    -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
+    *) [ -z "$ITEM" ] || die "unexpected argument: $1"; ITEM=$1; shift ;;
+  esac
+done
+[ -n "$ITEM" ] || die "usage: ship <S-01 | change-id | #issue> [--base <branch>] [--no-mutation] [--no-pr] [--stops <list>] | --publish-only"
+check_stops
+[ "$PUBLISH_ONLY" -eq 0 ] || [ "$OPEN_PR" -eq 1 ] || die "--publish-only and --no-pr exclude each other"
+
+# ---------------------------------------------------------------------------- preflight
+# Everything that could need a person is checked here, before any work starts.
+
+command -v claude >/dev/null || die "claude CLI not found"
+git check-ignore -q .workflow/x || die ".workflow/ must be in .gitignore (run install.sh)"
+[ -z "$(git status --porcelain --untracked-files=no)" ] || die "tracked files have uncommitted changes; commit or stash first"
+IFS=$'\t' read -r CHANGE ROADMAP_ID ISSUE < <($WF resolve "$ITEM")
+[ -n "$CHANGE" ] || die "roadmap item '$ITEM' has no change-id"
+[ "$OPEN_PR" -eq 0 ] || check_remote_access
+if [ "$PUBLISH_ONLY" -eq 1 ]; then
+  git rev-parse --verify --quiet "change/$CHANGE" >/dev/null || die "no branch change/$CHANGE to publish"
+fi
+
+if [ -z "$BASE" ]; then
+  BASE=$(git symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##' || true)
+  [ -n "$BASE" ] || BASE=$(git rev-parse --verify --quiet main >/dev/null && echo main || echo master)
+fi
+if git rev-parse --verify --quiet "change/$CHANGE" >/dev/null; then
+  git switch --quiet "change/$CHANGE"   # resume
+else
+  git switch --quiet -c "change/$CHANGE" "$BASE"
+fi
+
+if [ "$PUBLISH_ONLY" -eq 1 ]; then
+  [ -s "context/changes/$CHANGE/pr-body.md" ] || die "no context/changes/$CHANGE/pr-body.md to publish"
+fi
+
+begin_run "$CHANGE" "Run summary: ship $CHANGE ($ROADMAP_ID), base $BASE, stops $WORKFLOW_STOPS"
+DRAFT_REASON=""
+
+if [ "$PUBLISH_ONLY" -eq 1 ]; then
+  publish_pr "$BASE"
+  exit 0
+fi
+
+# ---------------------------------------------------------------------------- pipeline
+
+pipeline() {
+  local ticked total verdict round=0 planned=0
+  read -r ticked total < <($WF progress "$CHANGE")
+  if [ "$total" -eq 0 ]; then
+    run_step plan "/plan $CHANGE" || return 1
+    planned=1
+  fi
+
+  # Plan review: author and reviewer iterate; leftover blockers go to the PR instead of stopping.
+  # Skipped on resume once a reviewed plan is being implemented.
+  verdict=$($WF verdict "$CHANGE" plan-review)
+  if [ -z "$verdict" ] || { [ "$ticked" -eq 0 ] && [ "$verdict" = "NEEDS CHANGES" ]; }; then
+    while :; do
+      round=$((round + 1))
+      run_step plan-review "/plan-review $CHANGE" || return 1
+      verdict=$($WF verdict "$CHANGE" plan-review)
+      note "plan review round $round: $verdict"
+      [ "$verdict" = "NEEDS CHANGES" ] || break
+      if [ "$round" -ge "$WORKFLOW_PLAN_REVIEW_ROUNDS" ]; then
+        DRAFT_REASON="Plan review still says NEEDS CHANGES after $round rounds. Nothing was implemented; review the plan in this PR."
+        return 0
+      fi
+      run_step plan "/plan $CHANGE revise" || return 1
+      planned=1
+    done
+  fi
+
+  # Plan stop: only right after this run wrote the plan, so running ship again continues.
+  if [ "$planned" -eq 1 ] && stops_on plan; then
+    STOPPED="plan"
+    DRAFT_REASON="Stopped after the plan, as asked (stops: $WORKFLOW_STOPS). Nothing is implemented yet. Comment on the decisions (e.g. \`D-3: take B\`) and run \`.claude/workflow/address-pr <this PR>\`, or run \`.claude/workflow/ship $CHANGE\` to implement the plan as it is."
+    note "plan stop: plan reviewed ($verdict), stopping before implementation"
+    return 0
+  fi
+
+  implement_loop || return 1
+  [ -z "$STOPPED" ] || return 0
+  if [ "$MUTATION" -eq 1 ] && [ ! -f "context/changes/$CHANGE/mutation.md" ]; then
+    run_step mutation "/mutation $CHANGE" || return 1
+  fi
+  review_loop "$WORKFLOW_REVIEW_ROUNDS"
+}
+
+pipeline || note "pipeline stopped: $FAILED"
+save_leftovers
+write_pr_body
+if [ "$OPEN_PR" -eq 1 ]; then
+  publish_pr "$BASE"
+else
+  note "--no-pr: description in context/changes/$CHANGE/pr-body.md"
+fi
