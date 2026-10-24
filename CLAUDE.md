@@ -69,10 +69,11 @@ fast ones per phase; `/review` runs all of them.
 | lint | `pnpm lint` | - |
 | unit tests | `pnpm test` | - |
 | image | `pnpm docker:build` | Docker |
-| e2e | decided in `/test-plan` | - |
-| mutation (one module) | decided in `/test-plan` | - |
+| e2e | `pnpm e2e` | Playwright Chromium (`pnpm exec playwright install chromium`) |
+| mutation (one module) | `pnpm mutation --mutate <file>` | - |
 
 Scripts are created by the first roadmap item (project scaffold). Until then the gates fail.
+Test strategy, recipes and mutation targets: `context/test-plan.md`.
 Checks on the real Raspberry Pi and against real sources/LLM APIs are human checks with
 evidence, never a gate.
 
