@@ -9,7 +9,7 @@ than building on it.
 ## Overview
 | ID | Issue | change-id | Type | Covers | Depends on | Size | Status |
 |----|-------|-----------|------|--------|------------|------|--------|
-| F-01 | - | repo-skeleton | foundation | C-01…C-08, FR-24 AC1–AC2, FR-25 AC3 | - | M | todo |
+| F-01 | #1 | repo-skeleton | foundation | C-01…C-08, FR-23 AC4, FR-24 AC1–AC2, FR-25 AC3 | - | M | todo |
 | S-01 | - | operator-login | slice | FR-20 | F-01 | M | todo |
 | S-02 | - | operator-profile | slice | FR-01 | S-01 | S | todo |
 | S-03 | - | manual-text-import | slice | FR-02, FR-06, FR-11 AC1, FR-12 | S-02 | M | todo |
@@ -31,7 +31,8 @@ than building on it.
 
 ### F-01 Repository skeleton (`repo-skeleton`)
 - Goal: a pnpm workspace in which every gate in `CLAUDE.md` exists and passes, an API that
-  answers `GET /api/health`, a database created from migrations, and an empty Polish UI shell.
+  answers `GET /api/health`, a database created from migrations, an empty Polish UI shell, and
+  the whole app running with `docker compose up --build` from the first item (D-14).
 - Covers: C-01…C-08; FR-24 AC1–AC2 (gitignore check, log redaction); FR-25 AC3 (OpenAPI matches
   routes); FR-20 AC5 (health without secrets).
 - Depends on: -
@@ -51,6 +52,11 @@ than building on it.
   - `.github/workflows/ci.yml`: install, typecheck, lint, test on every PR and push; a step that
     fails if `.env`, `*.db`, backups or logs are tracked.
   - `pnpm-workspace.yaml` lists `better-sqlite3` in `onlyBuiltDependencies`.
+  - `Dockerfile` (multi-stage, `node:24-bookworm-slim`, non-root, migrations on start) and
+    `docker-compose.yml` at the repo root: `restart: unless-stopped`, `env_file: .env`, volume
+    `./data:/data`, port `127.0.0.1:8080:8080`, healthcheck on `/api/health`, `init: true`.
+    `docker compose up --build` serves health and the UI shell (FR-23 AC4).
+  - CI builds the image on every PR; `make`-free gate `pnpm docker:build` (= `docker build .`).
   - CLAUDE.md *Gates* and *Commands* tables updated to the real scripts.
 - Unknowns: none blocking.
 - Decided up front:
@@ -263,15 +269,14 @@ than building on it.
 - Goal: install on the Pi from the README, auto-start, survive reboot, measured footprint.
 - Covers: FR-23 AC1–AC5, FR-26 AC1, NFR-01…NFR-04.
 - Depends on: S-12, S-13, S-15
-- Acceptance: PRD FR-23 AC1–AC5, FR-26 AC1; `deploy/docker/Dockerfile` and `docker-compose.yml`;
-  CI job building the image; README install for 64-bit Raspberry Pi OS with Docker and Tailscale serve; "Co działa / Co wymaga
+- Acceptance: PRD FR-23 AC1–AC3, AC5, FR-26 AC1; README install for 64-bit Raspberry Pi OS with Docker and Tailscale serve; "Co działa / Co wymaga
   kluczy / Co wymaga ręcznej weryfikacji" complete. Human checks on the Pi: install, reboot,
   scheduled run, memory and response-time measurements (NFR-01, NFR-02), offline behaviour.
 - Unknowns: image build time and RAM on the Pi (NFR-01 measured inside the container).
 - Decided up front:
-  - Docker Compose is the only deployment; no `systemd` unit for the app (D-14). The compose file
-    publishes `127.0.0.1:8080:8080` for Tailscale serve; an optional `ollama` service sits behind a
-    compose profile. (user)
+  - Docker Compose is the only deployment; no `systemd` unit for the app (D-14). Dockerfile and
+    compose exist since F-01; this item adds the ARM64 build on the Pi, Tailscale serve docs, an
+    optional `ollama` service behind a compose profile, and the measurements. (user)
 - Size: M
 
 ## Later

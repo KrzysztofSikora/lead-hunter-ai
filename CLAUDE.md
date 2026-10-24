@@ -68,6 +68,7 @@ fast ones per phase; `/review` runs all of them.
 | typecheck | `pnpm typecheck` | - |
 | lint | `pnpm lint` | - |
 | unit tests | `pnpm test` | - |
+| image | `pnpm docker:build` | Docker |
 | e2e | decided in `/test-plan` | - |
 | mutation (one module) | decided in `/test-plan` | - |
 
@@ -77,5 +78,5 @@ evidence, never a gate.
 
 ## Commands
 
-Filled in by the scaffold item. The PRD expects: `pnpm install`, `pnpm dev`, `pnpm test`,
+Filled in by the scaffold item. Run the app: `docker compose up --build` (D-14). The PRD expects: `pnpm install`, `pnpm dev`, `pnpm test`,
 `pnpm typecheck`, `pnpm build`, `pnpm db:migrate`, `pnpm discover`.

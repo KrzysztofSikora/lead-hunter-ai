@@ -139,6 +139,7 @@ Versions verified on 2026-10-24 with `npm view` against the npm registry. Pin ex
 - Strongest case against: `systemd` (the brief's base) uses ~100–150 MB less RAM and no Docker
   daemon. We accept Docker because the operator runs everything in Docker and the image removes
   the better-sqlite3 build risk on the host.
+- Dockerfile and compose live at the repo root from F-01; every slice runs in the container.
 - CI builds the image (`docker build`, amd64) on every PR so a broken Dockerfile is caught; the
   arm64 build happens on the Pi (`docker compose up -d --build`). Revisit: publish arm64 images
   from CI if the build on the Pi is too slow.
