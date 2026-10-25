@@ -24,6 +24,36 @@ function amountsIn(text: string): Set<number> {
   return amounts;
 }
 
+const CURRENCY_TOKEN = /(?<!\p{L})(PLN|zł|EUR|€|USD|\$)(?!\p{L})/giu;
+const CURRENCY_OF: Record<string, string> = {
+  pln: 'PLN',
+  zł: 'PLN',
+  eur: 'EUR',
+  '€': 'EUR',
+  usd: 'USD',
+  $: 'USD',
+};
+
+/** The quote must be spelled with the budget's currency, and only with it. */
+function quoteCurrencyMatches(quote: string, currency: string): boolean {
+  const tokens = [...quote.matchAll(CURRENCY_TOKEN)].map((m) => CURRENCY_OF[m[1]!.toLowerCase()]);
+  return tokens.length > 0 && tokens.every((token) => token === currency);
+}
+
+/** True when some occurrence of the quote starts and ends outside a longer number in the text. */
+function quoteIsWholeNumber(haystack: string, quote: string): boolean {
+  const needle = squash(quote);
+  const first = needle.search(/\d/);
+  const last = needle.search(/\d(?!.*\d)/);
+  if (first < 0) return false;
+  for (let at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + 1)) {
+    const before = haystack.slice(0, at + first);
+    const after = haystack.slice(at + last + 1);
+    if (!/\d[ .,]?$/.test(before) && !/^[ .,]?\d/.test(after)) return true;
+  }
+  return false;
+}
+
 /** The quote is the evidence for the amounts: both must be readable in it. */
 function quoteStates(budget: { minMinor: number; maxMinor: number; quote: string }): boolean {
   const amounts = amountsIn(budget.quote);
@@ -58,6 +88,12 @@ export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): 
     sourceBudget = null;
   } else if (sourceBudget && !quoteStates(sourceBudget)) {
     notes.push('Usunięto budżet ze źródła: cytat nie zawiera podanych kwot.');
+    sourceBudget = null;
+  } else if (sourceBudget && !quoteCurrencyMatches(sourceBudget.quote, sourceBudget.currency)) {
+    notes.push('Usunięto budżet ze źródła: waluta nie zgadza się z cytatem.');
+    sourceBudget = null;
+  } else if (sourceBudget && !quoteIsWholeNumber(haystack, sourceBudget.quote)) {
+    notes.push('Usunięto budżet ze źródła: cytat zaczyna się lub kończy w środku liczby.');
     sourceBudget = null;
   }
 

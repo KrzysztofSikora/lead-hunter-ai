@@ -36,6 +36,37 @@ describe('guardAnalysis: source budget (TR-01)', () => {
     expect(notes.join(' ')).toContain('kwot');
   });
 
+  it('drops a quote cut from the middle of a number', () => {
+    const base = analysis({
+      sourceBudget: { minMinor: 50_000, maxMinor: 50_000, currency: 'PLN', quote: '500 zł' },
+    });
+    const { result, notes } = guardAnalysis(base, 'Szukam programisty. Budżet 1 500 zł za całość.');
+    expect(result.verdict === 'ANALYSED' && result.sourceBudget).toBeNull();
+    expect(notes.join(' ')).toContain('środku liczby');
+  });
+
+  it('keeps a quote that is a whole number in the source', () => {
+    const base = analysis({
+      sourceBudget: { minMinor: 150_000, maxMinor: 150_000, currency: 'PLN', quote: '1 500 zł' },
+    });
+    const { result } = guardAnalysis(base, 'Szukam programisty. Budżet 1 500 zł za całość.');
+    expect(result.verdict === 'ANALYSED' && result.sourceBudget?.minMinor).toBe(150_000);
+  });
+
+  it('drops a budget whose currency differs from the quote', () => {
+    const base = analysis({
+      sourceBudget: {
+        minMinor: 800_000,
+        maxMinor: 1_200_000,
+        currency: 'EUR',
+        quote: 'budżet 8000-12000 PLN',
+      },
+    });
+    const { result, notes } = guardAnalysis(base, 'Szukam kogoś. budżet 8000-12000 PLN, pilne.');
+    expect(result.verdict === 'ANALYSED' && result.sourceBudget).toBeNull();
+    expect(notes.join(' ')).toContain('waluta');
+  });
+
   it('drops an empty quote and an empty source fact', () => {
     const base = quoted('');
     const withFact = { ...base, sourceFacts: ['  '] };
