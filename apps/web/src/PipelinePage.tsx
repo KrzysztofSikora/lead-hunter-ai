@@ -25,7 +25,8 @@ function useLoad(): Load {
   return load;
 }
 
-function Item({ item }: { item: PipelineItem }) {
+/** One pipeline row; Today (S-13) lists its due follow-ups with it. */
+export function Item({ item }: { item: PipelineItem }) {
   return (
     <li className={styles.item}>
       <Link to={`/okazje/${item.id}`}>{item.title}</Link>
@@ -39,33 +40,6 @@ function Item({ item }: { item: PipelineItem }) {
           .join(' · ')}
       </span>
     </li>
-  );
-}
-
-/** S-08 D-8: follow-ups due today or overdue, shown on the start view until S-13's Today brief. */
-export function DueFollowUps() {
-  const load = useLoad();
-  if (load.state === 'loading') return null;
-  if (load.state === 'error') {
-    return (
-      <p role="alert" className={styles.error}>
-        {t.dueLoadFailed}
-      </p>
-    );
-  }
-  return (
-    <section aria-labelledby="due-title">
-      <h2 id="due-title">{t.dueTitle}</h2>
-      {load.data.followUpsDue.length === 0 ? (
-        <p className={styles.muted}>{t.dueNone}</p>
-      ) : (
-        <ul className={styles.list}>
-          {load.data.followUpsDue.map((item) => (
-            <Item key={item.id} item={item} />
-          ))}
-        </ul>
-      )}
-    </section>
   );
 }
 

@@ -15,6 +15,7 @@ import { createHealthProbe } from './infrastructure/db/health-probe.js';
 import { runMigrations } from './infrastructure/db/migrate.js';
 import { createPaymentRepository } from './infrastructure/db/payment-repository.js';
 import { createOpportunityRepository } from './infrastructure/db/opportunity-repository.js';
+import { createDigestRepository } from './infrastructure/db/digest-repository.js';
 import { createPipelineRepository } from './infrastructure/db/pipeline-repository.js';
 import { createProfileRepository } from './infrastructure/db/profile-repository.js';
 import { createSignalRepository } from './infrastructure/db/signal-repository.js';
@@ -124,6 +125,11 @@ async function main(): Promise<void> {
       clock,
     },
     pipeline: { repository: createPipelineRepository(db), clock },
+    digest: {
+      repository: createDigestRepository(db),
+      pipeline: createPipelineRepository(db),
+      clock,
+    },
     analysis: runner,
     sources: sourceRuntime.service,
     jobs: sourceRuntime.jobs,

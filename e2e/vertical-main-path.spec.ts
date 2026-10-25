@@ -10,10 +10,10 @@ Praca zdalna, budżet 6000-9000 PLN, start od zaraz. Zapłacimy za wykonanie int
 
 // Evidence screenshots are written only on request (`E2E_EVIDENCE=1 pnpm e2e`), so a plain
 // gate run never rewrites committed evidence.
-async function evidence(page: Page, name: string) {
+async function evidence(page: Page, name: string, directory = EVIDENCE) {
   if (process.env.E2E_EVIDENCE === '1') {
     await page.screenshot({
-      path: `${EVIDENCE}/${name}`,
+      path: `${directory}/${name}`,
       fullPage: true,
       type: 'jpeg',
       quality: 55,
@@ -76,11 +76,12 @@ test('main path: import, analysis, card, contact with follow-up, payment, pipeli
   await expect(page.getByText(/1\s500,00 PLN/)).toBeVisible();
   await assertNoOverflow(page);
 
-  await page.getByRole('link', { name: 'Start' }).click();
+  await page.getByRole('link', { name: 'Dziś' }).click();
+  await expect(page.getByText(/Nowe sygnały: \d+/)).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Na dziś: follow-up' })).toBeVisible();
   await expect(page.getByRole('link', { name: TITLE })).toBeVisible();
   await assertNoOverflow(page);
-  await evidence(page, 'today-360.jpg');
+  await evidence(page, 'today-360.jpg', 'context/changes/today-brief/evidence');
 
   await page.getByRole('link', { name: 'Lejek' }).click();
   const totals = page.getByRole('term').filter({ hasText: /./ });

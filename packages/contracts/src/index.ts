@@ -106,3 +106,4 @@ export {
   JobTrigger,
   RetryAnalysisResult,
 } from './jobs.js';
+export { DigestItem, DigestQuery, DigestToday, WEAK_CATEGORIES, WEAK_EVIDENCE } from './digest.js';

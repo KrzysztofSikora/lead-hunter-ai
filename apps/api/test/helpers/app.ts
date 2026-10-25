@@ -14,6 +14,7 @@ import type { LlmProvider } from '../../src/modules/analysis/ports.js';
 import { createProfileService } from '../../src/modules/profile/service.js';
 import { createPaymentRepository } from '../../src/infrastructure/db/payment-repository.js';
 import { createOpportunityRepository } from '../../src/infrastructure/db/opportunity-repository.js';
+import { createDigestRepository } from '../../src/infrastructure/db/digest-repository.js';
 import { createPipelineRepository } from '../../src/infrastructure/db/pipeline-repository.js';
 import { createProfileRepository } from '../../src/infrastructure/db/profile-repository.js';
 import { createSignalRepository } from '../../src/infrastructure/db/signal-repository.js';
@@ -163,6 +164,11 @@ export async function buildTestApp(
       clock,
     },
     pipeline: { repository: createPipelineRepository(db), clock },
+    digest: {
+      repository: createDigestRepository(db),
+      pipeline: createPipelineRepository(db),
+      clock,
+    },
     analysis: runner,
     sources: sourceRuntime.service,
     jobs: sourceRuntime.jobs,

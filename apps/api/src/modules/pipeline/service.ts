@@ -14,7 +14,7 @@ export interface PipelineDeps {
   clock: Clock;
 }
 
-const toItem = (row: PipelineItemRow): PipelineItem => ({
+export const toItem = (row: PipelineItemRow): PipelineItem => ({
   id: row.id,
   title: row.title,
   businessStatus: row.businessStatus,
