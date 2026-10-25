@@ -48,7 +48,7 @@ export interface OfferDrafter {
 export interface OfferDraftRow {
   id: number;
   opportunityId: number;
-  /** `FAILED` is internal and never leaves the repository's `current`/`history`. */
+  /** `FAILED` is internal and never leaves the repository's `current`. */
   status: 'DRAFT' | 'REVIEWED' | 'COPIED_OR_EXPORTED' | 'SENT_MANUALLY' | 'FAILED';
   language: string;
   subject: string;
@@ -88,8 +88,6 @@ export interface OfferDraftRepository {
   get(id: number): OfferDraftRow | undefined;
   /** The newest non-`FAILED` draft of the opportunity. */
   current(opportunityId: number): OfferDraftRow | undefined;
-  /** Non-`FAILED` drafts older than the current one, newest first. */
-  history(opportunityId: number, limit: number): OfferDraftRow[];
   /** Attempts (failed ones included) created at or after `at`. */
   countSince(at: number): number;
   /** Conditional on the status still being `expected`; false when it no longer is. */

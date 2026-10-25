@@ -452,6 +452,9 @@ describe('nothing leaves the machine but the LLM call (FR-13 AC4)', () => {
       for (const step of steps) expect((await act(step)).statusCode).toBe(200);
 
       expect(origins).toEqual([llm]);
+      expect(
+        (mocks as unknown as { pendingInterceptors(): unknown[] }).pendingInterceptors(),
+      ).toEqual([]);
     } finally {
       setGlobalDispatcher(mocks);
     }

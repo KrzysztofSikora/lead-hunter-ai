@@ -247,10 +247,11 @@ export function createOfferService(deps: OfferDeps): OfferService {
         usage: billed.usage,
         cost: billed.cost,
       });
-      moveForward(opportunityId, 'OFFER_DRAFTED');
     } catch {
       return fail('internal_error', billed);
     }
+    // Outside the try: the call is already stored once; a failure here must not bill it twice.
+    moveForward(opportunityId, 'OFFER_DRAFTED');
     const detail = deps.detail(opportunityId);
     return detail ? { result: 'ok', detail } : { result: 'not_found' };
   }

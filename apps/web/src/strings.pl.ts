@@ -150,7 +150,7 @@ export const strings = {
     bestNone: 'brak',
     cost: 'Koszt analizy dzisiaj: brak danych',
     tokens: (input: number | null, output: number | null, reported: number, analyses: number) =>
-      `tokeny${reported < analyses ? ` (${reported} z ${analyses} analiz)` : ''}: wejście ${input ?? 'brak danych'}, wyjście ${output ?? 'brak danych'}`,
+      `tokeny${reported < analyses ? ` (${reported} z ${analyses} wywołań LLM)` : ''}: wejście ${input ?? 'brak danych'}, wyjście ${output ?? 'brak danych'}`,
     dueTitle: 'Na dziś: follow-up',
     dueNone: 'Brak follow-upów na dziś.',
     sourceErrorsTitle: 'Błędy źródeł',

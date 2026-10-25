@@ -53,14 +53,13 @@ function setup() {
 }
 
 describe('offer draft repository (S-07 D-1)', () => {
-  it('the newest non-failed row is current, older ones are history, failed ones are neither', () => {
+  it('the newest non-failed row is current, failed ones are never current', () => {
     const { repo, id } = setup();
-    const first = repo.insert(draft(id, { subject: 'first' }), 100);
+    repo.insert(draft(id, { subject: 'first' }), 100);
     const second = repo.insert(draft(id, { subject: 'second' }), 200);
     repo.insert(draft(id, { status: 'FAILED', error: 'not_json' }), 300);
 
     expect(repo.current(id)?.id).toBe(second);
-    expect(repo.history(id, 20).map((d) => d.id)).toEqual([first]);
     expect(repo.countSince(0)).toBe(3);
     expect(repo.countSince(250)).toBe(1);
   });

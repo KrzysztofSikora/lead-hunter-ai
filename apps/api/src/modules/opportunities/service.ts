@@ -8,6 +8,7 @@ import {
   upgradeStoredAnalysis,
   type FollowUpRequest,
   type NoteRequest,
+  type OfferDraftStatus,
   type PaymentRequest,
   type OpportunityDetail,
   type OpportunityList,
@@ -223,7 +224,7 @@ const toOfferDraft = (row: OfferDraftRow): NonNullable<OpportunityDetail['offerD
 
 const toOfferHistory = (row: OfferDraftRow): OpportunityDetail['offerDraftHistory'][number] => ({
   id: row.id,
-  status: toOfferDraft(row).status,
+  status: row.status as OfferDraftStatus,
   language: row.language,
   subject: row.subject,
   message: row.messageMarkdown,

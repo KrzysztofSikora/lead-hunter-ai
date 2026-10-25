@@ -48,17 +48,6 @@ export function createOfferDraftRepository(db: BetterSQLite3Database): OfferDraf
         .get();
       return row ? toOfferDraftRow(row) : undefined;
     },
-    history(opportunityId, limit) {
-      return db
-        .select()
-        .from(offerDrafts)
-        .where(usable(opportunityId))
-        .orderBy(desc(offerDrafts.id))
-        .limit(limit)
-        .offset(1)
-        .all()
-        .map(toOfferDraftRow);
-    },
     countSince(at) {
       return (
         db.select({ value: count() }).from(offerDrafts).where(gte(offerDrafts.createdAt, at)).get()
