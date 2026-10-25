@@ -54,7 +54,7 @@ Gates: typecheck ok, lint ok, unit tests ok (34 files, 406 tests), e2e ok (4 tes
 - Fix: keep separate `noteText` / `rejectNote` state, or clear `text` in `open()` when the panel changes.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (e613c90)
 
 ### R2: Card rewrite dropped source fields without a deviation and left dead strings and CSS
 - Severity: minor
@@ -63,7 +63,7 @@ Gates: typecheck ok, lint ok, unit tests ok (34 files, 406 tests), e2e ok (4 tes
 - Fix: add the four source fields to element 2 as untagged app records (or `source` for type), and delete the unused keys and the `.components` rule. Option B: log the removal as a `[minor]` deviation and only delete the dead code.
 - Effort: small
 - Lesson candidate: When a rewrite removes something the UI used to show, log it as a deviation and delete what it orphaned.
-- Decision: open
+- Decision: fixed (2a566ec; dead code removed, source fields not restored: logged in plan.md, FOLLOW-UP for availability)
 
 ### R3: Pricing assumptions tagged `szacunek (hipoteza)`, against the plan's tag rule
 - Severity: minor
@@ -72,7 +72,7 @@ Gates: typecheck ok, lint ok, unit tests ok (34 files, 406 tests), e2e ok (4 tes
 - Fix: tag it `inference` and move it to the inference list in the test. Option B: keep `estimate` and record it as a `[minor]` deviation.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (ed95999)
 
 ### R4: Excerpt cut at 600 UTF-16 units can split an emoji
 - Severity: minor
@@ -81,7 +81,7 @@ Gates: typecheck ok, lint ok, unit tests ok (34 files, 406 tests), e2e ok (4 tes
 - Fix: `const chars = Array.from(source.snippet); excerpt = chars.slice(0, 600).join(''); rest = chars.length > 600`. Add an emoji case to the long-text test.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (ed95999)
 
 ### R5: Plan-review #5 (where `operatorMoves` lives) neither applied nor logged
 - Severity: minor
@@ -90,7 +90,7 @@ Gates: typecheck ok, lint ok, unit tests ok (34 files, 406 tests), e2e ok (4 tes
 - Fix: add "D: `allowedMoves` computed in the API and carried in `OpportunityDetail` (keeps the rule out of the client; one more DTO field)" to D-6's alternatives.
 - Effort: small
 - Lesson candidate: no (covered by the existing lesson)
-- Decision: open
+- Decision: fixed (plan.md D-6 alternatives)
 
 ### R6: System-event cause is typed `object` and stored unchecked
 - Severity: minor
@@ -99,7 +99,7 @@ Gates: typecheck ok, lint ok, unit tests ok (34 files, 406 tests), e2e ok (4 tes
 - Fix: type the parameter as `ActivityCause` (from `@lead-hunter/contracts`) so the compiler checks it. Optionally run `ActivityCause.parse(cause)` before the insert.
 - Effort: small
 - Lesson candidate: no (covered by the existing lesson)
-- Decision: open
+- Decision: fixed (bf19ec6)
 
 ### R7: The open note form is not checked for horizontal overflow
 - Severity: minor
@@ -108,4 +108,4 @@ Gates: typecheck ok, lint ok, unit tests ok (34 files, 406 tests), e2e ok (4 tes
 - Fix: call `await assertNoOverflow(page)` after `getByLabel('Notatka', { exact: true })` is visible, before filling it.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (a315fbd)
