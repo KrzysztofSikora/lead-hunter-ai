@@ -17,7 +17,7 @@ than building on it.
 | S-03 | #4 | manual-text-import | slice | FR-02, FR-06, FR-11 AC1, FR-12 | S-02 | M | done |
 | S-04 | #5 | analysis-and-scoring | slice | FR-07, FR-08 (mock), FR-10 | S-03 | L | done |
 | S-05 | #6 | llm-providers | slice | FR-08 AC1–AC4, AC7, FR-09, FR-24 AC3 | S-04 | M | todo |
-| S-06 | #7 | opportunity-card | slice | FR-11 AC2–AC4 | S-04 | M | in-progress |
+| S-06 | #7 | opportunity-card | slice | FR-11 AC2–AC4 | S-04 | M | review |
 | S-07 | #8 | offer-drafts | slice | FR-13 | S-05, S-06 | M | todo |
 | S-08 | #9 | pipeline-and-payments | slice | FR-14, FR-15 | S-06 | M | todo |
 | S-09 | #10 | url-import-guard | slice | FR-03 | S-03 | M | todo |
