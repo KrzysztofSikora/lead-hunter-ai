@@ -46,6 +46,8 @@ export const sources = sqliteTable(
     configKey: text('config_key').notNull().unique(),
     presetId: text('preset_id'),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /** S-17 D-1: `SourceFilter` JSON; `NULL` reads as off and empty. */
+    filterJson: text('filter_json'),
     /** D-3: adapter-owned JSON, e.g. `{ seen: [...] }`. */
     cursorJson: text('cursor_json'),
     /** D-5: the earliest time the next attempt may start (UTC epoch ms). */

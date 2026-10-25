@@ -1,15 +1,18 @@
-import type {
-  CreateSourceRequest,
-  Source,
-  SourceHealth,
-  SourceList,
-  SourceRunResult,
+import {
+  SourceFilter,
+  type CreateSourceRequest,
+  type Source,
+  type SourceHealth,
+  type SourceList,
+  type SourceRunResult,
+  type UpdateSourceRequest,
 } from '@lead-hunter/contracts';
 import type { Clock } from '../shared/clock.js';
 import { canonicalizeUrl, contentHash, normaliseSnippet } from '../signals/identity.js';
 import { ingest } from '../signals/ingest.js';
 import type { SignalRepository } from '../signals/ports.js';
-import { MANUAL_ACCESS_NOTE, PRESETS } from './presets.js';
+import { MANUAL_ACCESS_NOTE, PRESETS, WITHDRAWN_PRESETS } from './presets.js';
+import { readFilter } from './source-filter.js';
 import type {
   AdapterOutcome,
   AttemptOutcome,
@@ -54,7 +57,8 @@ export type CheckOutcome = { kind: 'done'; health: SourceHealth } | Refusal;
 export interface SourceService {
   list(): SourceList;
   create(request: CreateSourceRequest): CreateOutcome;
-  setEnabled(id: number, enabled: boolean): Source | undefined;
+  /** D-13: `filter` replaces the whole filter; it is validated before it is stored. */
+  update(id: number, patch: UpdateSourceRequest): Source | undefined;
   run(id: number, context?: RunContext): Promise<RunOutcome>;
   check(id: number): Promise<CheckOutcome>;
   /**
@@ -99,7 +103,9 @@ export function createSourceService({
   logger,
 }: SourceDeps): SourceService {
   const toSource = (record: SourceRecord): Source => {
-    const preset = PRESETS.find((candidate) => candidate.id === record.presetId);
+    const offered = PRESETS.find((candidate) => candidate.id === record.presetId);
+    const preset =
+      offered ?? WITHDRAWN_PRESETS.find((candidate) => candidate.id === record.presetId);
     return {
       id: record.id,
       type: record.type,
@@ -109,6 +115,8 @@ export function createSourceService({
       accessNote: preset?.accessNote ?? MANUAL_ACCESS_NOTE,
       termsUrl: preset?.termsUrl ?? null,
       enabled: record.enabled,
+      filter: readFilter(record.filterJson).filter,
+      presetWithdrawn: preset !== undefined && offered === undefined,
       lastAttemptAt: record.lastAttemptAt === null ? null : iso(record.lastAttemptAt),
       lastSuccessAt: record.lastSuccessAt === null ? null : iso(record.lastSuccessAt),
       lastError:
@@ -315,11 +323,13 @@ export function createSourceService({
       let name: string;
       let url: string;
       let presetId: string | null = null;
+      let filterJson: string | null = null;
       if ('preset' in request) {
         const preset = PRESETS.find((candidate) => candidate.id === request.preset);
         if (!preset) return { kind: 'unknown_preset' };
         ({ name, url } = preset);
         presetId = preset.id;
+        filterJson = JSON.stringify(preset.filter);
       } else {
         ({ name, url } = request);
       }
@@ -330,13 +340,23 @@ export function createSourceService({
         configJson: JSON.stringify(checked.config),
         configKey: checked.key,
         presetId,
+        filterJson,
         at: clock.now().getTime(),
       });
       return inserted ? { kind: 'created', source: toSource(inserted) } : { kind: 'exists' };
     },
 
-    setEnabled(id, enabled) {
-      const updated = repository.setEnabled(id, enabled, clock.now().getTime());
+    update(id, patch) {
+      // Lesson: validate before storing, not only on read.
+      const filter = patch.filter === undefined ? undefined : SourceFilter.parse(patch.filter);
+      const updated = repository.update(
+        id,
+        {
+          ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
+          ...(filter === undefined ? {} : { filterJson: JSON.stringify(filter) }),
+        },
+        clock.now().getTime(),
+      );
       return updated ? toSource(updated) : undefined;
     },
 

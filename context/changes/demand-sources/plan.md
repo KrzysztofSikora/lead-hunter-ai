@@ -338,7 +338,7 @@ left `PENDING` half-filtered.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Demand-only presets and filter configuration
+- [x] Phase 1: Demand-only presets and filter configuration
 - [ ] Phase 2: Filter at discovery and visible counts
 - [ ] Phase 3: Sources view, reason text and source policy
 
@@ -354,6 +354,12 @@ left `PENDING` half-filtered.
   branch would duplicate `de8127f` and conflict with `main`. The PR should be rebased onto (or
   merged with) `origin/main` before merging, and the status set then. Alternative: rebase the
   branch now (refused by the run rules).
+- [minor] Phase 1: plan says `readFilter(json | null): SourceFilter`; code returns
+  `{ filter, invalid }` so `service.run` (Phase 2) can log `source_filter_invalid` (D-18) without
+  re-parsing. Consequence: callers read `.filter`. No behaviour change.
+- [minor] Phase 1: `setEnabled` became `update` on both `SourceRepository` and `SourceService`;
+  the web `setSourceEnabled` became `updateSource(id, patch)` already in this phase (one call site
+  in `SourcesPage.tsx`) so the build stays green. Phase 3 does not need to rename it again.
 - [FOLLOW-UP] elektroda.pl "Projektowanie Bazar" preset: check from a machine with internet
   whether forum 392 has an RSS feed that robots.txt and the terms allow, and add it to
   `presets.ts` if so (D-10).

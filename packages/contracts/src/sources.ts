@@ -27,6 +27,26 @@ const feedUrl = z
 export const RssConfig = z.object({ url: feedUrl }).strict();
 export type RssConfig = z.infer<typeof RssConfig>;
 
+const FILTER_PHRASE_MAX_CHARS = 100;
+const FILTER_LIST_MAX = 30;
+
+const filterPhrases = z
+  .array(z.string().trim().min(1).max(FILTER_PHRASE_MAX_CHARS))
+  .max(FILTER_LIST_MAX)
+  .refine(
+    (phrases) => new Set(phrases.map((phrase) => phrase.toLowerCase())).size === phrases.length,
+    { message: 'Fraza występuje więcej niż raz.' },
+  );
+
+/**
+ * S-17 D-2, D-16: the per-source noise filter. No `.transform()`: this schema is reachable from
+ * response schemas, which are encoded and cannot hold a unidirectional transform.
+ */
+export const SourceFilter = z
+  .object({ enabled: z.boolean(), include: filterPhrases, exclude: filterPhrases })
+  .strict();
+export type SourceFilter = z.infer<typeof SourceFilter>;
+
 /** D-11: a ready-made source the operator adds in one step. */
 export const SourcePreset = z
   .object({
@@ -35,6 +55,7 @@ export const SourcePreset = z
     url: z.string(),
     accessNote: z.string(),
     termsUrl: z.string(),
+    filter: SourceFilter,
   })
   .strict();
 export type SourcePreset = z.infer<typeof SourcePreset>;
@@ -50,6 +71,10 @@ export const Source = z
     accessNote: z.string(),
     termsUrl: z.string().nullable(),
     enabled: z.boolean(),
+    /** S-17 D-1: off and empty when none was stored. */
+    filter: SourceFilter,
+    /** S-17 D-7: the preset is no longer offered; the source keeps working. */
+    presetWithdrawn: z.boolean(),
     lastAttemptAt: isoInstant.nullable(),
     lastSuccessAt: isoInstant.nullable(),
     lastError: z
@@ -78,7 +103,13 @@ export const CreateSourceRequest = z.union([
 ]);
 export type CreateSourceRequest = z.infer<typeof CreateSourceRequest>;
 
-export const UpdateSourceRequest = z.object({ enabled: z.boolean() }).strict();
+/** S-17 D-13: `filter` replaces the whole filter. */
+export const UpdateSourceRequest = z
+  .object({ enabled: z.boolean().optional(), filter: SourceFilter.optional() })
+  .strict()
+  .refine((body) => body.enabled !== undefined || body.filter !== undefined, {
+    message: 'Podaj enabled lub filter.',
+  });
 export type UpdateSourceRequest = z.infer<typeof UpdateSourceRequest>;
 
 /** D-10: the outcome of one run; `failed` counts entries that could not be mapped. */

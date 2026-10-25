@@ -6,7 +6,7 @@ import {
   createSource,
   listSources,
   runSource,
-  setSourceEnabled,
+  updateSource,
   type CreateOutcome,
   type Outcome,
 } from './api/sources.js';
@@ -89,7 +89,7 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
     setPending('toggle');
     setMessage(null);
     try {
-      await setSourceEnabled(source.id, !source.enabled);
+      await updateSource(source.id, { enabled: !source.enabled });
       onChanged();
     } catch {
       setMessage({ kind: 'error', text: t.toggleFailed });

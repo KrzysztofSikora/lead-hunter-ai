@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>DEMO Freelancer projects (synthetic)</title>
+    <link>https://www.freelancer.com/</link>
+    <description>DEMO synthetic fixture, not a recording</description>
+    <item>
+      <title>DEMO: Arduino temperature logger</title>
+      <link>https://www.freelancer.com/projects/demo/arduino-temperature-logger</link>
+      <description>Need an Arduino sketch that logs temperature to an SD card every minute. Budget: 150-250 EUR. Skills: Arduino, C Programming, Electronics.</description>
+      <pubDate>Tue, 06 Oct 2026 07:45:00 GMT</pubDate>
+      <guid>https://www.freelancer.com/projects/demo/arduino-temperature-logger</guid>
+    </item>
+    <item>
+      <title>DEMO: Raspberry Pi kiosk setup</title>
+      <link>https://www.freelancer.com/projects/demo/raspberry-pi-kiosk</link>
+      <description>Set up a Raspberry Pi 4 as a read-only kiosk. Skills: Linux, Raspberry Pi.</description>
+      <pubDate>Tue, 06 Oct 2026 08:10:00 GMT</pubDate>
+      <guid>https://www.freelancer.com/projects/demo/raspberry-pi-kiosk</guid>
+    </item>
+  </channel>
+</rss>

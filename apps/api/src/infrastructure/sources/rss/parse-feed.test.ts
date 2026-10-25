@@ -32,6 +32,31 @@ describe('parseFeed (S-10 D-12, D-13, TR-17)', () => {
     );
   });
 
+  it('maps a Freelancer.com item and keeps the budget line as source text (S-17 D-12)', () => {
+    const { items } = parse('synthetic-freelancer.xml', 'https://www.freelancer.com/rss.xml');
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({
+      title: 'DEMO: Arduino temperature logger',
+      url: 'https://www.freelancer.com/projects/demo/arduino-temperature-logger',
+      publishedAt: Date.parse('2026-10-06T07:45:00Z'),
+    });
+    expect(items[0]?.text).toContain('Budget: 150-250 EUR');
+  });
+
+  it('maps a Discourse category item: CDATA HTML stripped, topic guid as key (S-17 D-12)', () => {
+    const { items } = parse('synthetic-discourse.xml', 'https://forum.example.test/c/jobs/42.rss');
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatchObject({
+      key: 'forum.example.test-topic-900001',
+      url: 'https://forum.example.test/t/demo-lora-sensor/900001',
+      title: 'DEMO: Looking for an engineer to finish a LoRa sensor board',
+      publishedAt: Date.parse('2026-10-07T06:00:00Z'),
+    });
+    expect(items[0]?.text).toContain('Paid, fixed price.');
+    expect(items[0]?.text).not.toMatch(/<\/?(p|a)\b/);
+    expect(items[1]?.title).toContain('[FOR HIRE]');
+  });
+
   it('decodes escaped HTML in description', () => {
     const { items } = parse('synthetic-hnrss-freelance.xml', 'https://hnrss.org/x');
     expect(items[1]?.text).toBe(
