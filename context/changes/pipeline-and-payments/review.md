@@ -58,7 +58,7 @@ Gates: typecheck ok, lint ok, unit tests ok (36 files, 441 tests), e2e ok (5 tes
 - Fix: make leaving `NEEDS_VERIFICATION` a main-path move from rank 0: `forward` with `skipped` = the main stages before the target (so `NEEDS_VERIFICATION → MEETING` records `QUALIFIED…REPLIED`, `CONTACTED` included), and refuse `WON`/`LOST` from it as today. Option B (stricter, closes the note bypass too): from `NEEDS_VERIFICATION`, `REJECTED` and `EXPIRED` allow only main targets up to `CONTACTED`, so later stages always pass through a recorded contact. Either way add the two-step cases to `status.test.ts` and record the choice as a *Decisions* row (it changes D-1).
 - Effort: small
 - Lesson candidate: "When a rule has side doors (states reachable from anywhere), test the rule's invariants over two-step paths, not just single moves."
-- Decision: open
+- Decision: fixed (c625db4, 1ac47dc) + lesson proposed
 
 ### R2: The `GET /api/pipeline` contract has no `costly` decision, so it misses *Decisions to confirm*
 - Severity: major
@@ -67,7 +67,7 @@ Gates: typecheck ok, lint ok, unit tests ok (36 files, 441 tests), e2e ok (5 tes
 - Fix: set D-8 and D-9 (and D-11, which shapes `stages`/`otherCounts`) to `costly (public API: PipelineResponse)`; the shape already lives in one file (`packages/contracts/src/pipeline.ts`).
 - Effort: small
 - Lesson candidate: no (covered by the existing lesson)
-- Decision: open
+- Decision: fixed (plan.md: D-8, D-9, D-11 now costly)
 
 ### R3: WON contract dates are dropped without a word when no value is entered
 - Severity: minor
@@ -76,7 +76,7 @@ Gates: typecheck ok, lint ok, unit tests ok (36 files, 441 tests), e2e ok (5 tes
 - Fix: if either date is set and the value is empty, show an error (e.g. "Podaj wartość umowy, aby zapisać daty.") instead of submitting.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (4c343f0)
 
 ### R4: The e2e pipeline totals assert substrings, so wrong counts would still pass
 - Severity: minor
@@ -85,7 +85,7 @@ Gates: typecheck ok, lint ok, unit tests ok (36 files, 441 tests), e2e ok (5 tes
 - Fix: assert the `dd` exactly, e.g. `page.locator('dt', { hasText: 'Wygrane' }).locator('xpath=following-sibling::dd[1]')` with `toHaveText('0')` (and for "Opłacone", the leading count with a regex `^1\b`).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (089b2f3)
 
 ### R5: A status move clears the follow-up without a history entry
 - Severity: minor
@@ -94,4 +94,4 @@ Gates: typecheck ok, lint ok, unit tests ok (36 files, 441 tests), e2e ok (5 tes
 - Fix: when the move clears a non-null `follow_up_at`, add `followUpCleared: true` to that status event's metadata (or insert a `FOLLOW_UP` `{ on: null }` event in the same transaction) and render it in `eventDetails`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (4c343f0)
