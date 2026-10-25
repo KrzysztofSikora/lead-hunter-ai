@@ -46,7 +46,8 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   kształt `{ error: "validation_failed", fields }`.
 - **Co wymaga kluczy:** nic w tej chwili; klucze LLM i skrzynka IMAP dojdą ze slice'ami S-04 i S-11.
 - **Co wymaga ręcznej weryfikacji:** uruchomienie `docker compose up` na Raspberry Pi
-  (czas budowania better-sqlite3 na ARM64), wygląd powłoki i formularza logowania na telefonie,
+  (czas budowania better-sqlite3 na ARM64), wygląd powłoki i formularza logowania na telefonie, widok *Profil* na telefonie i komunikaty
+  błędów przy polach,
   flaga `Secure` ciasteczka za Tailscale (w Dockerze serwer widzi adres bramy, nie loopback,
   więc flaga nie jest ustawiana; patrz decyzja D-6 w `context/changes/operator-login/plan.md`).
 
