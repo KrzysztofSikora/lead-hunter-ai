@@ -86,11 +86,11 @@ direct-revenue vs product-hypothesis split (default 80/20).
 Every adapter implements the contract in §5.2 (`discover`, `validateConfig`, `healthCheck`) and
 returns raw signals with the §5.2 fields; adapters never score.
 - AC1: Given an enabled RSS/Atom source with a new entry, When discovery runs, Then the entry is stored as a raw signal with source, URL, title, snippet, `publishedAt` (or null), `fetchedAt` and content hash, and appears in the panel with source name and date.
-- AC2: Given presets, When the operator adds a source, Then "Hacker News — Seeking freelancer" (`hnrss.org/whoishiring/freelance`) and "We Work Remotely — <category>" feeds can be added in one step; any other RSS/Atom URL can be added manually.
+- AC2: Given presets, When the operator adds a source, Then demand-only feeds can be added in one step — "Hacker News — Seeking freelancer" (`hnrss.org/whoishiring/freelance`), Freelancer.com project feeds per skill, the Arduino Forum "Jobs and Paid Consultancy" category and any further preset that carries requests for work (D-15); job-board feeds are not offered as presets; any other RSS/Atom URL can be added manually. (revised 2026-10-25, D-15; WWR presets withdrawn)
 - AC3: Given a source that is unreachable, returns non-2xx or unparsable XML, When discovery runs, Then the job run records an error for that source, `lastError` is set, previously stored signals are untouched, and other sources still run.
 - AC4: Given a `429` or `503` with or without `Retry-After`, When discovery runs, Then the adapter backs off exponentially within the run, stops after the configured attempts, records the failure, and the next attempt waits at least the larger of `Retry-After` and the per-source minimum interval (A-03).
 - AC5: Given a successful run, When the same feed is read again, Then the cursor (last seen id/date) prevents reprocessing and no duplicate signal is created.
-- AC6: Given a WWR item, When it is shown, Then the card names "We Work Remotely" and links to the WWR URL (D-02).
+- AC6: Given an item from any feed, When it is shown, Then the card names the source and links to the original URL (D-02).
 - AC7: Given a source whose terms or access method is documented, When the Sources view shows it, Then it states the access method and limits (B-35).
 
 ### FR-05 E-mail alert import (IMAP)  (Must, covers US-11, D-03, D-04, A-08)
@@ -240,6 +240,23 @@ structured analysis.
 ### FR-30 CSV export, semantic grouping, multiple evidence  (Could — P1, covers B-47)
 - AC1: Given P1, When implemented, Then CSV export exists, similar needs can be grouped without a vector database, and independent evidence of the same demand is linked to one opportunity.
 
+### FR-31 Per-source keyword filter  (Must, covers B-20, D-15)
+Each source may carry include and exclude phrases checked against title and snippet before the
+pre-filter (FR-07) and before any LLM call; the operator switches the filter on and off per source
+in the Sources view without losing the phrases.
+- AC1: Given a source with the filter on and an exclude phrase present in an item, When discovery runs, Then the item is stored as rejected with reason "filtr źródła: <phrase>" and is not analysed.
+- AC2: Given include phrases and the filter on, When an item contains none of them, Then it is rejected with reason "filtr źródła: brak frazy"; with the filter off the same item passes to FR-07.
+- AC3: Given a run, When it finishes, Then the job run and the Sources view show how many items the source filter rejected, so filtered items are never silently "no results".
+
+### FR-32 Public procurement sources  (Should, covers B-16, D-15)
+- AC1: Given the e-Zamówienia BZP source with configured CPV prefixes (default 72, 48, 73), When discovery runs, Then new contract notices from the public API `ezamowienia.gov.pl/mo-board/api/v1/notice` become signals with buyer, deadline, estimated value as `sourceBudget` only when the notice states it, and the notice URL; requests stay within 30 per minute.
+- AC2: Given the TED source with the same CPV prefixes and country filter (default PL), When discovery runs, Then new notices from the official TED search API become signals the same way.
+- AC3: Given a tender signal, When it is analysed, Then it is classified as a public tender (not `DIRECT_REQUEST` from a private client) and the card shows the submission deadline.
+
+### FR-33 Paid code bounties  (Should, covers B-16, FR-27, D-15)
+- AC1: Given configured GitHub search queries (default: open issues labelled bounty/paid, languages from the profile) and an optional token, When discovery runs, Then issues come from the official search API within its rate limits and the stated reward is stored as `sourceBudget` only when the issue states it.
+- AC2: Given the Opire source, When discovery runs, Then active rewards from Opire's public API become signals linking to the GitHub issue; closed issues are skipped.
+
 ## Data model (conceptual)
 - **Operator profile** — the FR-01 fields; one record.
 - **Source** — type (manual, rss, imap, later github/search), name, enabled, configuration
@@ -340,7 +357,7 @@ the repo. The 30-day targets (§20) are an experiment, not acceptance criteria.
 | B-13 US-09 failure visibility, retry without duplicates | US-09 | FR-04, FR-18 | |
 | B-14 US-10 weekly channel effectiveness | US-10 | FR-19 | |
 | B-15 §4.1, §5.4 provenance, no guessing missing content | US-02 | FR-02, FR-06 | |
-| B-16 §5.1 source tiers | US-03 | FR-04, FR-05, FR-27, FR-28 | D-01, D-03, D-05 |
+| B-16 §5.1 source tiers | US-03 | FR-04, FR-05, FR-27, FR-28, FR-31, FR-32, FR-33 | D-01, D-03, D-05, D-15 |
 | B-17 §5.2 adapter contract and RawSignal fields | – | FR-04 | |
 | B-18 §5.3 queries per category, limit duplication | – | FR-04, FR-06 | |
 | B-19 §5.5 rate limits, backoff, explicit source errors | US-09 | FR-04, FR-18 | |

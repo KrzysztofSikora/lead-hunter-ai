@@ -69,6 +69,7 @@ fast ones per phase; `/review` runs all of them.
 | lint | `pnpm lint` | - |
 | unit tests | `pnpm test` | - |
 | image | `pnpm docker:build` | Docker |
+| image smoke | `pnpm docker:smoke` | Docker, after `pnpm docker:build` |
 | e2e | `pnpm e2e` | Playwright Chromium (`pnpm exec playwright install chromium`) |
 | mutation (one module) | `pnpm mutation --mutate <file>` | - |
 
@@ -88,5 +89,7 @@ Run the app: `docker compose up --build` (D-14); needs `mkdir -p data` and `.env
 | `pnpm start` | run the built API (serves the built web) |
 | `pnpm db:migrate` | apply migrations to `${DATA_DIR}/lead-hunter.db` (dev: `apps/api/data/lead-hunter.db`) |
 | `pnpm discover` | run every enabled source once (prints `brak skonfigurowanych źródeł` with none; `przebieg w toku`, exit 1, while another run holds the lock; a crashed CLI in a separate container frees it after 2 minutes) |
+| `pnpm seed:demo [--count N]` | fill an **empty** database with `DEMO` signals (default 10 000) for the Pi measurements; refuses a non-empty one |
 | `pnpm fixtures:record <source-id>` | record an anonymised feed fixture into `apps/api/test/fixtures/feeds/` (needs internet) |
 | `pnpm docker:build` | build the image `lead-hunter-ai:local` |
+| `pnpm docker:smoke` | run the built image: non-root, migrations, health, refusal without a hash, data kept on recreate (removes what it creates) |

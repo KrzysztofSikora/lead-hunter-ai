@@ -16,9 +16,11 @@
     "db:migrate": "pnpm --filter @lead-hunter/api db:migrate",
     "auth:hash": "pnpm --filter @lead-hunter/api auth:hash",
     "discover": "pnpm --filter @lead-hunter/api discover",
+    "seed:demo": "pnpm --filter @lead-hunter/api seed:demo",
     "fixtures:record": "pnpm --filter @lead-hunter/api fixtures:record",
     "e2e": "pnpm build && playwright test",
     "docker:build": "docker build -t lead-hunter-ai:local .",
+    "docker:smoke": "bash scripts/container-smoke.sh",
     "mutation": "stryker run"
   },
   "devDependencies": {
