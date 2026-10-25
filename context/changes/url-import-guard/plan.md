@@ -323,7 +323,7 @@ apps/api/src/modules/signals/ports.ts   PageFetcher port
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Address guard and shared HTTP client
+- [x] Phase 1: Address guard and shared HTTP client
 - [ ] Phase 2: Page fetch with robots.txt and the import contract
 - [ ] Phase 3: Import page handles a refused or failed fetch
 
@@ -332,6 +332,7 @@ apps/api/src/modules/signals/ports.ts   PageFetcher port
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] (Phase 1) `HttpClient.get` returns non-2xx responses to the caller instead of throwing `http_status`, because robots.txt needs the 4xx/5xx status (D-7); the page fetcher maps a bad page status to `http_status` in Phase 2. Plan-review findings 4, 5, 8, 10, 11 applied: `beforeHop` runs before a slot is taken, a 3xx body is destroyed, no `--` in test paths, caller lookup options are kept with `all: true`, `ipaddr.js` added to `DRIVERS` (the Phase 2 libs follow in Phase 2).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

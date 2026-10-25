@@ -9,6 +9,7 @@ const DRIVERS = [
   'drizzle-orm',
   'drizzle-orm/*',
   'undici',
+  'ipaddr.js',
   '@anthropic-ai/sdk',
   'openai',
   'imapflow',
