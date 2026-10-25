@@ -15,6 +15,7 @@ import {
   type StatusChangeRequest,
 } from '@lead-hunter/contracts';
 import type { Clock } from '../shared/clock.js';
+import { isDemo } from '../shared/demo.js';
 import { instantToWarsawDate, warsawDateToInstant } from '../shared/warsaw-day.js';
 import type {
   ActivityRepository,
@@ -69,9 +70,6 @@ function sourceFacts(row: OpportunityRow) {
     lastVerifiedAt: isoOrNull(row.lastVerifiedAt),
   };
 }
-
-/** Only the mock produces DEMO / MOCK results in this item (D-12). */
-const isDemo = (provider: string | null): boolean => provider === 'mock';
 
 /**
  * D-8: null while every analysis column is empty and nothing was analysed. A completed
