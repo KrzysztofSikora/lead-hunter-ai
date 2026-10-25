@@ -1,4 +1,4 @@
-import type { ActivityEvent, OpportunityDetail } from '@lead-hunter/contracts';
+import type { ActivityEvent, OpportunityDetail, PrefilterRule } from '@lead-hunter/contracts';
 import { formatMinor, strings } from './strings.pl.js';
 import { formatCalendarDate, formatWarsaw } from './warsawTime.js';
 
@@ -67,13 +67,17 @@ function money(minMinor: number, maxMinor: number, currency: string) {
   return `${fmt(minMinor)}–${fmt(maxMinor)} ${currency}`;
 }
 
+/** D-15: the rule's label; a source filter adds the matched phrase or "brak frazy". */
+export function prefilterReason(rule: PrefilterRule, phrase: string | null): string {
+  return rule === 'source_filter' ? t.history.sourceFilter(phrase) : strings.prefilterRules[rule];
+}
+
 function emptyReason(data: OpportunityDetail): string | undefined {
   const latest = data.latestAnalysis;
-  const rule = data.prefilter?.rule;
-  if (rule) {
-    return data.analysisStatus === 'SKIPPED'
-      ? list.skippedBecause(strings.prefilterRules[rule])
-      : strings.prefilterRules[rule];
+  const prefilter = data.prefilter;
+  if (prefilter?.rule) {
+    const why = prefilterReason(prefilter.rule, prefilter.phrase);
+    return data.analysisStatus === 'SKIPPED' ? list.skippedBecause(why) : why;
   }
   if (latest?.result?.verdict === 'ANALYSED') return undefined;
   if (latest?.result?.verdict === 'INSUFFICIENT_DATA') return t.empty.insufficient;

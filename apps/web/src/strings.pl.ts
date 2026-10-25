@@ -77,8 +77,19 @@ export const strings = {
     tooSoon: (time: string) => `Następna próba możliwa o ${time}.`,
     sourceDisabled: 'Źródło jest wyłączone.',
     notFound: 'Nie znaleziono źródła.',
-    runDone: (n: number, dup: number, failed: number) =>
-      `Pobrano: nowe ${n}, duplikaty ${dup}, pominięte ${failed}.`,
+    runDone: (n: number, dup: number, failed: number, filtered: number) =>
+      `Pobrano: nowe ${n}, duplikaty ${dup}, pominięte ${failed}, odrzucone przez filtr źródła ${filtered}.`,
+    withdrawn: 'preset wycofany',
+    filter: {
+      title: 'Filtr źródła',
+      enabled: 'Filtr włączony',
+      excludeLabel: 'Odrzucaj, gdy zawiera (jedna fraza w wierszu)',
+      includeLabel: 'Wymagaj jednej z fraz (jedna fraza w wierszu)',
+      save: 'Zapisz filtr',
+      saving: 'Zapisywanie…',
+      saved: 'Filtr zapisany.',
+      saveFailed: 'Nie udało się zapisać filtru. Sprawdź frazy (do 30, do 100 znaków).',
+    },
     runFailed: (reason: string) => `Błąd pobierania: ${reason}.`,
     checkOk: (time: string) => `Kanał odpowiada (${time}).`,
     checkFailed: (reason: string) => `Kanał nie odpowiada: ${reason}.`,

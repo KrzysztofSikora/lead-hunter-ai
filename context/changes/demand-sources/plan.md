@@ -340,11 +340,14 @@ left `PENDING` half-filtered.
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Demand-only presets and filter configuration
 - [x] Phase 2: Filter at discovery and visible counts
-- [ ] Phase 3: Sources view, reason text and source policy
+- [x] Phase 3: Sources view, reason text and source policy
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
-(Phase 2 has none.)
+(Phases 1 and 2 have none.)
+- [ ] (Phase 3) Real run of every preset (status, fetched / new / odrzucone przez filtr źródła, one sample signal; failures `robots_disallowed`/404/`invalid_feed`; compare first five item URLs of `freelancer-nodejs` and `freelancer-arduino` — same means `?keyword=` is ignored, switch D-9 to C) — run: `pnpm dev`, log in, add each preset in Sources, press **Uruchom** (or `pnpm discover`) — evidence: `context/changes/demand-sources/evidence/real-run.md` (none yet)
+- [ ] (Phase 3) Record fixtures for one `freelancer-*` source and `arduino-jobs`, check they hold no real names, handles or e-mails, commit, run `pnpm test` — run: `pnpm fixtures:record freelancer-nodejs`, `pnpm fixtures:record arduino-jobs` — evidence: none
+- [ ] (Phase 3) UI at 360 px and on a laptop: edit an exclude phrase, switch the filter off and on (phrases stay), run a source, list and card read "filtr źródła: …"; a WWR source added before this change shows "preset wycofany" — run: `pnpm dev`, Sources view and Okazje — evidence: none
 
 ## Deviations
 - [REVIEW] Plan says the roadmap item is resolved in `context/roadmap.md` and its status set to
@@ -378,6 +381,11 @@ left `PENDING` half-filtered.
 - [FOLLOW-UP] elektroda.pl "Projektowanie Bazar" preset: check from a machine with internet
   whether forum 392 has an RSS feed that robots.txt and the terms allow, and add it to
   `presets.ts` if so (D-10).
+
+- [minor] Phase 3: `prefilterReason(rule, phrase)` takes the rule and phrase, not the whole
+  `prefilter` object, because TypeScript does not narrow `prefilter.rule` through the object. The
+  history row already used the `source_filter` cause since Phase 2, so no change there. README and
+  CLAUDE.md list neither presets nor counts, so they are untouched.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
