@@ -175,6 +175,8 @@ export function createOpportunityRepository(db: BetterSQLite3Database): Opportun
           error: analyses.error,
           inputTokens: analyses.inputTokens,
           outputTokens: analyses.outputTokens,
+          costMicroUsd: analyses.costMicroUsd,
+          reusedFromAnalysisId: analyses.reusedFromAnalysisId,
           createdAt: analyses.createdAt,
         })
         .from(analyses)

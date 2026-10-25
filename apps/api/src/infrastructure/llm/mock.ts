@@ -92,6 +92,7 @@ function evidenceOf(text: string, profileTerms: number): EvidenceLevel {
  */
 export class MockProvider implements LlmProvider {
   readonly name = 'mock' as const;
+  readonly paid = false;
   readonly model = 'mock-rules';
   readonly promptVersion = 'mock-rules-1';
   readonly demo = true;

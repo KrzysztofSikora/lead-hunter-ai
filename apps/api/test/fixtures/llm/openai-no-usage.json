@@ -1,0 +1,16 @@
+{
+  "id": "chatcmpl-demo",
+  "object": "chat.completion",
+  "created": 1,
+  "model": "demo-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"verdict\": \"ANALYSED\", \"category\": \"DIRECT_GIG\", \"evidenceLevel\": \"DIRECT_REQUEST\", \"problem\": \"DEMO: a small dashboard is needed.\", \"buyerOrAudience\": null, \"buyerConfirmed\": false, \"relevantSkills\": [\"TypeScript\"], \"solutionApproach\": \"DEMO approach\", \"suggestedDeliverable\": \"DEMO dashboard\", \"mvpScope\": [\"DEMO: zakres MVP\"], \"exclusions\": [\"DEMO: poza zakresem\"], \"monetizationModel\": \"FIXED_PRICE\", \"estimatedHours\": {\"min\": 20, \"max\": 40}, \"proposedPrice\": null, \"pricingAssumptions\": [], \"requiredClarifications\": [], \"nextAction\": \"DEMO: ask for scope\", \"uncertainties\": [], \"rationale\": \"DEMO rationale\", \"sourceFacts\": [], \"inferences\": [], \"unknowns\": [], \"sourceBudget\": null, \"industry\": null, \"workMode\": \"UNKNOWN\", \"countries\": []}"
+      },
+      "finish_reason": "stop"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-demo",
+  "object": "chat.completion",
+  "created": 1,
+  "model": "demo-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"verdict\": \"ANALYSED\", \"category\": \"DIR"
+      },
+      "finish_reason": "length"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 321,
+    "completion_tokens": 123,
+    "total_tokens": 444
+  }
+}

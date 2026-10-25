@@ -219,6 +219,13 @@ export const strings = {
     analysisLimit: (limit: number, waiting: number) =>
       `Dzienny limit analiz (${limit}) osiągnięty — ${waiting} czeka do jutra`,
     analysisStatusFailed: 'Nie udało się sprawdzić stanu analizy.',
+    analysisBlockedMissing:
+      'Analiza wstrzymana: płatny dostawca bez limitu kosztów. Ustaw LLM_MONTHLY_BUDGET_USD w .env i uruchom ponownie.',
+    analysisBlockedPrice: (model: string) =>
+      `Analiza wstrzymana: brak ceny modelu ${model}. Dodaj ją w LLM_PRICES w .env.`,
+    analysisBlockedReached: (spent: string, cap: string) =>
+      `Analiza wstrzymana: wydano ${spent} z limitu ${cap} USD w tym miesiącu. Wznowi się w przyszłym miesiącu albo po podniesieniu limitu.`,
+    analysisUnknownCost: (n: number) => `Analiz bez danych o koszcie: ${n}`,
     noScore: 'brak oceny',
     score: (n: number) => `Ocena: ${n}`,
     previous: 'Poprzednia',
@@ -482,6 +489,20 @@ export const strings = {
     hours: (min: number, max: number) => `${min}–${max} h`,
     sourceFactsTitle: 'Fakty ze źródła',
     noScore: 'brak oceny',
+    failedReason: 'Analiza nie powiodła się',
+    retry: 'Ponów analizę',
+    reanalyse: 'Analizuj ponownie',
+    requestQueued: 'Analiza w kolejce — wynik pojawi się po odświeżeniu widoku.',
+    requestPrefiltered: 'Ta okazja została pominięta przez filtr wstępny.',
+    requestNotConfigured: 'Analiza nie jest skonfigurowana — ustaw LLM_PROVIDER w .env.',
+    requestFailed: 'Nie udało się zlecić analizy.',
+    cost: (usd: string) => `Koszt: ${usd} USD`,
+    costUnknown: (input: number | null, output: number | null) =>
+      `Koszt: brak danych (tokeny: ${input === null ? '?' : input.toLocaleString('pl-PL')} wej. / ${
+        output === null ? '?' : output.toLocaleString('pl-PL')
+      } wyj.)`,
+    reusedFrom: 'Wynik ponownie użyty z wcześniejszej analizy tej samej treści',
+    prefilterSkipped: 'Pominięta przez filtr wstępny',
     provider: 'Dostawca',
     analysedAt: 'Czas analizy',
     evidenceSection: 'Dowody',

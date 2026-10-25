@@ -53,7 +53,8 @@ describe('database and migrations (TR-20)', () => {
       const journal = JSON.parse(readFileSync(journalFile, 'utf8')) as {
         entries: { tag: string }[];
       };
-      journal.entries = journal.entries.filter((entry) => !entry.tag.startsWith('0008'));
+      // Keep 0000–0007 only: drizzle applies nothing older than the newest applied migration.
+      journal.entries = journal.entries.filter((entry) => entry.tag < '0008');
       writeFileSync(journalFile, JSON.stringify(journal));
 
       const dir = mkdtempSync(join(tmpdir(), 'lh-db-'));

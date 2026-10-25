@@ -58,8 +58,13 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   modelu`, `szacunek (hipoteza)`, `wyliczone regułami`, `brak danych`); akcje `Zapisz`, `Odrzuć`
   (z powodem) i `Dodaj notatkę` (`POST /api/opportunities/:id/status` i `/notes`) oraz historia
   zmian statusu i notatek; `Przygotuj ofertę` i `Oznacz jako kontakt` są wyłączone do kolejnych
-  wersji. Bez `LLM_PROVIDER` UI mówi, że analiza nie jest
-  skonfigurowana, a okazje czekają jako „Analiza: oczekuje".
+  wersji. Prawdziwi dostawcy: `anthropic` i
+  `openai-compatible` (ten sam runner, schemat i kontrola wyniku co `mock`), koszt każdej analizy,
+  miesięczny limit `LLM_MONTHLY_BUDGET_USD` (płatny dostawca bez limitu nic nie analizuje),
+  ponowne użycie wyniku dla tej samej treści, przyciski „Ponów analizę" / „Analizuj ponownie"
+  (`POST /api/opportunities/:id/analysis`); co dokładnie wysyłamy i jak liczymy koszt:
+  [`docs/llm.md`](docs/llm.md). Bez `LLM_PROVIDER` UI mówi, że analiza nie jest skonfigurowana, a
+  okazje czekają jako „Analiza: oczekuje".
 - **Źródła RSS/Atom:** widok *Źródła* (`/zrodla`): dodanie gotowego kanału jednym kliknięciem
   (Hacker News „Seeking freelancer", We Work Remotely: programming, full-stack, back-end, devops)
   albo dowolnego adresu RSS/Atom, włączanie i wyłączanie, **Uruchom teraz** i **Sprawdź**, status
@@ -69,10 +74,13 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   regulaminy i limity: [`docs/source-policy.md`](docs/source-policy.md). Automatyczne przebiegi:
   codziennie o 08:00 i 18:00 (Europe/Warsaw), zmiana przez `DISCOVERY_TIMES`; przebieg pominięty,
   gdy aplikacja była wyłączona, nie jest nadrabiany.
-- **Co wymaga kluczy:** prawdziwy dostawca LLM (Anthropic, OpenAI-compatible) dojdzie ze slice'em
-  S-05; skrzynka IMAP ze slice'em S-11. Zmienne analizy: `LLM_PROVIDER`, `ANALYSIS_DAILY_LIMIT`,
-  `PREFILTER_MAX_AGE_DAYS` (patrz `.env.example`).
-- **Co wymaga ręcznej weryfikacji:** prawdziwe kanały hnrss.org i We Work Remotely (adresy
+- **Co wymaga kluczy:** Anthropic (`LLM_PROVIDER=anthropic`, `LLM_API_KEY`, `LLM_MONTHLY_BUDGET_USD`);
+  serwer OpenAI-compatible (`LLM_BASE_URL`, `LLM_MODEL`, klucz opcjonalny); skrzynka IMAP ze
+  slice'em S-11. Zmienne analizy: `LLM_*`, `ANALYSIS_DAILY_LIMIT`, `PREFILTER_MAX_AGE_DAYS`
+  (patrz `.env.example`).
+- **Co wymaga ręcznej weryfikacji:** prawdziwe analizy Anthropic i OpenAI-compatible (czy schemat
+  jest przyjęty, czy `json_object` i zużycie tokenów działają u danego dostawcy), wygląd
+  komunikatów o limicie kosztów na telefonie, prawdziwe kanały hnrss.org i We Work Remotely (adresy
   presetów w `apps/api/src/modules/sources/presets.ts`, format wpisów, regulaminy; agent nie miał
   do nich dostępu), widok *Źródła* na telefonie, nagranie fixture'ów poleceniem
   `pnpm fixtures:record <id źródła>` (zapisuje do `apps/api/test/fixtures/feeds/` pierwsze 5

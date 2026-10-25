@@ -32,6 +32,15 @@ export function startOfWarsawDay(instant: Date): Date {
   return new Date(utcMidnight - offset * 60_000);
 }
 
+/** The instant at which the Europe/Warsaw calendar month containing `instant` began (D-5). */
+export function startOfWarsawMonth(instant: Date): Date {
+  const get = (type: string) =>
+    Number(dayParts.formatToParts(instant).find((part) => part.type === type)?.value);
+  const utcMidnight = Date.UTC(get('year'), get('month') - 1, 1);
+  const offset = offsetMinutes(new Date(utcMidnight - 2 * 3_600_000));
+  return new Date(utcMidnight - offset * 60_000);
+}
+
 /** S-08 D-5: the instant a `YYYY-MM-DD` Europe/Warsaw calendar day begins (a real date is assumed). */
 export function warsawDateToInstant(date: string): Date {
   const [year, month, day] = date.split('-').map(Number) as [number, number, number];

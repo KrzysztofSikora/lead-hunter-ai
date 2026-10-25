@@ -212,12 +212,39 @@ export type PrefilterRule = z.infer<typeof PrefilterRule>;
 export const AnalysisServiceStatus = z
   .object({
     configured: z.boolean(),
-    provider: z.enum(['mock']).nullable(),
+    provider: z.enum(['mock', 'anthropic', 'openai-compatible']).nullable(),
     demo: z.boolean(),
     dailyLimit: z.number().int(),
     analysedToday: z.number().int(),
     waiting: z.number().int(),
     limitReached: z.boolean(),
+    /** D-13 (S-05): what is being used and whether the budget lets it run. */
+    model: z.string().nullable(),
+    paid: z.boolean(),
+    blocked: z.enum(['budget_missing', 'price_unknown', 'budget_reached']).nullable(),
+    budget: z
+      .object({
+        capMicroUsd: z.number().int().nullable(),
+        spentMicroUsd: z.number().int(),
+        unknownCostCount: z.number().int(),
+        /** Start of the current Europe/Warsaw month. */
+        monthStart: z.iso.datetime(),
+      })
+      .strict(),
   })
   .strict();
 export type AnalysisServiceStatus = z.infer<typeof AnalysisServiceStatus>;
+
+/** D-10 (S-05): retry or re-analyse one opportunity; `force` skips the content-hash reuse. */
+export const AnalysisRequestBody = z.object({ force: z.boolean().optional() }).strict();
+export type AnalysisRequestBody = z.infer<typeof AnalysisRequestBody>;
+
+export const AnalysisRequestResult = z
+  .object({ result: z.literal('queued'), force: z.boolean() })
+  .strict();
+export type AnalysisRequestResult = z.infer<typeof AnalysisRequestResult>;
+
+export const AnalysisRequestRefused = z
+  .object({ error: z.enum(['prefiltered', 'not_configured']) })
+  .strict();
+export type AnalysisRequestRefused = z.infer<typeof AnalysisRequestRefused>;
