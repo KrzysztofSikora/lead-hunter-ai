@@ -86,12 +86,15 @@ export const opportunities = sqliteTable(
     amountCurrency: text('amount_currency'),
     /** D-10: the next analysis must call the provider instead of reusing a stored result. */
     analysisForce: integer('analysis_force').notNull().default(0),
+    /** S-08 D-5, D-7: Warsaw midnight (UTC epoch ms) of the one current follow-up day. */
+    followUpAt: integer('follow_up_at'),
   },
   (table) => [
     check('score_range', sql`${table.score} IS NULL OR ${table.score} BETWEEN 0 AND 100`),
     index('opportunities_business_status_idx').on(table.businessStatus),
     index('opportunities_score_idx').on(table.score),
     index('opportunities_created_at_idx').on(table.createdAt),
+    index('opportunities_follow_up_idx').on(table.followUpAt),
   ],
 );
 
@@ -186,5 +189,29 @@ export const signalIdentities = sqliteTable(
   (table) => [
     primaryKey({ columns: [table.kind, table.value] }),
     index('signal_identities_opportunity_idx').on(table.opportunityId),
+  ],
+);
+
+/** S-08 D-10: append-only; a payment never depends on, or implies, a status. */
+export const payments = sqliteTable(
+  'payments',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    opportunityId: integer('opportunity_id')
+      .notNull()
+      .references(() => opportunities.id, { onDelete: 'cascade' }),
+    /** Integer minor units of `currency`. */
+    amountMinor: integer('amount_minor').notNull(),
+    currency: text('currency').notNull(),
+    /** Warsaw midnight (UTC epoch ms) of the day paid (D-5). */
+    paidAt: integer('paid_at').notNull(),
+    /** Operator text; never logged. */
+    note: text('note'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    check('amount_positive', sql`${table.amountMinor} > 0`),
+    check('currency_known', sql`${table.currency} IN ('PLN', 'EUR', 'USD')`),
+    index('payments_opportunity_idx').on(table.opportunityId, table.paidAt),
   ],
 );

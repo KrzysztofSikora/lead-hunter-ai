@@ -83,3 +83,14 @@ export function warsawDayEnd(date: string): string {
   const next = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + 1));
   return warsawDayStart(next.toISOString().slice(0, 10));
 }
+
+/** Today's Europe/Warsaw calendar day as `YYYY-MM-DD`. */
+export function warsawToday(now: number = Date.now()): string {
+  const p = wallParts(now);
+  return `${p.year}-${pad(p.month)}-${pad(p.day)}`;
+}
+
+/** `2026-10-25` → `25.10.2026`. */
+export function formatCalendarDate(date: string): string {
+  return date.split('-').reverse().join('.');
+}

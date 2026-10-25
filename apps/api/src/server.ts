@@ -13,7 +13,9 @@ import { createAnalysisRunner } from './modules/analysis/service.js';
 import { createProfileService } from './modules/profile/service.js';
 import { createHealthProbe } from './infrastructure/db/health-probe.js';
 import { runMigrations } from './infrastructure/db/migrate.js';
+import { createPaymentRepository } from './infrastructure/db/payment-repository.js';
 import { createOpportunityRepository } from './infrastructure/db/opportunity-repository.js';
+import { createPipelineRepository } from './infrastructure/db/pipeline-repository.js';
 import { createProfileRepository } from './infrastructure/db/profile-repository.js';
 import { createSignalRepository } from './infrastructure/db/signal-repository.js';
 import { createSessionRepository } from './infrastructure/db/session-repository.js';
@@ -84,9 +86,11 @@ async function main(): Promise<void> {
     opportunities: {
       repository: createOpportunityRepository(db),
       activity: createActivityRepository(db),
+      payments: createPaymentRepository(db),
       sourceStatus: noSourcesYet,
       clock,
     },
+    pipeline: { repository: createPipelineRepository(db), clock },
     analysis: runner,
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),

@@ -1,0 +1,69 @@
+.totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.total {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+}
+
+.total dt {
+  color: #444;
+  font-size: 0.875rem;
+}
+
+.total dd {
+  margin: 0;
+  font-weight: bold;
+}
+
+.sums {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-weight: normal;
+  font-size: 0.875rem;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+}
+
+.meta {
+  display: block;
+  color: #444;
+  font-size: 0.875rem;
+}
+
+.counts {
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.counts li {
+  padding: 0.25rem 0;
+}
+
+.muted {
+  color: #444;
+}
+
+.error {
+  color: #b71c1c;
+}

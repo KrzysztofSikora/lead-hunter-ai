@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "764a4c37-a18e-4cf1-b10f-9e63d34d36a1",
+  "id": "c34a9784-b8d9-49fe-be2a-60440944c67d",
   "prevId": "c58206c2-4ca6-41d3-8a4a-9b256c2e6313",
   "tables": {
     "activity_events": {
@@ -201,20 +201,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "cost_micro_usd": {
-          "name": "cost_micro_usd",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reused_from_analysis_id": {
-          "name": "reused_from_analysis_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -252,19 +238,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "analyses_reused_from_analysis_id_analyses_id_fk": {
-          "name": "analyses_reused_from_analysis_id_analyses_id_fk",
-          "tableFrom": "analyses",
-          "tableTo": "analyses",
-          "columnsFrom": [
-            "reused_from_analysis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -498,13 +471,12 @@
           "notNull": false,
           "autoincrement": false
         },
-        "analysis_force": {
-          "name": "analysis_force",
+        "follow_up_at": {
+          "name": "follow_up_at",
           "type": "integer",
           "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
@@ -533,6 +505,13 @@
           "name": "opportunities_created_at_idx",
           "columns": [
             "created_at"
+          ],
+          "isUnique": false
+        },
+        "opportunities_follow_up_idx": {
+          "name": "opportunities_follow_up_idx",
+          "columns": [
+            "follow_up_at"
           ],
           "isUnique": false
         }
@@ -669,6 +648,97 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
+    "payments": {
+      "name": "payments",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "opportunity_id": {
+          "name": "opportunity_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "amount_minor": {
+          "name": "amount_minor",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "paid_at": {
+          "name": "paid_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "payments_opportunity_idx": {
+          "name": "payments_opportunity_idx",
+          "columns": [
+            "opportunity_id",
+            "paid_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "payments_opportunity_id_opportunities_id_fk": {
+          "name": "payments_opportunity_id_opportunities_id_fk",
+          "tableFrom": "payments",
+          "tableTo": "opportunities",
+          "columnsFrom": [
+            "opportunity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "amount_positive": {
+          "name": "amount_positive",
+          "value": "\"payments\".\"amount_minor\" > 0"
+        },
+        "currency_known": {
+          "name": "currency_known",
+          "value": "\"payments\".\"currency\" IN ('PLN', 'EUR', 'USD')"
+        }
+      }
+    },
     "raw_signals": {
       "name": "raw_signals",
       "columns": {
@@ -750,15 +820,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "raw_signals_content_hash_idx": {
-          "name": "raw_signals_content_hash_idx",
-          "columns": [
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},

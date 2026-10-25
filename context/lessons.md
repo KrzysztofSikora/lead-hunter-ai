@@ -31,3 +31,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: llm-providers, R2
 - Scope: `apps/api/src/infrastructure/llm/**`, `apps/api/src/modules/analysis/service.ts`
 - Status: proposed in the PR for llm-providers
+
+## When a rule has side doors, test its invariants over two-step paths, not only single moves
+- Why: `checkMove` was right for every single move, yet `WON → NEEDS_VERIFICATION → MEETING` skipped the note and `NEEDS_VERIFICATION → MEETING → WON` won a row that was never contacted.
+- Seen in: pipeline-and-payments, R1
+- Scope: transition and state-machine code (`packages/contracts/src/status.ts` and its tests)
+- Status: proposed in the PR for pipeline-and-payments

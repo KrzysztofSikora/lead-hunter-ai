@@ -4,7 +4,9 @@ import type {
   BusinessStatus,
   Category,
   Confidence,
+  Currency,
   EvidenceLevel,
+  MoveCheck,
   OpportunityListQuery,
   RejectionReason,
   PrefilterRule,
@@ -69,7 +71,7 @@ export interface EvidenceRow {
 /** One `activity_events` row; `metadataJson` is still text here. */
 export interface ActivityRow {
   id: number;
-  type: 'STATUS_CHANGE' | 'NOTE';
+  type: 'STATUS_CHANGE' | 'NOTE' | 'FOLLOW_UP';
   actor: 'operator' | 'system';
   fromStatus: BusinessStatus | null;
   toStatus: BusinessStatus | null;
@@ -77,6 +79,16 @@ export interface ActivityRow {
   note: string | null;
   metadataJson: string | null;
   occurredAt: number;
+}
+
+/** One `payments` row; `paidAt` is the Warsaw midnight of the day paid (S-08 D-5). */
+export interface PaymentRow {
+  id: number;
+  amountMinor: number;
+  currency: Currency;
+  paidAt: number;
+  note: string | null;
+  createdAt: number;
 }
 
 export interface OpportunityFilter extends Omit<
@@ -100,6 +112,10 @@ export interface OpportunityRepository {
         latestAnalysis: AnalysisAttemptRow | undefined;
         /** Newest first. */
         activity: ActivityRow[];
+        /** Warsaw midnight of the current follow-up day (D-7). */
+        followUpAt: number | null;
+        /** Newest paid first. */
+        payments: PaymentRow[];
       }
     | undefined;
 }
@@ -109,19 +125,47 @@ export interface SourceStatusReader {
   summary(): SourcesStatus;
 }
 
-export type StatusChangeOutcome = 'changed' | 'not_found' | 'not_allowed';
+export type StatusChangeOutcome = 'changed' | 'not_found' | 'not_allowed' | 'note_required';
 
 export interface ActivityRepository {
   /**
-   * One transaction: reads the current status, asks `allowed` about it, then updates the status
+   * One transaction: reads the current status, asks `decide` about it, then updates the status
    * (conditional on the status read) and inserts the event.
    */
   changeStatus(
     id: number,
-    to: 'SAVED' | 'REJECTED',
-    allowed: (from: BusinessStatus) => boolean,
-    event: { reason: RejectionReason | null; note: string | null; at: number },
+    to: BusinessStatus,
+    decide: (from: BusinessStatus) => MoveCheck,
+    event: {
+      reason: RejectionReason | null;
+      note: string | null;
+      /** Returns the validated `metadata_json` for the move that was decided, or null. */
+      metadata: (
+        check: Extract<MoveCheck, { allowed: true }>,
+        /** The move dropped a follow-up that was set. */
+        followUpCleared: boolean,
+      ) => string | null;
+      at: number;
+    },
   ): StatusChangeOutcome;
+  /**
+   * Sets (`followUpAt` an instant) or clears (null) the follow-up and records a `FOLLOW_UP` event,
+   * in one transaction. Only while the status may hold one (D-7).
+   */
+  setFollowUp(
+    id: number,
+    followUpAt: number | null,
+    event: { metadata: string; at: number },
+  ): 'changed' | 'not_found' | 'not_allowed';
   /** False when the opportunity does not exist. */
   addNote(id: number, text: string, at: number): boolean;
+}
+
+export interface PaymentRepository {
+  /** False when the opportunity does not exist. Touches no status (D-10). */
+  add(
+    id: number,
+    payment: { amountMinor: number; currency: Currency; paidAt: number; note: string | null },
+    at: number,
+  ): boolean;
 }

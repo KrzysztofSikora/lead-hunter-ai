@@ -15,6 +15,8 @@ import { registerHealthRoutes } from './modules/health/routes.js';
 import type { HealthProbe } from './modules/health/ports.js';
 import { registerOpportunityRoutes } from './modules/opportunities/routes.js';
 import type { OpportunityDeps } from './modules/opportunities/service.js';
+import { registerPipelineRoutes } from './modules/pipeline/routes.js';
+import type { PipelineDeps } from './modules/pipeline/service.js';
 import { registerProfileRoutes } from './modules/profile/routes.js';
 import type { ProfileDeps } from './modules/profile/service.js';
 import { registerSignalRoutes } from './modules/signals/routes.js';
@@ -27,6 +29,7 @@ export interface AppDeps {
   profile: ProfileDeps;
   signals: SignalDeps;
   opportunities: OpportunityDeps;
+  pipeline: PipelineDeps;
   analysis: AnalysisRouteDeps;
   /** Called after an import created a new opportunity; the analysis runner is kicked here (D-4). */
   onSignalCreated?: () => void;
@@ -72,6 +75,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   registerOpportunityRoutes(app, deps.opportunities);
+  registerPipelineRoutes(app, deps.pipeline);
   registerAnalysisRoutes(app, deps.analysis);
 
   if (deps.config.nodeEnv !== 'production') {
