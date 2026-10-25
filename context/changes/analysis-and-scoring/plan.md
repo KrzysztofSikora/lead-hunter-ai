@@ -412,3 +412,4 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
+- [STUCK] (fix-review) Tree not clean: three e2e-regenerated screenshots of other changes (manual-text-import, operator-login, operator-profile evidence) were modified before this step; restoring them was denied by the permission classifier and committing them would rewrite other changes' evidence. A person must restore or commit them.
