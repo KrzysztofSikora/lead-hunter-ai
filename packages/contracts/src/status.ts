@@ -96,7 +96,8 @@ export function checkMove(from: BusinessStatus, to: BusinessStatus): MoveCheck {
   const fromRank = from === 'NEEDS_VERIFICATION' ? 0 : MAIN_RANK[from];
   const toRank = MAIN_RANK[to];
   if (fromRank === undefined || toRank === undefined) return { allowed: false };
-  if (from === 'NEEDS_VERIFICATION' && toRank > (MAIN_RANK.CONTACTED ?? 0)) return { allowed: false };
+  if (from === 'NEEDS_VERIFICATION' && toRank > (MAIN_RANK.CONTACTED ?? 0))
+    return { allowed: false };
   if (toRank < fromRank || from === 'WON' || from === 'LOST') return back;
   return forward(
     MAIN_PATH.filter(
