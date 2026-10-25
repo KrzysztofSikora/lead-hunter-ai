@@ -1,7 +1,9 @@
 # Review: analysis-and-scoring
 
 Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tests), image fail (environment: corepack cannot fetch pnpm inside the build, "self-signed certificate in certificate chain" from the sandbox proxy, at `RUN pnpm install`, before any project code; same as the Phase 3 deviation), mutation not re-run (`mutation.md`: 98.5 %, target 80 %) · Round: 1
+Gates: typecheck ok, lint ok, unit tests ok (32 files, 376 tests), e2e ok (4 tests), image fail (environment: corepack cannot fetch pnpm 12.15.0 inside the build, "self-signed certificate in certificate chain" from the sandbox proxy, at `RUN pnpm install --frozen-lockfile --prod`, before any project code; same as round 1 and the Phase 3 deviation), mutation not re-run (`mutation.md`: 98.5 %, target 80 %) · Round: 2
+
+Round 2 re-checked the fix commits `54c05d7..01de258` against R1-R6. All six are fixed in the code and covered by new tests (R1: `listed()` caps names, excluded term trimmed to 80, `ScoreBreakdown.parse` before `saveComplete` inside the `internal_error` catch; R2: `quoteStates` plus empty-needle rejection; R3: grouped-thousands regex with decimals; R4: `analysisOf` returns a summary for `COMPLETE` rows with a provider; R5: country uppercased, decimal amount, `maxAgeDays <= 3650`, currency message; R6: both sections added and match `prefilter.ts`, `output-guard.ts` and `strings.pl.ts`). Two new problems found in the R2/R3 fixes: R7, R8.
 
 ## Plan vs diff
 | File | Status | Note |
@@ -11,7 +13,7 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 | `packages/contracts/src/classification.ts` | unplanned | logged under *Deviations* (Phase 4, import cycle) |
 | `packages/contracts/src/opportunities.ts` | done | `SKIPPED`, `demo`, `prefilter`, `latestAnalysis`, D-13 query params with refine |
 | `apps/api/src/modules/scoring/rubric.ts`, `score.ts` + tests | done | D-2/D-3; profitability change logged as `[REVIEW]` (plan-review #7) |
-| `docs/scoring.md` | diverged | plan says it also documents the pre-filter rules (D-6) and the evidence guard (D-14); neither is there (R6) |
+| `docs/scoring.md` | done | pre-filter (D-6) and guard (D-14) sections added in round 1 fixes (R6) |
 | `apps/api/src/modules/analysis/cues.ts`, `prefilter.ts`, `output-guard.ts` | done | D-6, D-14 |
 | `apps/api/src/modules/analysis/output-guard.test.ts` | done | TR-01, FR-10 AC3 |
 | `apps/api/src/modules/analysis/prefilter.test.ts` | unplanned | logged (Phase 2) |
@@ -33,7 +35,9 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 | `apps/web/src/api/analysis.ts`, `api/opportunities.ts` | done | major→minor units logged (Phase 5) |
 | `apps/web/src/OpportunitiesPage.tsx`, `.module.css` | done | status line, badge, filters, "Tylko ≥ 65" |
 | `apps/web/src/OpportunityPage.tsx`, `.module.css` | done | *Analiza* section |
-| `apps/web/src/strings.pl.ts` | done | `seeking_work` = "oferta wykonawcy, nie zlecenie" |
+| `apps/web/src/strings.pl.ts` | done | `seeking_work` = "oferta wykonawcy, nie zlecenie"; `amountNeedsCurrency` (R5) |
+| `apps/web/src/OpportunitiesPage.test.tsx` | unplanned | added by the R5 fix; component tests for the filter form |
+| `context/lessons.md` | unplanned | two proposed lessons from R1, R2 |
 | `e2e/smoke.spec.ts` | done | analysed state, five components, hypothesis label, screenshots |
 | `README.md` | done | *Co działa*, *Co wymaga kluczy*, variables |
 | `context/changes/analysis-and-scoring/{plan,plan-review,mutation}.md`, `evidence/*.png` | done | workflow artifacts |
@@ -42,12 +46,12 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 ## Areas
 | Area | Result (ok / concern / fail) | One-line reason |
 |------|------------------------------|-----------------|
-| Correctness | concern | a long skill-fit justification makes the stored breakdown unreadable and the detail drops it silently (R1); mock misreads Polish amounts (R3) |
+| Correctness | concern | R1-R6 fixed; the new mock regex reads "1,500 USD" as 500 USD (R8) |
 | Design | ok | ports respected, runner small and serial, costly decisions each in one place |
-| Safety | concern | the budget guard checks only that the quote exists, not the amounts (R2); provider input is data only (TR-02 test) |
-| Tests | ok | behaviour-level integration tests for every AC; mutation 98.5 % with plausible `accept` decisions |
-| Simplicity | ok | integer tables, no premature abstraction |
-| Plan fidelity | concern | `docs/scoring.md` misses the pre-filter and guard sections (R6) |
+| Safety | concern | the budget guard now checks the amounts, but not the currency nor where the quote starts and ends in the source (R7) |
+| Tests | ok | each fix has a behaviour test; the gaps in R7/R8 are untested cases, not weak assertions |
+| Simplicity | ok | integer tables, small helpers, no premature abstraction |
+| Plan fidelity | ok | `docs/scoring.md` now complete; all other files as planned or logged |
 | Agent decisions | ok | D-5/D-7/D-8/D-11/D-12/D-13 each implemented in one place; the profitability `[REVIEW]` deviation is documented in `docs/scoring.md` and needs the user's call at the PR |
 
 ## Findings
@@ -104,3 +108,21 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 - Effort: small
 - Lesson candidate: no
 - Decision: fixed (01de258)
+
+### R7: The budget guard accepts a quote cut from the middle of a number and any currency
+- Severity: major
+- Where: `apps/api/src/modules/analysis/output-guard.ts:28-31`, `:40-43`, `:56-62`
+- Problem: after the R2 fix the guard checks that the quote is a substring of the source and that the quote's numbers include `minMinor`/`maxMinor`. It checks neither the quote's boundaries in the source nor the currency. Checked with a script against `guardAnalysis`: (a) source "Szukam programisty. Budżet 1 500 zł za całość.", budget `{ minMinor: 50 000, maxMinor: 50 000, PLN, quote: "500 zł" }` is kept with no note, so the UI would show "500 PLN — ze źródła: „500 zł”" for a 1 500 PLN post; (b) source "budżet 8000-12000 PLN", budget with `currency: "EUR"` and the exact quote is kept with no note, so the amount column, the `minAmount`/`currency` filter and profitability use EUR. The mock itself produces case (a) end to end (R8), which shows the guard does not catch it. D-14 claims TR-01 (invented budget shown as a source fact) holds for any provider; currency and digits are both values derived from the quote, which is what the R2 lesson candidate asks the guard to verify.
+- Fix: in `quoteStates`, also require the quote's currency token (`PLN|zł|EUR|€|USD|$`, mapped as in the mock) to map to `budget.currency`, and require the quote not to start or end inside a number in the source (find the squashed quote in the squashed source and reject when the character before its first digit, or after its last digit, is a digit or a `[ .,]` followed/preceded by a digit). Add both cases to `output-guard.test.ts`.
+- Effort: small
+- Lesson candidate: no (covered by the R2 lesson candidate)
+- Decision: open
+
+### R8: Mock reads a comma thousands separator as the start of a new number
+- Severity: minor
+- Where: `apps/api/src/infrastructure/llm/mock.ts:24`
+- Problem: the R3 fix allows only space or dot between groups of three, so "Budget: 1,500 USD" no longer matches as one number: the `(?<!\d)` lookbehind lets the match start at "500", giving `{ minMinor: 50 000, maxMinor: 50 000, USD, quote: "500 USD" }` (checked with a script; before the fix this string gave 1 500 USD). Because the quote is a real substring and contains 500, the guard keeps it (R7), and the detail shows a DEMO-labelled 500 USD as "ze źródła". The English comma-thousands form is common in the `en` posts the profile accepts.
+- Fix: accept a comma as a thousands separator when followed by exactly three digits and not by a decimal pair (`\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?`, and keep the decimal tail rule), and make the start lookbehind also reject a preceding `[ .,]\d` group (e.g. `(?<![\d][ .,]?)`), so a match never begins mid-number. Add "Budget: 1,500 USD" and "1,500.50 USD" to `mock.test.ts`.
+- Effort: small
+- Lesson candidate: no
+- Decision: open
