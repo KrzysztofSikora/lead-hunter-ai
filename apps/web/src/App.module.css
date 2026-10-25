@@ -35,6 +35,24 @@
   width: 100%;
 }
 
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.nav a {
+  padding: 0.5rem 0;
+  color: inherit;
+}
+
+.nav a[aria-current='page'] {
+  font-weight: bold;
+  text-decoration: underline;
+}
+
 .logout {
-  align-self: flex-start;
+  margin-left: auto;
 }

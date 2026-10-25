@@ -41,10 +41,13 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   sekretów w logach, polska powłoka UI, `pnpm discover` (brak źródeł); logowanie operatora
   (hasło w `OPERATOR_PASSWORD_HASH`, sesja w ciasteczku `HttpOnly` + `SameSite=Strict` ważna 30 dni
   bez aktywności, wylogowanie, limit 5 prób na 15 minut); każdy `/api/*` poza health i logowaniem
-  wymaga sesji.
+  wymaga sesji; profil operatora (`GET`/`PUT /api/profile`, widok *Profil* w UI, przykładowy profil
+  z etykietą `PRZYKŁAD` przy pierwszym uruchomieniu); błędy walidacji ciała żądania mają jeden
+  kształt `{ error: "validation_failed", fields }`.
 - **Co wymaga kluczy:** nic w tej chwili; klucze LLM i skrzynka IMAP dojdą ze slice'ami S-04 i S-11.
 - **Co wymaga ręcznej weryfikacji:** uruchomienie `docker compose up` na Raspberry Pi
-  (czas budowania better-sqlite3 na ARM64), wygląd powłoki i formularza logowania na telefonie,
+  (czas budowania better-sqlite3 na ARM64), wygląd powłoki i formularza logowania na telefonie, widok *Profil* na telefonie i komunikaty
+  błędów przy polach,
   flaga `Secure` ciasteczka za Tailscale (w Dockerze serwer widzi adres bramy, nie loopback,
   więc flaga nie jest ustawiana; patrz decyzja D-6 w `context/changes/operator-login/plan.md`).
 

@@ -18,9 +18,7 @@ export interface PasswordVerifier {
   verify(password: string): Promise<boolean>;
 }
 
-export interface Clock {
-  now(): Date;
-}
+export type { Clock } from '../shared/clock.js';
 
 export interface TokenSource {
   newToken(): string;
