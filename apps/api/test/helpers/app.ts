@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
+import { createProfileRepository } from '../../src/infrastructure/db/profile-repository.js';
 import { createSessionRepository } from '../../src/infrastructure/db/session-repository.js';
 import { randomTokenSource } from '../../src/infrastructure/auth/token-source.js';
 import type { Clock } from '../../src/modules/auth/ports.js';
@@ -26,8 +27,8 @@ function tempDir(): string {
 }
 
 /** A file-backed, migrated database in a temp dir, closed after the test. */
-export function openTestDb(): OpenDb & { dir: string; file: string } {
-  const dir = tempDir();
+export function openTestDb(existingDir?: string): OpenDb & { dir: string; file: string } {
+  const dir = existingDir ?? tempDir();
   const file = join(dir, 'lead-hunter.db');
   const opened = openDb(file);
   cleanups.push(() => void opened.sqlite.close());
@@ -59,9 +60,11 @@ export async function buildTestApp(
     clock?: Clock;
     /** Run without a configured password hash (D-2). */
     noPassword?: boolean;
+    /** Reuse the database in this dir (a restart); the first app's connection stays open. */
+    dir?: string;
   } = {},
 ): Promise<{ app: FastifyInstance; config: Config; dir: string }> {
-  const { dir, sqlite, db } = openTestDb();
+  const { dir, sqlite, db } = openTestDb(options.dir);
   const config = loadConfig({ DATA_DIR: dir, ...options.env });
   const hash = await getTestHash();
   const app = await buildApp({
@@ -73,6 +76,10 @@ export async function buildTestApp(
       ...(options.noPassword ? {} : { verifier: { verify: (pw) => verifyPassword(pw, hash) } }),
       clock: options.clock ?? { now: () => new Date() },
       tokens: randomTokenSource,
+    },
+    profile: {
+      repository: createProfileRepository(db),
+      clock: options.clock ?? { now: () => new Date() },
     },
     ...options.overrides,
   });
