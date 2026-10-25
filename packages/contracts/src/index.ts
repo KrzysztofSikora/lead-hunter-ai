@@ -73,3 +73,9 @@ export {
   StatusChangeRequest,
 } from './status.js';
 export type { MoveCheck } from './status.js';
+export {
+  PIPELINE_STAGE_LIMIT,
+  PIPELINE_STAGES,
+  PipelineItem,
+  PipelineResponse,
+} from './pipeline.js';

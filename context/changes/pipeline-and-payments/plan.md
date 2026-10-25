@@ -255,7 +255,7 @@ Observably true when done:
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Transition rules and the widened status API
 - [x] Phase 2: Follow-ups and payments
-- [ ] Phase 3: Pipeline summary API
+- [x] Phase 3: Pipeline summary API
 - [ ] Phase 4: Card: status panel, contact, follow-up, payments
 - [ ] Phase 5: Pipeline view, "Na dziś" and the main-path e2e
 
@@ -300,6 +300,8 @@ Observably true when done:
   `payments: []` (new required `OpportunityDetail` fields); no assertion changed.
 - [minor] Phase 2: a payment writes no `activity_events` row (plan lists none); the payments list on
   the detail is its only history.
+- [minor] Phase 3: `contacted` counts distinct opportunities with an operator `STATUS_CHANGE` to CONTACTED, REPLIED, MEETING, WON or LOST, or with `CONTACTED` in `skipped` (the [REVIEW] note of Phase 1); `json_each` worked in the bundled SQLite, so no TypeScript fallback. `followUpsDue` uses `FOLLOW_UP_STATUSES`.
+- [minor] Phase 3: `PIPELINE_STAGES` and `PIPELINE_STAGE_LIMIT` live in `packages/contracts/src/pipeline.ts` so the web can reuse the stage order in Phase 5.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

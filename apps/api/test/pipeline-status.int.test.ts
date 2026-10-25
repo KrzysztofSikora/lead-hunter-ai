@@ -240,3 +240,109 @@ describe('payments (FR-15 AC1)', () => {
     expect((await t.call('GET', `/api/opportunities/${id}`)).json().payments).toEqual([]);
   });
 });
+
+describe('pipeline summary (FR-15 AC2, FR-14 AC4)', () => {
+  it('counts contacted, won and paid separately and sums per currency', async () => {
+    const t = await setup();
+    const a = await t.importText('DEMO: Potrzebujemy strony wizytówki dla pracowni.');
+    const b = await t.importText('DEMO: Szukamy kogoś do integracji z systemem magazynowym.');
+    const c = await t.importText('DEMO: Zlecenie na prosty skrypt do raportów.');
+    const move = (id: number, payload: object) =>
+      t.call('POST', `/api/opportunities/${id}/status`, payload);
+    const pay = (id: number, amountMinor: number, currency: string) =>
+      t.call('POST', `/api/opportunities/${id}/payments`, {
+        amountMinor,
+        currency,
+        paidOn: '2026-01-01',
+      });
+
+    await move(a, { status: 'SAVED' });
+    await move(a, { status: 'CONTACTED' });
+    await pay(a, 10_000, 'PLN');
+    await move(b, { status: 'SAVED' });
+    await move(b, { status: 'CONTACTED' });
+    await move(b, { status: 'WON' });
+    await move(c, { status: 'SAVED' });
+    await pay(c, 5_000, 'EUR');
+    await pay(c, 2_000, 'EUR');
+
+    const res = await t.call('GET', '/api/pipeline');
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.totals).toEqual({
+      contacted: 2,
+      won: 1,
+      paid: 2,
+      paidSums: [
+        { currency: 'EUR', totalMinor: 7_000, count: 2 },
+        { currency: 'PLN', totalMinor: 10_000, count: 1 },
+      ],
+    });
+
+    const stage = (status: string) =>
+      body.stages.find((s: { status: string }) => s.status === status);
+    expect(stage('CONTACTED')).toMatchObject({ count: 1 });
+    expect(stage('CONTACTED').items[0]).toMatchObject({
+      id: a,
+      paid: [{ currency: 'PLN', totalMinor: 10_000 }],
+    });
+    expect(stage('WON').items[0]).toMatchObject({ id: b, paid: [] });
+    expect(stage('SAVED').items[0]).toMatchObject({
+      id: c,
+      paid: [{ currency: 'EUR', totalMinor: 7_000 }],
+    });
+    expect(body.otherCounts).toContainEqual({ status: 'NEW', count: 0 });
+  });
+
+  it('counts a row that reached a later contact stage from an off-path status as contacted', async () => {
+    const t = await setup();
+    const id = await t.importText(POST);
+    const move = (payload: object) => t.call('POST', `/api/opportunities/${id}/status`, payload);
+    await move({ status: 'NEEDS_VERIFICATION' });
+    await move({ status: 'MEETING' });
+    const { totals } = (await t.call('GET', '/api/pipeline')).json();
+    expect(totals).toMatchObject({ contacted: 1, won: 0, paid: 0, paidSums: [] });
+  });
+
+  it('lists only follow-ups due today or overdue, overdue first, in contact stages', async () => {
+    const t = await setup();
+    const today = await t.importText('DEMO: Prośba o wycenę sklepu na WooCommerce.');
+    const tomorrow = await t.importText('DEMO: Poszukujemy developera do panelu klienta.');
+    const early = await t.importText('DEMO: Chcemy zautomatyzować fakturowanie.');
+    for (const id of [today, tomorrow, early]) {
+      await t.call('POST', `/api/opportunities/${id}/status`, { status: 'CONTACTED' });
+    }
+    const followUp = (id: number, on: string) =>
+      t.call('PUT', `/api/opportunities/${id}/follow-up`, { on });
+    await followUp(today, '2026-01-02');
+    await followUp(tomorrow, '2026-01-03');
+    await followUp(early, '2026-01-01');
+
+    t.clock.advance(24 * 3_600_000); // 2026-01-02 in Warsaw
+    const body = (await t.call('GET', '/api/pipeline')).json();
+    expect(body.followUpsDue.map((i: { id: number }) => i.id)).toEqual([early, today]);
+    expect(body.followUpsDue[0]).toMatchObject({ followUpOn: '2026-01-01' });
+
+    // Cleared by leaving the contact stages: no longer due.
+    await t.call('POST', `/api/opportunities/${today}/status`, { status: 'LOST' });
+    const after = (await t.call('GET', '/api/pipeline')).json();
+    expect(after.followUpsDue.map((i: { id: number }) => i.id)).toEqual([early]);
+  });
+
+  it('is empty on an empty database and needs a session', async () => {
+    const t = await setup();
+    const body = (await t.call('GET', '/api/pipeline')).json();
+    expect(body.followUpsDue).toEqual([]);
+    expect(body.totals).toEqual({ contacted: 0, won: 0, paid: 0, paidSums: [] });
+    expect(body.stages.map((s: { status: string }) => s.status)).toEqual([
+      'SAVED',
+      'OFFER_DRAFTED',
+      'CONTACTED',
+      'REPLIED',
+      'MEETING',
+      'WON',
+      'LOST',
+    ]);
+    expect((await t.app.inject({ method: 'GET', url: '/api/pipeline' })).statusCode).toBe(401);
+  });
+});

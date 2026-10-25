@@ -14,6 +14,7 @@ import type { LlmProvider } from '../../src/modules/analysis/ports.js';
 import { createProfileService } from '../../src/modules/profile/service.js';
 import { createPaymentRepository } from '../../src/infrastructure/db/payment-repository.js';
 import { createOpportunityRepository } from '../../src/infrastructure/db/opportunity-repository.js';
+import { createPipelineRepository } from '../../src/infrastructure/db/pipeline-repository.js';
 import { createProfileRepository } from '../../src/infrastructure/db/profile-repository.js';
 import { createSignalRepository } from '../../src/infrastructure/db/signal-repository.js';
 import { createSessionRepository } from '../../src/infrastructure/db/session-repository.js';
@@ -119,6 +120,7 @@ export async function buildTestApp(
       sourceStatus: noSourcesYet,
       clock,
     },
+    pipeline: { repository: createPipelineRepository(db), clock },
     analysis: runner,
     ...options.overrides,
   });
