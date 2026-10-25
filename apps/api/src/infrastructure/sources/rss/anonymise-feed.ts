@@ -5,9 +5,10 @@ const ENTRY_OPEN = /<(item|entry)[\s>]/g;
 // Bounded by RFC lengths (64 local part, 255 domain) so each start position scans a constant run.
 const EMAIL = /[^\s<>"'&;@]{1,64}@[^\s<>"'&;@]{1,255}\.[^\s<>"'&;@]{1,63}/g;
 const URL_IN_TEXT = /https?:\/\/(?:(?!&(?:quot|lt|gt|apos|#\d+|#x[\da-f]+);)[^\s"'<>\\])+/gi;
-const PHONE = /(?<![\w.-])\+?\d[\d ()-]{7,}\d(?![\w-])/g;
+// A phone number is at most ~20 characters, so each start position scans a bounded run.
+const PHONE = /(?<![\w.-])\+?\d[\d ()-]{7,20}\d(?![\w-])/g;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const PERSON_TAG = /<((?:dc:)?creator|author)(\s[^>]*)?>[\s\S]*?<\/\1>/g;
+const PERSON_OPEN = /<((?:dc:)?creator|author)(\s[^>]{0,256})?>/g;
 const OWN_LINKS = [
   /<link(?:\s[^>]*)?>\s*(?:<!\[CDATA\[)?([^<\]]+)/,
   /<link\b[^>]*\bhref="([^"]+)"/,
@@ -17,8 +18,8 @@ const OWN_LINKS = [
 
 /**
  * Cuts a feed down to its first entries and strips what identifies a person: e-mail addresses,
- * author names, phone-like numbers and every URL inside an entry except that entry's own link. Linear string work on a body that is already size-capped. The person still
- * reviews the file before committing it.
+ * author names, phone-like numbers and every URL inside an entry except that entry's own link. Linear string work on a body that is already size-capped. The person still reviews the
+ * file before committing it.
  */
 export function anonymiseFeed(xml: string, entries: number = FIXTURE_ENTRIES): string {
   const starts = [...xml.matchAll(ENTRY_OPEN)].map((m) => m.index);
@@ -55,11 +56,30 @@ export function anonymiseFeed(xml: string, entries: number = FIXTURE_ENTRIES): s
 
 /** `keepUrls` null keeps every URL (the feed's own header: namespaces, channel link). */
 function scrub(text: string, keepUrls: ReadonlySet<string> | null): string {
-  return text
-    .replace(PERSON_TAG, '<$1>DEMO</$1>')
+  return blankPeople(text)
     .replace(EMAIL, 'demo@example.com')
     .replace(URL_IN_TEXT, (url) =>
       keepUrls === null || keepUrls.has(url) ? url : 'https://example.com/demo',
     )
     .replace(PHONE, (match) => (ISO_DATE.test(match) ? match : '+00 000 000 000'));
+}
+
+/** Replaces the body of every author/creator element; a tag with no close tag is left alone. */
+function blankPeople(text: string): string {
+  let out = '';
+  let cursor = 0;
+  const missing = new Set<string>();
+  for (const open of text.matchAll(PERSON_OPEN)) {
+    const tag = open[1] as string;
+    if (open.index < cursor || missing.has(tag)) continue;
+    const close = `</${tag}>`;
+    const end = text.indexOf(close, open.index + open[0].length);
+    if (end === -1) {
+      missing.add(tag);
+      continue;
+    }
+    out += `${text.slice(cursor, open.index)}<${tag}>DEMO${close}`;
+    cursor = end + close.length;
+  }
+  return out + text.slice(cursor);
 }
