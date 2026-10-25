@@ -352,3 +352,4 @@ apps/api/src/modules/signals/ports.ts   PageFetcher port
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
+- [minor] Mutation: Stryker's sandbox re-encodes files as UTF-8, which corrupted the raw ISO-8859-2 fixture and failed the dry run. The fixture is now ASCII with `\xNN` escapes, read through `apps/api/test/helpers/page-fixture.ts`; test content is unchanged.

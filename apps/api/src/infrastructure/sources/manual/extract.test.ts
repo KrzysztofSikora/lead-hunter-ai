@@ -1,10 +1,8 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { pageFixture as fixture } from '../../../../test/helpers/page-fixture.js';
 import { extractPage } from './extract.js';
 
 const enc = (text: string) => new TextEncoder().encode(text);
-const fixture = (name: string) =>
-  readFileSync(new URL(`../../../../test/fixtures/pages/${name}`, import.meta.url));
 const URL_ = 'https://example.com/job';
 const LONG = 'Fikcyjne zlecenie na panel do planowania tras. '.repeat(20);
 

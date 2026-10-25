@@ -1,12 +1,10 @@
-import { readFileSync } from 'node:fs';
 import { getGlobalDispatcher, type MockAgent } from 'undici';
 import { describe, expect, it } from 'vitest';
 import { opportunities, rawSignals } from '../src/infrastructure/db/schema.js';
 import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/app.js';
+import { pageFixture as fixture } from './helpers/page-fixture.js';
 
 const PAGE = '/oferta/1';
-const fixture = (name: string) =>
-  readFileSync(new URL(`./fixtures/pages/${name}`, import.meta.url));
 
 const mock = () => getGlobalDispatcher() as unknown as MockAgent;
 

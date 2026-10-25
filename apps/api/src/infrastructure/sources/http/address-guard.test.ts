@@ -87,6 +87,7 @@ describe('checkTarget', () => {
     ['javascript:alert(1)', 'blocked_url'],
     ['http://user:secret@example.com/', 'blocked_url'],
     ['http://user@example.com/', 'blocked_url'],
+    ['http://:secret@example.com/', 'blocked_url'],
     ['http://127.0.0.1/', 'blocked_address'],
     ['http://[::1]/', 'blocked_address'],
     ['http://[::ffff:10.0.0.1]/', 'blocked_address'],
@@ -141,6 +142,12 @@ describe('createGuardedLookup', () => {
     const { run } = lookupWith([PUBLIC]);
     expect(await run({})).toEqual({ error: null, address: '93.184.216.34', family: 4 });
     expect(await run(4)).toEqual({ error: null, address: '93.184.216.34', family: 4 });
+  });
+
+  it('turns a numeric family into the family option', async () => {
+    const { run, calls } = lookupWith([PUBLIC]);
+    await run(6);
+    expect(calls[0]?.options).toEqual({ family: 6, all: true });
   });
 
   it('forces all and keeps the caller options', async () => {
