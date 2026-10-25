@@ -1,1 +1,1 @@
-export const ENV_VARIABLES = [] as const;
+export * from './env.js';
