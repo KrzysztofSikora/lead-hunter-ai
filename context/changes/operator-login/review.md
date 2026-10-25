@@ -52,7 +52,7 @@ Gates: typecheck ok, lint ok, unit tests ok (122/122), e2e ok (2/2, Chromium via
 - Fix: in `auth.int.test.ts`, with `FakeClock`, advance 2 h after login and assert `GET /api/auth/session` returns a `Set-Cookie` with `Max-Age=2592000`; a second request right after returns none.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (b6d1f19)
 
 ### R2: A server that is down shows the login form instead of the error
 - Severity: minor
@@ -61,7 +61,7 @@ Gates: typecheck ok, lint ok, unit tests ok (122/122), e2e ok (2/2, Chromium via
 - Fix: `getSession()` returns `true` for 200, `false` for 401, and throws otherwise. `App` adds an `error` view that shows `strings.status.error` (with a retry option, or reload), and the test expects that text.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (9db2bc5)
 
 ### R3: Redundant hash variable in the server wiring
 - Severity: minor
@@ -70,4 +70,4 @@ Gates: typecheck ok, lint ok, unit tests ok (122/122), e2e ok (2/2, Chromium via
 - Fix: `const hash = config.operatorPasswordHash;` then `...(hash ? { verifier: { verify: (password) => verifyPassword(password, hash) } } : {})`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (94f7a5c)

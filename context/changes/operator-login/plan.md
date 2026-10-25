@@ -282,3 +282,4 @@ Migration `0001_*`: `sessions` as in D-3. No foreign keys. Nothing else changes.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
+- [minor] Review round 1 (R2): `getSession()` now throws on any status except 200/401 and `App` has an `error` view showing `strings.status.error`; the earlier test pinning "login form on unreachable server" was replaced (not weakened) by two tests expecting the error text and no login form.
