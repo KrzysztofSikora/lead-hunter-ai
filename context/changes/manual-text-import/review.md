@@ -1,7 +1,18 @@
 # Review: manual-text-import
 
-Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (24 files, 217 tests), e2e ok (4 tests), image not run (sandbox: corepack inside `docker build` cannot fetch pnpm 12.15.0 through the TLS proxy, `self-signed certificate in certificate chain`; environment, not this change, which touches no `package.json` or lockfile; the CI `image` job is the authority), mutation n/a (S-03 is not a mutation target in the test plan) · Round: 1
+Verdict: APPROVE
+Gates: typecheck ok, lint ok, unit tests ok (23 files, 214 tests), e2e ok (4 tests), image not run (sandbox: corepack inside `docker build` cannot fetch pnpm 12.15.0 through the TLS proxy, `self-signed certificate in certificate chain`; environment, not this change, which touches no `package.json` or lockfile; the CI `image` job is the authority), mutation n/a (S-03 is not a mutation target in the test plan) · Round: 2
+
+## Re-review (round 2)
+Checked the five fix commits (71f019b, 68bce4d, 69f699e, 459ade3, ea927ed) against R1–R5; gates re-run on `bbd50d8`. No new findings.
+
+| Finding | Verified | Evidence |
+|---------|----------|----------|
+| R1 | fixed | `apps/web/src/ImportPage.test.tsx` deleted; no package or config left behind; unit count 217 → 214 matches the removed file |
+| R2 | fixed | `emptyAsAbsent` preprocess on `page`/`pageSize`/`minScore` in `packages/contracts/src/opportunities.ts:172`; int test `?minScore=&page=` → `total: 3, page: 1` passes |
+| R3 | fixed | `OpportunitiesPage.tsx:216` *Poprzednia* goes to `min(page - 1, pages)`, so from `?page=5` with one page it lands on page 1 in one click. The out-of-range page itself still shows "Razem: N" with no items; acceptable now that the way back is a single click |
+| R4 | fixed | `identity.ts:64` cuts with `Array.from`; new unit row asserts `isWellFormed()` and 200 code points |
+| R5 | fixed | the three keys are gone; typecheck passes, so nothing referenced them |
 
 ## Plan vs diff
 | File | Status | Note |
@@ -28,9 +39,9 @@ Gates: typecheck ok, lint ok, unit tests ok (24 files, 217 tests), e2e ok (4 tes
 | `apps/web/src/warsawTime.ts`, `warsawTime.test.ts` | done | DST days covered |
 | `apps/web/src/App.tsx` | done | nav *Okazje*/*Import*, routes |
 | `apps/web/src/App.module.css` | absent | not needed: the nav already wraps and e2e shows no overflow |
-| `apps/web/src/strings.pl.ts` | done | three unused keys, see R5 |
+| `apps/web/src/strings.pl.ts` | done | unused keys removed (R5) |
 | `apps/web/src/ImportPage.tsx` | done | form, result line, field errors |
-| `apps/web/src/ImportPage.test.tsx` | unplanned | React component test against the test-plan budget, not logged, see R1 |
+| `apps/web/src/ImportPage.test.tsx` | done | was unplanned (R1); removed in 71f019b, no longer in the diff |
 | `e2e/smoke.spec.ts` | done | D-13 test, no-overflow on `/okazje`, `/import`, `/okazje/:id`, screenshots |
 | `README.md` | done | *Co działa* updated |
 | `context/changes/manual-text-import/evidence/*.png` | done | three screenshots from the e2e |
@@ -39,12 +50,12 @@ Gates: typecheck ok, lint ok, unit tests ok (24 files, 217 tests), e2e ok (4 tes
 ## Areas
 | Area | Result | One-line reason |
 |------|--------|-----------------|
-| Correctness | ok | ACs FR-02 AC1–AC4, FR-06 AC1–AC3, FR-11 AC1, FR-12 AC1 met; small edge cases in R2–R4 |
+| Correctness | ok | ACs FR-02 AC1–AC4, FR-06 AC1–AC3, FR-11 AC1, FR-12 AC1 met; R2–R4 edge cases fixed |
 | Design | ok | module/port/repository layering as in S-01/S-02; costly decisions each live in one file |
 | Safety | ok | every 400 comes from the schema; http(s)-only URLs (no `javascript:` hrefs); source text rendered as text; pasted text not logged |
-| Tests | concern | API and identity tests assert behaviour and failure paths; one unplanned component test breaks the budget (R1) |
-| Simplicity | ok | small functions; a few dead strings (R5) |
-| Plan fidelity | concern | matches the plan except the unlogged component test (R1) |
+| Tests | ok | API and identity tests assert behaviour and failure paths; R2/R4 fixes come with tests; component test removed (R1) |
+| Simplicity | ok | small functions; dead strings removed (R5) |
+| Plan fidelity | ok | matches the plan now that the unlogged component test is gone (R1) |
 | Agent decisions | ok | D-1/D-2/D-14 in `identity.ts` + `service.ts`; D-8–D-11 only in `contracts/opportunities.ts`; D-10 stub in one file |
 
 ## Findings
