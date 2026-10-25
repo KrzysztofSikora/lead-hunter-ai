@@ -60,7 +60,8 @@ czego źródło nie powiedziało, jest usuwane lub obniżane, a każda zmiana tr
 - **Fakty „ze źródła”** (`sourceFacts`) zostają tylko wtedy, gdy występują w tekście
   (bez rozróżniania wielkości liter i białych znaków); puste fakty są usuwane.
 - **Budżet ze źródła** zostaje tylko wtedy, gdy cytat występuje w tekście **i** zawiera obie kwoty
-  (`minMinor`, `maxMinor`); inaczej jest usuwany, a opłacalność liczy się jako brak danych.
+  (`minMinor`, `maxMinor`), walutę zgodną z budżetem i nie zaczyna się ani nie kończy w środku
+  dłuższej liczby w tekście (np. „500 zł” z „1 500 zł”); inaczej jest usuwany, a opłacalność liczy się jako brak danych.
 - **Poziom dowodu** `DIRECT_REQUEST` bez sygnału zlecenia lub płatności w tekście spada do
   `EXPLICIT_PROBLEM`.
 - **Kategoria** płatna (`DIRECT_GIG`, `B2B_SUBCONTRACT`) bez takiego sygnału zmienia się na
