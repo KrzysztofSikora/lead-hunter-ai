@@ -238,11 +238,13 @@ storing (lesson). Notes and reasons are operator text, never logged.
 - [x] Phase 1: Analysis schema v2 with MVP scope and exclusions
 - [x] Phase 2: Activity events and the actions API
 - [x] Phase 3: The twelve-element card with provenance tags
-- [ ] Phase 4: Card actions, history and e2e
+- [x] Phase 4: Card actions, history and e2e
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 3) Open a mock-analysed card at 360×740 and at laptop width; judge that facts, inferences, estimates and rule results are told apart by tag text and border, and that the Polish reads naturally — run: `pnpm dev`, import a pasted ad on /import, open /okazje/<id> — evidence: screenshots arrive in Phase 4 (`E2E_EVIDENCE=1 pnpm e2e`)
+
+- [ ] (Phase 4) On a phone, reject an opportunity with "inne" and a note, then add a note; check the history reads correctly and the disabled buttons read as "not yet", not broken — run: `pnpm dev`, import a pasted ad on /import, open /okazje/<id> — evidence: `context/changes/opportunity-card/evidence/card-360.jpg`, `card-actions-360.jpg` (from `E2E_EVIDENCE=1 pnpm e2e`)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -250,6 +252,7 @@ storing (lesson). Notes and reasons are operator text, never logged.
 - [minor] Phase 2: `ActivityRepository` has no `list`; `OpportunityRepository.get` returns the activity rows (one read path for the detail). System events follow plan-review #3 (status read in the same transaction; no event when the operator moved the row first, covered by an integration case). `refine` for `OTHER` sits on the `REJECTED` member with `path: ['note']` (plan-review #6).
 
 - [minor] Phase 3: the plan lists no `History` rendering until phase 4; the page shows a plain placeholder list (time, type, note) and the disabled action buttons, both replaced in phase 4. Guard notes sit in element 4 (tag `wyliczone regułami`); the source-fact list sits in element 3; the demo banner and provider line stay above the card.
+- [minor] Phase 4: evidence screenshots are JPEG (quality 55) to stay under 300 KB for a full-page card. The older e2e assertion on component names ("Popyt" exact) became a regex on "Popyt n / m" because phase 3 puts points in the same row; the source link now appears in elements 2 and 12, so the duplicate-import check uses `.first()`.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

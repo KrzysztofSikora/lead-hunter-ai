@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { ActivityEvent, OpportunityDetail } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
+import { CardActions } from './CardActions.js';
 import { getOpportunity } from './api/opportunities.js';
 import { buildCard, type CardItem, type CardSection } from './opportunityCard.js';
 import { strings } from './strings.pl.js';
 import { formatWarsaw } from './warsawTime.js';
 
 const t = strings.opportunity;
+const list = strings.opportunities;
 
 type Load =
   | { state: 'loading' }
@@ -49,7 +51,9 @@ export function OpportunityPage() {
           {t.loadFailed}
         </p>
       )}
-      {load.state === 'ready' && <Detail data={load.data} />}
+      {load.state === 'ready' && (
+        <Detail data={load.data} onChange={(data) => setLoad({ state: 'ready', data })} />
+      )}
     </section>
   );
 }
@@ -62,7 +66,13 @@ const TAG_CLASS = {
   unknown: styles.tagUnknown,
 } as const;
 
-function Detail({ data }: { data: OpportunityDetail }) {
+function Detail({
+  data,
+  onChange,
+}: {
+  data: OpportunityDetail;
+  onChange: (data: OpportunityDetail) => void;
+}) {
   const analysis = data.latestAnalysis;
   return (
     <>
@@ -80,7 +90,13 @@ function Detail({ data }: { data: OpportunityDetail }) {
       )}
       <div className={styles.card}>
         {buildCard(data).map((section, index) => (
-          <Section key={section.key} section={section} number={index + 1} />
+          <Section
+            key={section.key}
+            section={section}
+            number={index + 1}
+            data={data}
+            onChange={onChange}
+          />
         ))}
       </div>
       {data.evidence.length > 0 && (
@@ -107,14 +123,24 @@ function Detail({ data }: { data: OpportunityDetail }) {
   );
 }
 
-function Section({ section, number }: { section: CardSection; number: number }) {
+function Section({
+  section,
+  number,
+  data,
+  onChange,
+}: {
+  section: CardSection;
+  number: number;
+  data: OpportunityDetail;
+  onChange: (data: OpportunityDetail) => void;
+}) {
   return (
     <section className={`${styles.element} ${styles[`el_${section.key}`] ?? ''}`}>
       <h3>
         {number}. {section.title}
       </h3>
       {section.emptyReason && <p className={styles.emptyReason}>{section.emptyReason}</p>}
-      {section.key === 'actions' && <ActionButtons />}
+      {section.key === 'actions' && <CardActions data={data} onChange={onChange} />}
       {section.items.length > 0 && (
         <dl className={styles.facts}>
           {section.items.map((item) => (
@@ -122,7 +148,7 @@ function Section({ section, number }: { section: CardSection; number: number }) 
           ))}
         </dl>
       )}
-      {section.events && <History events={section.events} />}
+      {section.events && <History events={section.events} createdAt={data.createdAt} />}
     </section>
   );
 }
@@ -179,33 +205,31 @@ function Value({ item }: { item: CardItem }) {
   return <>{value}</>;
 }
 
-/** Phase 4 enables Zapisz / Odrzuć / Dodaj notatkę; until then no button looks live. */
-function ActionButtons() {
-  const a = t.actions;
-  return (
-    <div className={styles.actions}>
-      {[a.save, a.reject, a.note, a.offer, a.contact].map((label) => (
-        <button key={label} type="button" disabled>
-          {label}
-        </button>
-      ))}
-      <p className={styles.meta}>
-        {a.offer}, {a.contact}: {a.later}
-      </p>
-    </div>
-  );
-}
-
-function History({ events }: { events: ActivityEvent[] }) {
-  if (events.length === 0) return <p className={styles.meta}>{t.historyEmpty}</p>;
+function History({ events, createdAt }: { events: ActivityEvent[]; createdAt: string }) {
+  const h = t.history;
   return (
     <ul className={styles.plain}>
       {events.map((event) => (
         <li key={event.id}>
-          {formatWarsaw(event.occurredAt)} · {event.type}
-          {event.note ? ` — ${event.note}` : ''}
+          <strong>{formatWarsaw(event.occurredAt)}</strong> ·{' '}
+          {event.type === 'NOTE' ? h.note : h.statusChange} ({h[event.actor]})
+          {event.type === 'STATUS_CHANGE' && event.toStatus && (
+            <>
+              {': '}
+              {event.fromStatus && `${list.businessStatus[event.fromStatus]} → `}
+              {list.businessStatus[event.toStatus]}
+            </>
+          )}
+          {event.reason && ` — ${h.reason}: ${t.actions.reasons[event.reason]}`}
+          {event.cause?.kind === 'prefilter' &&
+            ` — ${h.prefilter(strings.prefilterRules[event.cause.rule])}`}
+          {event.cause?.kind === 'insufficient_data' && ` — ${h.insufficientData}`}
+          {event.note && <div className={styles.text}>{event.note}</div>}
         </li>
       ))}
+      <li>
+        <strong>{formatWarsaw(createdAt)}</strong> · {t.detectedEntry}
+      </li>
     </ul>
   );
 }

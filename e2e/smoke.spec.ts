@@ -5,7 +5,10 @@ test.use({ viewport: { width: 360, height: 740 } });
 
 // Evidence screenshots are written only on request (`E2E_EVIDENCE=1 pnpm e2e`), so a plain
 // gate run never rewrites committed evidence of other changes.
-async function evidence(page: Page, options: { path: string; fullPage?: boolean }) {
+async function evidence(
+  page: Page,
+  options: { path: string; fullPage?: boolean; quality?: number },
+) {
   if (process.env.E2E_EVIDENCE === '1') await page.screenshot(options);
 }
 
@@ -82,6 +85,7 @@ test('the operator edits the example profile and it survives a reload', async ({
 });
 
 const IMPORT_EVIDENCE = 'context/changes/manual-text-import/evidence';
+const CARD_EVIDENCE = 'context/changes/opportunity-card/evidence';
 const ANALYSIS_EVIDENCE = 'context/changes/analysis-and-scoring/evidence';
 const POST_TITLE =
   'DEMO: Szukamy programisty TypeScript do zbudowania integracji API z systemem magazynowym.';
@@ -134,12 +138,51 @@ test('the operator imports a pasted post, sees it in the list and the repeat is 
     'Opłacalność',
     'Powtarzalność',
   ]) {
-    await expect(page.getByText(component, { exact: true })).toBeVisible();
+    await expect(page.getByText(new RegExp(`^${component} \\d+ / \\d+`))).toBeVisible();
   }
   await expect(page.getByText('szacunek (hipoteza)').first()).toBeVisible();
   await expect(page.getByText(/ze źródła: „.*8000-12000 PLN.*”/)).toBeVisible();
   await assertNoOverflow(page);
   await evidence(page, { path: `${ANALYSIS_EVIDENCE}/detail-360.png`, fullPage: true });
+
+  // The twelve §8 elements, each under its own heading.
+  for (const [index, title] of [
+    'Okazja',
+    'Źródło i daty',
+    'Fragment źródła i poziom dowodu',
+    'Ocena',
+    'Kto ma problem i jaki',
+    'Co można sprzedać',
+    'Dopasowane kompetencje',
+    'Rozliczenie, cena i czas',
+    'Ryzyka i braki',
+    'Następny krok',
+    'Akcje',
+    'Historia i źródło',
+  ].entries()) {
+    await expect(page.getByRole('heading', { name: `${index + 1}. ${title}` })).toBeVisible();
+  }
+  await expect(page.getByRole('button', { name: 'Przygotuj ofertę' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Oznacz jako kontakt' })).toBeDisabled();
+  await evidence(page, { path: `${CARD_EVIDENCE}/card-360.jpg`, fullPage: true, quality: 55 });
+
+  await page.getByRole('button', { name: 'Zapisz', exact: true }).click();
+  await expect(page.getByText('Zapisana').first()).toBeVisible();
+  await expect(page.getByText(/Zmiana statusu \(operator\): Nowa → Zapisana/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Dodaj notatkę' }).click();
+  await page.getByLabel('Notatka', { exact: true }).fill('DEMO: zadzwonić we wtorek');
+  await page.getByRole('button', { name: 'Zapisz notatkę' }).click();
+  await expect(page.getByText('DEMO: zadzwonić we wtorek')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Odrzuć' }).click();
+  await expect(page.getByLabel('Powód odrzucenia')).toBeVisible();
+  await assertNoOverflow(page);
+  await evidence(page, {
+    path: `${CARD_EVIDENCE}/card-actions-360.jpg`,
+    fullPage: true,
+    quality: 55,
+  });
   await page.getByRole('link', { name: 'Wróć do listy' }).click();
 
   await page.getByRole('link', { name: 'Import' }).click();
@@ -151,7 +194,7 @@ test('the operator imports a pasted post, sees it in the list and the repeat is 
   await page.getByRole('link', { name: 'Zobacz istniejącą okazję' }).click();
   await expect(page).toHaveURL(/\/okazje\/\d+$/);
   await expect(
-    page.locator('dl').getByText('https://example.com/oferta/1?utm_source=x#frag'),
+    page.locator('dl').getByText('https://example.com/oferta/1?utm_source=x#frag').first(),
   ).toBeVisible();
   await assertNoOverflow(page);
 });
