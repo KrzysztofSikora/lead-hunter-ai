@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { getGlobalDispatcher, type MockAgent } from 'undici';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createAnalysisRepository } from '../src/infrastructure/db/analysis-repository.js';
+import { createOfferDraftRepository } from '../src/infrastructure/db/offer-draft-repository.js';
 import { analyses, opportunities, rawSignals } from '../src/infrastructure/db/schema.js';
 import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/app.js';
 
@@ -365,6 +366,42 @@ describe('budget (FR-09 AC1, AC2, AC4)', () => {
     expect(t.runner.status().blocked).toBeNull();
     await t.runner.drain();
     expect(t.opp(second).analysisStatus).toBe('COMPLETE');
+  });
+
+  it('offer drafts spend from the same cap (S-07 D-8)', async () => {
+    answer(ANTHROPIC, MESSAGES, 200, json('anthropic-valid.json'));
+    const t = await setup({ env: anthropicEnv(EXPENSIVE) });
+    const id = await t.importText(post(1));
+    createOfferDraftRepository(t.db()).insert(
+      {
+        opportunityId: id,
+        status: 'DRAFT',
+        language: 'pl',
+        subject: 'DEMO',
+        messageMarkdown: 'DEMO',
+        proposalMarkdown: 'DEMO',
+        contentJson: null,
+        guardNotesJson: null,
+        provider: 'anthropic',
+        model: 'claude-sonnet-5-5',
+        promptVersion: 'offer-1',
+        schemaVersion: 1,
+        analysed: false,
+        error: null,
+        inputTokens: 1000,
+        outputTokens: 800,
+        costMicroUsd: 18_010,
+      },
+      t.clock.now().getTime(),
+    );
+    await t.runner.drain();
+
+    expect(outbound).toBe(0);
+    expect(t.opp(id).analysisStatus).toBe('PENDING');
+    expect(await t.status()).toMatchObject({
+      blocked: 'budget_reached',
+      budget: { spentMicroUsd: 18_010 },
+    });
   });
 
   it('a paid answer without usage costs "brak danych" and is counted', async () => {

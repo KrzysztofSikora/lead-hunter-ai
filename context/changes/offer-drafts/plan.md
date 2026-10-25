@@ -101,6 +101,11 @@ Observable when done:
 | D-13 | Follow-up suggestion (FR-14 AC4, S-08 D-12 `[FOLLOW-UP]`) | When the current draft is `SENT_MANUALLY` and no follow-up is set, the card shows "Wysłano ręcznie {data}. Ustaw przypomnienie o follow-up." next to the existing follow-up form. Nothing is scheduled or sent | B: leave it to a later item (FR-14 AC4 stays half done) | One string and one condition; S-08 sent it here | cheap | agent |
 | D-14 | Generation without a completed analysis | Allowed: `<analysis>` is `null` and the draft rests on source and profile; the card says "Szkic bez analizy" | B: refuse with 409 `analysis_required` (better drafts, but AC1 says "Given an opportunity" and a failed analysis would block drafting) | Follows the AC wording; the label keeps it honest | cheap | prd + agent |
 | D-15 | The alternative variant | The main message is always the short reply in the source's language; the alternative is always the full B2B proposal (Markdown, same language) | B: the model picks which variant is primary (more natural for some posts, but the UI and copy buttons would need to follow a per-draft choice) | AC1 lists exactly these two; fixed roles keep the UI simple | cheap | agent |
+| D-16 | Edits after copying (plan-review 1, 6) | `save` with changed subject/message/proposal from `COPIED_OR_EXPORTED` moves to `REVIEWED` (copy or export again before `sent`); `save` with unchanged text keeps the status. "Kopiuj wariant B2B" sends `copied`. The UI copies and exports only saved text (buttons disabled while the form is dirty). Phase 4 test adds `copied → save(changed) → sent` refused. Replaces the `save` line of D-3 | B: keep `COPIED_OR_EXPORTED` on save (breaks "the sent text is what was copied") | Closes the side door the lesson on two-step paths describes | cheap | agent (plan-review) |
+| D-17 | Guard scope (plan-review 2) | D-11 drops phone-number removal (left to the prompt rule). A guard result that leaves a list under its contract minimum (e.g. `questions` < 3) means a `FAILED` row, as the re-parse already implies | B: pinned phone regex with unit cases (more protection, more false positives on prices) | AC2 asks for URLs and e-mails; money and day ranges must survive | cheap | agent (plan-review) |
+| D-18 | Today brief cost (plan-review 3) | Phase 1 adds `offer_drafts` tokens to `llmUsageSince` (`analyses` count stays the analysis count) so FR-16 AC1 cost matches the cap | B: `[FOLLOW-UP]` only (under-reports until done) | One query, with a test | cheap | agent (plan-review) |
+| D-19 | `pricing.model` type (plan-review 4) | `BillingModel` from the profile plus `UNKNOWN` (`FIXED_PRICE, HOURLY, DAILY, RETAINER, UNKNOWN`), so the model can state the operator's billing models | B: `MonetizationModel` (mismatches the profile) | Persisted in `content_json` v1, costly to change later | costly (schema) | agent (plan-review) |
+| D-20 | Concurrency and latency (plan-review 7, 8) | The in-flight guard is global: one draft at a time (409 `in_progress`), which also keeps the daily limit and budget reads race-free. Latency bound is about 3 × 120 s (`MAX_RETRIES = 2`). References fixed: `eslint.config.js`, `.env.example:49` | B: per-opportunity (races past the limit) | Single operator | cheap | agent (plan-review) |
 
 ## Design
 
@@ -113,7 +118,7 @@ Observable when done:
   - `mvpScope`: string[] 1–10; `exclusions`: string[] 0–10;
   - `timeline`: `{ minDays: int 1–365, maxDays: int 1–730, assumptions: string[] 1–6 }`, with
     min ≤ max;
-  - `pricing`: `{ model: MonetizationModel, range: MoneyRange | null, assumptions: string[] 1–6 }`
+  - `pricing`: `{ model: BillingModel | 'UNKNOWN' (D-19), range: MoneyRange | null, assumptions: string[] 1–6 }`
     (an estimate by contract; the UI always labels it);
   - `questions`: string[] **3–6**;
   - `message`: `{ subject: 1–200, body: 1–4000 }`; `proposal`: `{ body: 1–8000 }`.
@@ -208,7 +213,7 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
     `get(id)`, `current(opportunityId)`, `history(opportunityId, 20)`, `countSince(at)`,
     `update(id, expectedStatus, changes, at): boolean`.
   - `apps/api/src/infrastructure/db/analysis-repository.ts`: `spentSince` sums both tables
-    (D-8).
+    (D-8). `digest-repository.ts` `llmUsageSince` adds draft tokens (D-18).
   - `apps/api/src/infrastructure/db/opportunity-repository.ts`, `modules/opportunities/ports.ts`,
     `service.ts`: `get()` loads the current draft and the history; the detail maps them
     (`content` through `parseStored`).
@@ -339,7 +344,7 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Contracts, table and spend
+- [x] Phase 1: Contracts, table and spend
 - [ ] Phase 2: Offer prompt and adapters
 - [ ] Phase 3: Generate a draft
 - [ ] Phase 4: Draft actions and the no-send proof
@@ -353,6 +358,10 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 - [FOLLOW-UP] FR-09 AC3: show the number of drafts made today, against the limit, in the Today
   brief (`GET /api/digest/today`). The card shows the limit refusal, but the brief does not
   show the count yet.
+- [minor] Phase 1 created `modules/offers/ports.ts` (row types and `OfferDraftRepository`) because the
+  opportunity detail needs `OfferDraftRow`; Phase 2 adds `OfferInput` and `OfferDrafter` to it.
+- [minor] D-18: the brief's `llm.analyses` now counts every stored LLM call (analyses and drafts),
+  so `reported` never exceeds it; the field name stays (contract unchanged).
 - [FOLLOW-UP] S-14: Pipeline/Insights "sent" should count `SENT_MANUALLY` drafts (S-08 D-9).
 
 ## Review response

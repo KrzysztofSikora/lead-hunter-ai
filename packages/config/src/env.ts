@@ -22,6 +22,7 @@ export const ENV_VARIABLES = [
   'LLM_PRICES',
   'LLM_JSON_MODE',
   'ANALYSIS_DAILY_LIMIT',
+  'OFFER_DRAFT_DAILY_LIMIT',
   'PREFILTER_MAX_AGE_DAYS',
   'FETCH_TIMEOUT_MS',
   'FETCH_MAX_BYTES',
@@ -93,6 +94,7 @@ export const EnvSchema = z
     LLM_PRICES: optional(z.string()),
     LLM_JSON_MODE: optional(z.enum(['json_object', 'off'])),
     ANALYSIS_DAILY_LIMIT: optional(z.coerce.number().int().min(1).max(1_000)),
+    OFFER_DRAFT_DAILY_LIMIT: optional(z.coerce.number().int().min(1).max(100)),
     PREFILTER_MAX_AGE_DAYS: optional(z.coerce.number().int().min(1).max(365)),
     FETCH_TIMEOUT_MS: optional(z.coerce.number().int().min(1_000).max(60_000)),
     FETCH_MAX_BYTES: optional(z.coerce.number().int().min(65_536).max(5_242_880)),
@@ -164,6 +166,7 @@ export interface Config {
   llm?: LlmConfig;
   /** Analyses per Europe/Warsaw day (FR-07 AC3). */
   analysisDailyLimit: number;
+  offerDraftDailyLimit: number;
   /** Sources older than this many days are pre-filtered out (D-6). */
   prefilterMaxAgeDays: number;
   /** One deadline for everything a URL import fetches: robots.txt, redirects, headers, body (D-8). */
@@ -200,6 +203,7 @@ const EXPECTED: Record<string, string> = {
   PORT: 'oczekiwano liczby całkowitej 1–65535',
   IMPORT_MAX_TEXT_CHARS: 'oczekiwano liczby całkowitej 1000–200000',
   ANALYSIS_DAILY_LIMIT: 'oczekiwano liczby całkowitej 1–1000',
+  OFFER_DRAFT_DAILY_LIMIT: 'oczekiwano liczby całkowitej 1–100',
   PREFILTER_MAX_AGE_DAYS: 'oczekiwano liczby całkowitej 1–365',
   FETCH_TIMEOUT_MS: 'oczekiwano liczby całkowitej 1000–60000',
   FETCH_MAX_BYTES: 'oczekiwano liczby całkowitej 65536–5242880',
@@ -255,6 +259,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     logLevel: v.LOG_LEVEL ?? 'info',
     importMaxTextChars: v.IMPORT_MAX_TEXT_CHARS ?? 20_000,
     analysisDailyLimit: v.ANALYSIS_DAILY_LIMIT ?? 20,
+    offerDraftDailyLimit: v.OFFER_DRAFT_DAILY_LIMIT ?? 5,
     prefilterMaxAgeDays: v.PREFILTER_MAX_AGE_DAYS ?? 30,
     fetchTimeoutMs: v.FETCH_TIMEOUT_MS ?? 20_000,
     fetchMaxBytes: v.FETCH_MAX_BYTES ?? 1_048_576,

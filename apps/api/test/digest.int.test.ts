@@ -1,6 +1,12 @@
 import { ANALYSIS_SCHEMA_VERSION } from '@lead-hunter/contracts';
 import { describe, expect, it } from 'vitest';
-import { analyses, opportunities, rawSignals, sources } from '../src/infrastructure/db/schema.js';
+import {
+  analyses,
+  offerDrafts,
+  opportunities,
+  rawSignals,
+  sources,
+} from '../src/infrastructure/db/schema.js';
 import { analysis } from './helpers/analysis.js';
 import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/app.js';
 
@@ -116,6 +122,38 @@ describe('GET /api/digest/today (FR-16)', () => {
       llm: { analyses: 0, reported: 0, inputTokens: null, outputTokens: null },
       weakSignals: [],
     });
+  });
+
+  it("counts an offer draft's tokens in today's LLM usage (S-07 D-18)", async () => {
+    const t = await setup();
+    const id = t.seed(
+      { title: 'DEMO draft', createdAt: NOW - 2 * HOUR },
+      { input: 100, output: 20 },
+    );
+    const draft = {
+      opportunityId: id,
+      language: 'pl',
+      subject: 'DEMO',
+      messageMarkdown: 'DEMO',
+      proposalMarkdown: 'DEMO',
+      provider: 'anthropic',
+      model: 'claude-sonnet-5-5',
+      promptVersion: 'offer-1',
+      schemaVersion: 1,
+      createdAt: NOW - HOUR,
+      updatedAt: NOW - HOUR,
+      statusChangedAt: NOW - HOUR,
+    };
+    t.db
+      .insert(offerDrafts)
+      .values([
+        { ...draft, status: 'DRAFT', inputTokens: 1000, outputTokens: 400 },
+        { ...draft, status: 'FAILED', inputTokens: 50, outputTokens: 5 },
+        { ...draft, status: 'FAILED', inputTokens: null, outputTokens: null },
+      ])
+      .run();
+    const body = (await t.today()).json();
+    expect(body.llm).toEqual({ analyses: 4, reported: 3, inputTokens: 1150, outputTokens: 425 });
   });
 
   it('builds the brief of a seeded day (FR-16 AC1–AC3, FR-14 AC4)', async () => {

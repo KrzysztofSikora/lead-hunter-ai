@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { OpportunityAnalysis, PrefilterRule, ScoreBreakdown } from './analysis.js';
 import { Category, Confidence, EvidenceLevel } from './classification.js';
 import { Currency } from './profile.js';
+import { OfferDraft, OfferDraftHistoryItem } from './offer-drafts.js';
 import { calendarDate, Contract, RejectionReason } from './status.js';
 
 export { Category, Confidence, EvidenceLevel };
@@ -285,6 +286,10 @@ export const OpportunityDetail = z
     payments: z.array(Payment),
     /** Newest first. */
     activity: z.array(ActivityEvent),
+    /** S-07 D-1: the newest non-failed draft. */
+    offerDraft: OfferDraft.nullable(),
+    /** Older drafts, newest first, at most 20. */
+    offerDraftHistory: z.array(OfferDraftHistoryItem),
   })
   .strict();
 export type OpportunityDetail = z.infer<typeof OpportunityDetail>;
