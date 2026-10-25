@@ -8,7 +8,7 @@ export const PRESETS: readonly SourcePreset[] = [
   {
     id: 'hn-freelance',
     name: 'Hacker News — Seeking freelancer',
-    url: 'https://hnrss.org/whoishiring/freelancer',
+    url: 'https://hnrss.org/whoishiring/freelance',
     accessNote:
       'Kanał RSS serwisu hnrss.org (nieoficjalne lustro Hacker News): komentarze z miesięcznego wątku „Freelancer? Seeking freelancer?”. Jedno zapytanie na przebieg, co najmniej godzina odstępu, zgodnie z robots.txt.',
     termsUrl: 'https://github.com/hnrss/hnrss',

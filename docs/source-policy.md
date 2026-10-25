@@ -28,7 +28,7 @@ ręczną kontrolę (patrz `context/changes/rss-sources/plan.md`, *Human checks*)
 - **Limity:** `IMPORT_MAX_TEXT_CHARS`, `FETCH_TIMEOUT_MS`, `FETCH_MAX_BYTES`.
 
 ### RSS: Hacker News przez hnrss.org (`hn-freelance`, `hn-jobs-contract`)
-- **Dostęp:** kanały `https://hnrss.org/whoishiring/freelancer` (miesięczny wątek „Freelancer?
+- **Dostęp:** kanały `https://hnrss.org/whoishiring/freelance` (miesięczny wątek „Freelancer?
   Seeking freelancer?") i `https://hnrss.org/jobs?q=contract`. hnrss.org to nieoficjalne lustro
   Hacker News, nie sam serwis. `DO WERYFIKACJI`: adresy i format wpisów.
 - **Regulamin:** projekt <https://github.com/hnrss/hnrss> (opis kanałów i zasad użycia).

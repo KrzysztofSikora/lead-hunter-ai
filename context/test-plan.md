@@ -149,7 +149,7 @@ Don't (see *Test budget*). UI behaviour is covered by the e2e main path and huma
 1. `apps/api/test/<area>/<name>.int.test.ts`.
 2. `const app = await buildTestApp({ clock, llm: 'mock', env })` (helper: temp DB with
    migrations, `MockAgent` installed, a logged-in session cookie via `app.loginAsOperator()`).
-3. Mock outbound calls: `mockAgent.get('https://hnrss.org').intercept({ path: '/whoishiring/freelancer' }).reply(200, fixture('feeds/hn-freelance.xml'))`.
+3. Mock outbound calls: `mockAgent.get('https://hnrss.org').intercept({ path: '/whoishiring/freelance' }).reply(200, fixture('feeds/hn-freelance.xml'))`.
 4. Drive the HTTP API with `app.inject(...)`; assert on the response and on rows read back
    through the API or a repository.
 5. For failures, reply with 429/500, `.replyWithError()`, or `.delay()` past the timeout.

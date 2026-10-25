@@ -14,7 +14,7 @@ const WWR = 'https://weworkremotely.com';
 const HN = 'https://hnrss.org';
 const WWR_PROGRAMMING = '/categories/remote-programming-jobs.rss';
 const WWR_FULL_STACK = '/categories/remote-full-stack-programming-jobs.rss';
-const HN_FREELANCE = '/whoishiring/freelancer';
+const HN_FREELANCE = '/whoishiring/freelance';
 const HN_JOBS = '/jobs?q=contract';
 const HOUR = 3_600_000;
 
