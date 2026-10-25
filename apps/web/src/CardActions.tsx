@@ -25,7 +25,8 @@ export function CardActions({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reason, setReason] = useState('');
-  const [text, setText] = useState('');
+  const [noteText, setNoteText] = useState('');
+  const [rejectNote, setRejectNote] = useState('');
   const moves = operatorMoves(data.businessStatus);
 
   async function run(action: () => Promise<ActionOutcome>) {
@@ -37,7 +38,8 @@ export function CardActions({
         onChange(outcome.detail);
         setPanel(null);
         setReason('');
-        setText('');
+        setNoteText('');
+        setRejectNote('');
       } else if (outcome.kind === 'conflict') {
         setError(a.conflict);
       } else if (outcome.kind === 'invalid') {
@@ -64,7 +66,7 @@ export function CardActions({
       setError(a.reasonPlaceholder);
       return;
     }
-    const note = text.trim();
+    const note = rejectNote.trim();
     void run(() =>
       changeStatus(data.id, {
         status: 'REJECTED',
@@ -76,7 +78,7 @@ export function CardActions({
 
   function submitNote(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    void run(() => addNote(data.id, text));
+    void run(() => addNote(data.id, noteText));
   }
 
   return (
@@ -129,10 +131,10 @@ export function CardActions({
           <label>
             {a.rejectNote}
             <textarea
-              value={text}
+              value={rejectNote}
               maxLength={NOTE_MAX_CHARS}
               rows={3}
-              onChange={(event) => setText(event.target.value)}
+              onChange={(event) => setRejectNote(event.target.value)}
             />
           </label>
           <div className={styles.formButtons}>
@@ -150,14 +152,14 @@ export function CardActions({
           <label>
             {a.noteLabel}
             <textarea
-              value={text}
+              value={noteText}
               maxLength={NOTE_MAX_CHARS}
               rows={3}
-              onChange={(event) => setText(event.target.value)}
+              onChange={(event) => setNoteText(event.target.value)}
             />
           </label>
           <div className={styles.formButtons}>
-            <button type="submit" disabled={busy || text.trim() === ''}>
+            <button type="submit" disabled={busy || noteText.trim() === ''}>
               {busy ? a.saving : a.saveNote}
             </button>
             <button type="button" disabled={busy} onClick={() => setPanel(null)}>
