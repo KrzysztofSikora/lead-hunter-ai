@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { LatestAnalysis, OpportunityDetail } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
+import { requestAnalysis } from './api/analysis.js';
 import { getOpportunity } from './api/opportunities.js';
 import { strings } from './strings.pl.js';
+import { formatUsd } from './usd.js';
 import { formatWarsaw } from './warsawTime.js';
 
 const t = strings.opportunity;
@@ -21,6 +23,7 @@ const when = (iso: string | null, empty: string) => (iso ? formatWarsaw(iso) : e
 export function OpportunityPage() {
   const { id } = useParams();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
+  const [reloads, setReloads] = useState(0);
 
   useEffect(() => {
     let active = true;
@@ -29,7 +32,6 @@ export function OpportunityPage() {
       setLoad({ state: 'missing' });
       return;
     }
-    setLoad({ state: 'loading' });
     getOpportunity(numeric).then(
       (data) => active && setLoad(data ? { state: 'ready', data } : { state: 'missing' }),
       () => active && setLoad({ state: 'error' }),
@@ -37,7 +39,7 @@ export function OpportunityPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, reloads]);
 
   return (
     <section>
@@ -51,12 +53,14 @@ export function OpportunityPage() {
           {t.loadFailed}
         </p>
       )}
-      {load.state === 'ready' && <Detail data={load.data} />}
+      {load.state === 'ready' && (
+        <Detail data={load.data} onRequested={() => setReloads((n) => n + 1)} />
+      )}
     </section>
   );
 }
 
-function Detail({ data }: { data: OpportunityDetail }) {
+function Detail({ data, onRequested }: { data: OpportunityDetail; onRequested: () => void }) {
   const { source } = data;
   return (
     <>
@@ -92,7 +96,7 @@ function Detail({ data }: { data: OpportunityDetail }) {
       </dl>
 
       <h3>{t.analysisSection}</h3>
-      <AnalysisSection data={data} />
+      <AnalysisSection data={data} onRequested={onRequested} />
 
       <h3>{t.evidenceSection}</h3>
       <ul className={styles.evidence}>
@@ -125,7 +129,13 @@ function money(minMinor: number, maxMinor: number, currency: string) {
   return `${fmt(minMinor)}–${fmt(maxMinor)} ${currency}`;
 }
 
-function AnalysisSection({ data }: { data: OpportunityDetail }) {
+function AnalysisSection({
+  data,
+  onRequested,
+}: {
+  data: OpportunityDetail;
+  onRequested: () => void;
+}) {
   const latest = data.latestAnalysis;
   if (data.prefilter?.rule && data.analysisStatus === 'SKIPPED') {
     return <p>{list.skippedBecause(strings.prefilterRules[data.prefilter.rule])}</p>;
@@ -136,7 +146,63 @@ function AnalysisSection({ data }: { data: OpportunityDetail }) {
   if (!latest) {
     return <p>{data.analysisStatus === 'PENDING' ? t.noAnalysis : list.analysisFailed}</p>;
   }
-  return <Analysis analysis={latest} score={data.analysis?.score ?? null} />;
+  return (
+    <>
+      <Analysis analysis={latest} score={data.analysis?.score ?? null} />
+      <RequestButton
+        id={data.id}
+        force={latest.status === 'COMPLETE'}
+        label={latest.status === 'COMPLETE' ? t.reanalyse : t.retry}
+        onRequested={onRequested}
+      />
+    </>
+  );
+}
+
+function RequestButton({
+  id,
+  force,
+  label,
+  onRequested,
+}: {
+  id: number;
+  force: boolean;
+  label: string;
+  onRequested: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const press = () => {
+    setBusy(true);
+    setMessage(null);
+    requestAnalysis(id, force).then(
+      (outcome) => {
+        setBusy(false);
+        setMessage(
+          outcome === 'queued'
+            ? t.requestQueued
+            : outcome === 'prefiltered'
+              ? t.requestPrefiltered
+              : outcome === 'not_configured'
+                ? t.requestNotConfigured
+                : t.notFound,
+        );
+        if (outcome === 'queued') setTimeout(onRequested, 1500);
+      },
+      () => {
+        setBusy(false);
+        setMessage(t.requestFailed);
+      },
+    );
+  };
+  return (
+    <p>
+      <button type="button" onClick={press} disabled={busy}>
+        {label}
+      </button>
+      {message && <span role="status"> {message}</span>}
+    </p>
+  );
 }
 
 function Analysis({ analysis, score }: { analysis: LatestAnalysis; score: number | null }) {
@@ -152,6 +218,15 @@ function Analysis({ analysis, score }: { analysis: LatestAnalysis; score: number
         {t.provider}: {analysis.provider} ({analysis.model}) · {t.analysedAt}{' '}
         {formatWarsaw(analysis.createdAt)}
       </p>
+      {!analysis.demo && (
+        <p className={styles.meta}>
+          {analysis.reusedFromAnalysisId !== null
+            ? t.reusedFrom
+            : analysis.costMicroUsd !== null
+              ? t.cost(formatUsd(analysis.costMicroUsd))
+              : t.costUnknown(analysis.inputTokens, analysis.outputTokens)}
+        </p>
+      )}
       {analysis.status === 'FAILED' && (
         <p role="alert" className={styles.error}>
           {t.failedReason}: {analysis.error}

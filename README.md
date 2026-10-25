@@ -53,12 +53,20 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   osobną pewnością (reguły w [`docs/scoring.md`](docs/scoring.md)), dzienny limit analiz
   (`ANALYSIS_DAILY_LIMIT`, domyślnie 20; reszta czeka do następnego dnia czasu Europe/Warsaw),
   `GET /api/analysis/status`, filtry listy (min. ocena z linkiem „Tylko ≥ 65", wiek, kwota,
-  język, tryb pracy, kraj, wykluczone branże). Bez `LLM_PROVIDER` UI mówi, że analiza nie jest
-  skonfigurowana, a okazje czekają jako „Analiza: oczekuje".
-- **Co wymaga kluczy:** prawdziwy dostawca LLM (Anthropic, OpenAI-compatible) dojdzie ze slice'em
-  S-05; skrzynka IMAP ze slice'em S-11. Zmienne analizy: `LLM_PROVIDER`, `ANALYSIS_DAILY_LIMIT`,
-  `PREFILTER_MAX_AGE_DAYS` (patrz `.env.example`).
-- **Co wymaga ręcznej weryfikacji:** uruchomienie `docker compose up` na Raspberry Pi
+  język, tryb pracy, kraj, wykluczone branże). Prawdziwi dostawcy: `anthropic` i
+  `openai-compatible` (ten sam runner, schemat i kontrola wyniku co `mock`), koszt każdej analizy,
+  miesięczny limit `LLM_MONTHLY_BUDGET_USD` (płatny dostawca bez limitu nic nie analizuje),
+  ponowne użycie wyniku dla tej samej treści, przyciski „Ponów analizę" / „Analizuj ponownie"
+  (`POST /api/opportunities/:id/analysis`); co dokładnie wysyłamy i jak liczymy koszt:
+  [`docs/llm.md`](docs/llm.md). Bez `LLM_PROVIDER` UI mówi, że analiza nie jest skonfigurowana, a
+  okazje czekają jako „Analiza: oczekuje".
+- **Co wymaga kluczy:** Anthropic (`LLM_PROVIDER=anthropic`, `LLM_API_KEY`, `LLM_MONTHLY_BUDGET_USD`);
+  serwer OpenAI-compatible (`LLM_BASE_URL`, `LLM_MODEL`, klucz opcjonalny); skrzynka IMAP ze
+  slice'em S-11. Zmienne analizy: `LLM_*`, `ANALYSIS_DAILY_LIMIT`, `PREFILTER_MAX_AGE_DAYS`
+  (patrz `.env.example`).
+- **Co wymaga ręcznej weryfikacji:** prawdziwe analizy Anthropic i OpenAI-compatible (czy schemat
+  jest przyjęty, czy `json_object` i zużycie tokenów działają u danego dostawcy), wygląd
+  komunikatów o limicie kosztów na telefonie, uruchomienie `docker compose up` na Raspberry Pi
   (czas budowania better-sqlite3 na ARM64), wygląd powłoki i formularza logowania na telefonie, widok *Profil* na telefonie i komunikaty
   błędów przy polach,
   flaga `Secure` ciasteczka za Tailscale (w Dockerze serwer widzi adres bramy, nie loopback,

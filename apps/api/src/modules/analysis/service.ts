@@ -48,6 +48,8 @@ export interface AnalysisRunner {
   kick(): void;
   /** D-11: what the UI and the brief need to say how much analysis is done and waiting. */
   status(): AnalysisServiceStatus;
+  /** D-10: puts one opportunity back in the queue and kicks the runner. */
+  requeue(id: number, force: boolean): 'queued' | 'prefiltered' | 'not_configured' | 'not_found';
   /** Resolves when no drain is in flight. */
   idle(): Promise<void>;
 }
@@ -313,6 +315,14 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
         waiting: repository.waitingCount(),
         limitReached: analysedToday >= deps.dailyLimit,
       };
+    },
+    requeue(id, force) {
+      if (!provider) return 'not_configured';
+      if (!repository.requeue(id, force, clock.now().getTime())) {
+        return repository.exists(id) ? 'prefiltered' : 'not_found';
+      }
+      drain().catch(deps.onError);
+      return 'queued';
     },
     idle: () => inFlight ?? Promise.resolve(),
   };

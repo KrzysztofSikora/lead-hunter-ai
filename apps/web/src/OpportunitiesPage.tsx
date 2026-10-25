@@ -12,6 +12,7 @@ import {
 } from '@lead-hunter/contracts';
 import styles from './OpportunitiesPage.module.css';
 import { getAnalysisStatus } from './api/analysis.js';
+import { formatUsd } from './usd.js';
 import { listOpportunities, PAGE_SIZE, type ListFilters } from './api/opportunities.js';
 import { strings } from './strings.pl.js';
 import { formatWarsaw, isCalendarDate, warsawDayEnd, warsawDayStart } from './warsawTime.js';
@@ -384,8 +385,47 @@ function AnalysisLine({ load }: { load: StatusLoad }) {
   if (load.state === 'error') return <p className={styles.meta}>{t.analysisStatusFailed}</p>;
   const status = load.data;
   if (!status.configured) return <p role="status">{t.analysisNotConfigured}</p>;
-  if (status.limitReached) {
-    return <p role="status">{t.analysisLimit(status.dailyLimit, status.waiting)}</p>;
+  const unknown =
+    status.budget.unknownCostCount > 0 ? (
+      <p role="status">{t.analysisUnknownCost(status.budget.unknownCostCount)}</p>
+    ) : null;
+  const blocked = blockedMessage(status);
+  if (blocked) {
+    return (
+      <>
+        <p role="alert">{blocked}</p>
+        {unknown}
+      </>
+    );
   }
-  return status.waiting > 0 ? <p role="status">{t.analysisWaiting(status.waiting)}</p> : null;
+  if (status.limitReached) {
+    return (
+      <>
+        <p role="status">{t.analysisLimit(status.dailyLimit, status.waiting)}</p>
+        {unknown}
+      </>
+    );
+  }
+  return (
+    <>
+      {status.waiting > 0 && <p role="status">{t.analysisWaiting(status.waiting)}</p>}
+      {unknown}
+    </>
+  );
+}
+
+function blockedMessage(status: AnalysisServiceStatus): string | null {
+  switch (status.blocked) {
+    case 'budget_missing':
+      return t.analysisBlockedMissing;
+    case 'price_unknown':
+      return t.analysisBlockedPrice(status.model ?? '?');
+    case 'budget_reached':
+      return t.analysisBlockedReached(
+        formatUsd(status.budget.spentMicroUsd),
+        formatUsd(status.budget.capMicroUsd ?? 0),
+      );
+    default:
+      return null;
+  }
 }

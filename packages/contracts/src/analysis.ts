@@ -219,3 +219,17 @@ export const AnalysisServiceStatus = z
   })
   .strict();
 export type AnalysisServiceStatus = z.infer<typeof AnalysisServiceStatus>;
+
+/** D-10 (S-05): retry or re-analyse one opportunity; `force` skips the content-hash reuse. */
+export const AnalysisRequestBody = z.object({ force: z.boolean().optional() }).strict();
+export type AnalysisRequestBody = z.infer<typeof AnalysisRequestBody>;
+
+export const AnalysisRequestResult = z
+  .object({ result: z.literal('queued'), force: z.boolean() })
+  .strict();
+export type AnalysisRequestResult = z.infer<typeof AnalysisRequestResult>;
+
+export const AnalysisRequestRefused = z
+  .object({ error: z.enum(['prefiltered', 'not_configured']) })
+  .strict();
+export type AnalysisRequestRefused = z.infer<typeof AnalysisRequestRefused>;

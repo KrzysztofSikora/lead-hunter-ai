@@ -149,6 +149,15 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
           .run().changes > 0
       );
     },
+    exists(id) {
+      return (
+        db
+          .select({ id: opportunities.id })
+          .from(opportunities)
+          .where(eq(opportunities.id, id))
+          .get() !== undefined
+      );
+    },
     waitingCount() {
       return db.select({ value: count() }).from(opportunities).where(waiting).get()?.value ?? 0;
     },

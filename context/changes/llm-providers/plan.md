@@ -344,12 +344,16 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 - [x] Phase 1: Config, prices, budget rules and the AC4 guard
 - [x] Phase 2: Anthropic and OpenAI-compatible adapters (checkpoint)
 - [x] Phase 3: Runner — budget, cost, reuse, failures
-- [ ] Phase 4: Retry route, UI and docs
+- [x] Phase 4: Retry route, UI and docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 2) One real analysis with Anthropic: does the structured-output schema (root `anyOf`, no lengths/ranges) get accepted, and is usage reported? Note that `LLM_MONTHLY_BUDGET_USD` is not enforced until Phase 3, so use a small test key — run: `.env` with `LLM_PROVIDER=anthropic`, `LLM_API_KEY=<key>`, `pnpm dev`, import `apps/api/test/fixtures/llm/synthetic-direct-pl.txt`, open the card — evidence: `context/changes/llm-providers/evidence/real-providers.md` (provider, model, tokens, schema accepted yes/no; no key)
 - [ ] (Phase 2) One real analysis with an OpenAI-compatible endpoint (Groq free tier or Ollama): was `json_object` accepted and usage reported? — run: `.env` with `LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL`, `LLM_MODEL` (try `LLM_JSON_MODE=off` if rejected), same import as above — evidence: `context/changes/llm-providers/evidence/real-providers.md` (closes the `UNVERIFIED` note)
+- [ ] (Phase 4) Blocked message: with `LLM_PROVIDER=anthropic` and no `LLM_MONTHLY_BUDGET_USD`, open *Okazje* at 360 px width and judge the wording — run: `pnpm dev`, `.env` as stated, import any text — evidence: none
+- [ ] (Phase 4) Limit reached message: with `LLM_MONTHLY_BUDGET_USD=0.01` and a real analysis done, open *Okazje* and judge the `budget_reached` wording — run: as above plus one real analysis — evidence: none
+- [ ] (Phase 4) Buttons: press "Ponów analizę" on a failed card (wrong `LLM_API_KEY`) and "Analizuj ponownie" on a complete one — run: open `/okazje/<id>` — evidence: none
+- [ ] (Phase 4) Read `docs/llm.md` and confirm it matches what the operator is willing to send — run: `docs/llm.md` section "Co jest wysyłane do dostawcy" — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -368,6 +372,10 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 - [minor] (Phase 3, plan-review #8) Race accepted: a forced `requeue` arriving while the runner is analysing that same row is overwritten by the save (status `COMPLETE`, `analysis_force` cleared). The operator can press "Analizuj ponownie" again. A null `content_hash` never matches (test added).
 - [minor] (Phase 3) The TR-12 canary is checked in the database rows, the status and the detail responses; captured logs are not asserted (the runner logs only `onError` messages, which the test helper discards).
 - [minor] (Phase 3) `llmRunnerDeps(config.llm)` in `create-provider.ts` derives the runner's `budget` and `secrets` from config; both `AnalysisDeps` fields are optional so runners built without them behave as free providers.
+- [minor] (Phase 4) `docker:build` could not be run in this sandbox (same proxy/corepack certificate failure as Phase 2); typecheck, lint, unit/integration tests and `pnpm e2e` passed.
+- [minor] (Phase 4) The route lives in `modules/analysis/routes.ts` (the runner owns `requeue`); the body is `nullish` so a bare POST means "retry without force". The runner distinguishes 404 from 409 `prefiltered` through a new repository method `exists(id)`.
+- [minor] (Phase 4) The reused-result line says "z wcześniejszej analizy tej samej treści" without the original date: the API exposes only `reusedFromAnalysisId`, not the original's date; adding it would widen the D-13 contract for a cosmetic gain. Mock (`demo`) results show no cost line.
+- [minor] (Phase 4) After "queued" the card reloads once after 1.5 s; a slower provider call needs a manual refresh (message says so).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

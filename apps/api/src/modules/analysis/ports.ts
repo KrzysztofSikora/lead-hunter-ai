@@ -179,6 +179,8 @@ export interface AnalysisRepository {
   ): ReusableAnalysis | undefined;
   /** Puts an analysed, failed or waiting opportunity back in the queue (D-10); false if it cannot. */
   requeue(id: number, force: boolean, at: number): boolean;
+  /** Tells a missing opportunity from one the pre-filter skipped when `requeue` says no. */
+  exists(id: number): boolean;
   waitingCount(): number;
   saveComplete(analysis: CompletedAnalysis): void;
   saveFailed(analysis: FailedAnalysis): void;
