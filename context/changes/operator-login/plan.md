@@ -260,11 +260,14 @@ Migration `0001_*`: `sessions` as in D-3. No foreign keys. Nothing else changes.
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Password hash, `pnpm auth:hash` and config validation
 - [x] Phase 2: Sessions, auth API, guard and throttle
-- [ ] Phase 3: Login form, logout, e2e and docs
+- [x] Phase 3: Login form, logout, e2e and docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 1) `pnpm auth:hash` on a terminal: password not echoed, mismatch refused, printed line pasted into `.env` lets `HOST=0.0.0.0 pnpm start` start — run: `pnpm auth:hash` then `HOST=0.0.0.0 pnpm start` — evidence: context/changes/operator-login/evidence/auth-hash-output.txt (piped run only; the TTY prompt needs a person)
+
+- [ ] (Phase 3) Polish wording and look of the login form at phone width and on a laptop — run: `pnpm build`, then `HOST=127.0.0.1 OPERATOR_PASSWORD_HASH=$(pnpm --silent auth:hash) pnpm start`, open http://127.0.0.1:8080/ — evidence: context/changes/operator-login/evidence/login-360.png, shell-360.png
+- [ ] (Phase 3) Docker behind `tailscale serve` (or on the Pi): log in from the phone over `https://<host>.<tailnet>.ts.net`, check in dev tools whether `lh_session` has `Secure` (expected not set in Docker, D-6), still logged in after a day, logout on the phone leaves the laptop logged in — run: `docker compose up --build` — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -272,6 +275,8 @@ Migration `0001_*`: `sessions` as in D-3. No foreign keys. Nothing else changes.
 - [minor] Phase 1: plan-review finding 5 applied: `.env.example` and README say the Docker form needs an existing (possibly empty) `.env`.
 - [minor] Phase 2: plan-review finding 1/3/6 applied: the guard decides on `request.routeOptions.url` (test `/%61pi/auth/session` → 401), `modules/health/routes.ts` is marked `public: true`, and the route-table test substitutes `:param` with a dummy value.
 - [minor] Phase 2: plan says the thrown rate-limit object becomes the 429 body; code shows Fastify's default error handler replaces it (and adds `statusCode`), so serialization failed with 500. Consequence: the login route lives in a child plugin with its own error handler that rebuilds the `ThrottledError` body; other errors are rethrown to the default handler. Added `infrastructure/auth/token-source.ts` (the `TokenSource` implementation) which the plan did not list.
+- [minor] Phase 3: plan-review finding 2 applied: `App.test.tsx` routes the fetch stub by URL; added `LoginForm.test.tsx` (invalid, 429 minutes with rounding, 503, unexpected answer) and `api/client.test.ts` (401 → handler). The 401-from-a-later-call → login view path is covered at the `apiFetch` level only, since no web call uses `apiFetch` yet (health is public, auth calls need to read 401 themselves); S-02 is its first user. Finding 7 applied as a comment in `e2e/env.ts`.
+- [minor] Phase 3: a failed logout request keeps the shell (the session is still alive) instead of showing the form; a 401 on logout counts as success.
 - [FOLLOW-UP] Invalidate all sessions when `OPERATOR_PASSWORD_HASH` changes, or offer "log out
   everywhere" (see *Risks*). Not in S-01's acceptance.
 
