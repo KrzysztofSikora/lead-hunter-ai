@@ -3,6 +3,7 @@ import { DEFAULT_MIN_SCORE } from '@lead-hunter/contracts';
 import type { Clock } from '../shared/clock.js';
 import type { PipelineRepository } from '../pipeline/ports.js';
 import { toItem } from '../pipeline/service.js';
+import { isDemo } from '../shared/demo.js';
 import { instantToWarsawDate, startOfWarsawDay } from '../shared/warsaw-day.js';
 import type { DigestCandidateRow, DigestRepository } from './ports.js';
 import { CANDIDATE_LIMIT, DIGEST_WINDOW_DAYS, pickTop, pickWeak } from './select.js';
@@ -22,8 +23,7 @@ const toDigestItem = (row: DigestCandidateRow): DigestItem => ({
   evidenceLevel: row.evidenceLevel,
   score: row.score,
   nextAction: row.nextAction,
-  // Only the mock produces DEMO / MOCK results (as in the opportunities module).
-  demo: row.provider === 'mock',
+  demo: isDemo(row.provider),
   businessStatus: row.businessStatus,
   createdAt: new Date(row.createdAt).toISOString(),
 });
