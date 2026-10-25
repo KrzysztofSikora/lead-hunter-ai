@@ -210,7 +210,11 @@ function Results({ data, onPage }: { data: OpportunityList; onPage: (page: numbe
         ))}
       </ul>
       <div className={styles.pager}>
-        <button type="button" disabled={data.page <= 1} onClick={() => onPage(data.page - 1)}>
+        <button
+          type="button"
+          disabled={data.page <= 1}
+          onClick={() => onPage(Math.min(data.page - 1, pages))}
+        >
           {t.previous}
         </button>
         <span>{t.page(data.page, pages)}</span>
