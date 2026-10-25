@@ -110,7 +110,7 @@ Round 2 re-checks the fixes for R1–R5 (commits 026e922, 5170138, 5dea73e, 7db1
 - Fix: bound `PHONE` (`[\d ()-]{7,20}`: no phone number is longer) and replace `PERSON_TAG` with an `indexOf` scan for the matching close tag (or bound the body, e.g. `[^<]{0,512}`). Extend the 1 MiB timing test in `anonymise-feed.test.ts` with these two shapes.
 - Effort: small
 - Lesson candidate: no (covered by the existing lesson)
-- Decision: open
+- Decision: fixed (8d43716)
 
 ### R7: `docs/source-policy.md` does not mention the 7-day backoff cap
 - Severity: minor
@@ -119,4 +119,4 @@ Round 2 re-checks the fixes for R1–R5 (commits 026e922, 5170138, 5dea73e, 7db1
 - Fix: append "…, najwyżej 7 dni" to that sentence.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (784889b)
