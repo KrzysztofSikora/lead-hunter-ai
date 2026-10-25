@@ -153,4 +153,4 @@ Gates: typecheck ok, lint ok, unit tests ok (601), image fail (environment: Core
   but costs a worker per import and more code.
 - Effort: small
 - Lesson candidate: no (covered by the lesson proposed from R1; its test should use the maximum body size)
-- Decision: open
+- Decision: fixed (72a000d) + lesson proposed
