@@ -6,4 +6,4 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Why: a half-applied finding left `.env.example` claiming compose pins HOST/DATA_DIR while it did not, so a copied template could break the container.
 - Seen in: repo-skeleton, R1
 - Scope: plans, config templates, compose/Docker files
-- Status: proposed in the PR for repo-skeleton
+- Status: accepted (PR #18)

@@ -9,7 +9,7 @@ than building on it.
 ## Overview
 | ID | Issue | change-id | Type | Covers | Depends on | Size | Status |
 |----|-------|-----------|------|--------|------------|------|--------|
-| F-01 | #1 | repo-skeleton | foundation | C-01…C-08, FR-23 AC4, FR-24 AC1–AC2, FR-25 AC3 | - | M | review |
+| F-01 | #1 | repo-skeleton | foundation | C-01…C-08, FR-23 AC4, FR-24 AC1–AC2, FR-25 AC3 | - | M | done |
 | S-01 | #2 | operator-login | slice | FR-20 | F-01 | M | todo |
 | S-02 | #3 | operator-profile | slice | FR-01 | S-01 | S | todo |
 | S-03 | #4 | manual-text-import | slice | FR-02, FR-06, FR-11 AC1, FR-12 | S-02 | M | todo |
