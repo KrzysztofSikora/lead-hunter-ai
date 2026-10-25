@@ -2,6 +2,7 @@ import {
   ANALYSIS_SCHEMA_VERSION,
   type AnalysisServiceStatus,
   OpportunityAnalysis,
+  ScoreBreakdown,
   type BusinessStatus,
   type PrefilterRule,
 } from '@lead-hunter/contracts';
@@ -129,7 +130,7 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       };
       let breakdown: CompletedAnalysis['breakdown'] = null;
       if (result.verdict === 'ANALYSED') {
-        breakdown = scoreAnalysis(result, profile);
+        breakdown = ScoreBreakdown.parse(scoreAnalysis(result, profile));
         Object.assign(columns, {
           category: result.category,
           evidenceLevel: result.evidenceLevel,

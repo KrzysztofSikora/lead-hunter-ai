@@ -51,6 +51,26 @@ describe('skillFit', () => {
     expect(skillFit(analysis({ relevantSkills }), p)).toMatchObject({ points, max: 25 });
   });
 
+  it('keeps the justification within the contract for 20 long matched terms', () => {
+    const terms = Array.from(
+      { length: 20 },
+      (_, i) => `${'x'.repeat(75)}${String(i).padStart(2, '0')}`,
+    );
+    const wide = profile({ skills: terms, preferredTechnologies: [] });
+    const { justification } = skillFit(analysis({ relevantSkills: terms }), wide);
+    expect(justification.length).toBeLessThanOrEqual(500);
+    expect(justification).toContain('i 17 innych');
+  });
+
+  it('keeps an excluded-technology justification within the contract', () => {
+    const long = 'p'.repeat(500);
+    const { justification } = skillFit(
+      analysis({ relevantSkills: [long] }),
+      profile({ excludedTechnologies: [long] }),
+    );
+    expect(justification.length).toBeLessThanOrEqual(500);
+  });
+
   it('trims names and scores five distinct matches as the maximum', () => {
     const wide = profile({ skills: ['a', 'b', 'c', 'd', 'e'], preferredTechnologies: [] });
     expect(skillFit(analysis({ relevantSkills: [' A ', 'b', 'c', 'd', 'e'] }), wide).points).toBe(

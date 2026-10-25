@@ -72,6 +72,14 @@ export function demand(analysis: AnalysedResult): Scored {
   };
 }
 
+const LISTED_NAMES = 3;
+
+/** Keeps the justification inside the contract's 500 characters whatever the profile holds. */
+function listed(names: string[]): string {
+  const shown = names.slice(0, LISTED_NAMES).join(', ');
+  return names.length > LISTED_NAMES ? `${shown} i ${names.length - LISTED_NAMES} innych` : shown;
+}
+
 export function skillFit(analysis: AnalysedResult, profile: OperatorProfile): Scored {
   const wanted = new Set(
     [...profile.skills, ...profile.preferredTechnologies].map((term) => term.toLowerCase()),
@@ -85,7 +93,7 @@ export function skillFit(analysis: AnalysedResult, profile: OperatorProfile): Sc
     return {
       points: 0,
       max: SCORE_MAX.skillFit,
-      justification: `Zlecenie wymaga wykluczonej technologii (${excludedHit}): 0 pkt.`,
+      justification: `Zlecenie wymaga wykluczonej technologii (${excludedHit.trim().slice(0, 80)}): 0 pkt.`,
     };
   }
   const matched = [...new Set(named.filter((skill) => wanted.has(skill)))];
@@ -96,7 +104,7 @@ export function skillFit(analysis: AnalysedResult, profile: OperatorProfile): Sc
     justification:
       matched.length === 0
         ? 'Żadna umiejętność z profilu nie pasuje do zlecenia: 0 pkt.'
-        : `Pasujące umiejętności z profilu (${matched.length}): ${matched.join(', ')}: ${points} pkt.`,
+        : `Pasujące umiejętności z profilu (${matched.length}): ${listed(matched)}: ${points} pkt.`,
   };
 }
 
