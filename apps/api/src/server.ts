@@ -42,16 +42,14 @@ async function main(): Promise<void> {
     );
   }
 
-  const hash = config.operatorPasswordHash ?? '';
+  const hash = config.operatorPasswordHash;
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
     version: VERSION,
     auth: {
       sessions: createSessionRepository(db),
-      ...(config.operatorPasswordHash
-        ? { verifier: { verify: (password) => verifyPassword(password, hash) } }
-        : {}),
+      ...(hash ? { verifier: { verify: (password) => verifyPassword(password, hash) } } : {}),
       clock: { now: () => new Date() },
       tokens: randomTokenSource,
     },
