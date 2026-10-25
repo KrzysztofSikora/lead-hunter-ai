@@ -1,7 +1,15 @@
 # Review: url-import-guard
 
 Verdict: CHANGES REQUESTED
-Gates: typecheck ok, lint ok, unit tests ok (596), image fail (environment: Corepack cannot download pnpm, `SELF_SIGNED_CERT_IN_CHAIN`; `pnpm install --frozen-lockfile --offline` passes), e2e ok (5), mutation ok (address-guard.ts 90.67 %, from `mutation.md`) · Round: 1
+Gates: typecheck ok, lint ok, unit tests ok (601), image fail (environment: Corepack cannot download pnpm 12.15.0 inside the build, same as round 1), e2e ok (5), mutation ok (address-guard.ts 91.46 %, re-run this round; the survivors are the round-1 `accept`/`equivalent` ones, line numbers shifted by the R3 fix) · Round: 2
+
+## Re-review of round 1
+| Finding | Status | Evidence |
+|---------|--------|----------|
+| R1 | partly fixed | Readability is now skipped above depth 64 / 5 000 elements and the 2 000-deep case takes milliseconds, but linkedom's own parse is superlinear on deep nesting and runs twice before the check; see R5 |
+| R2 | fixed | `source.trim() === ''` returns `no_text`, the Readability call is guarded, a null `documentElement` skips the fallback; `''`, whitespace and `<` are tested; unexpected errors are logged at `warn` (wired in `server.ts`) |
+| R3 | fixed | IPv6 must match `2000::/3` after the mapped-v4 unwrap; `::7f00:1`, `::a00:1` in the blocked table; the new line has no surviving mutant |
+| R4 | fixed | route test redirects A to B with B `Disallow: /` and asserts 422 `robots_disallowed` and `b.requests == ['/robots.txt']` |
 
 ## Plan vs diff
 | File | Status | Note |
@@ -33,17 +41,20 @@ Gates: typecheck ok, lint ok, unit tests ok (596), image fail (environment: Core
 | `apps/api/test/helpers/page-fixture.ts` | unplanned | mutation sandbox fix; logged in *Review response* |
 | `.prettierignore`, `eslint.config.js` | unplanned | logged deviations (plan-review 11, byte-exact fixture) |
 | `pnpm-lock.yaml`, `context/roadmap.md`, `context/changes/url-import-guard/*` | unplanned | expected bookkeeping |
+| `apps/api/src/infrastructure/sources/manual/extract.test.ts`, `apps/api/test/url-import.int.test.ts`, `address-guard.test.ts` | done | round-2 fixes: tests for R1, R2, R3, R4 |
+| `apps/api/src/server.ts` | done | round 2: `warn` logger wired for R2 |
+| `context/lessons.md` | unplanned | lesson proposed from R1 (expected from `/fix-review`) |
 
 ## Areas
 | Area | Result | One-line reason |
 |------|--------|-----------------|
-| Correctness | fail | a small nested page blocks the whole process past the deadline (R1); empty HTML is reported as a network error (R2) |
-| Design | ok | guard, client, robots and extraction are separate and the client knows nothing about robots/HTML |
-| Safety | concern | connect-path guard and rebinding handling are sound; CPU DoS through Readability (R1); `::/96` passes the allow-list (R3) |
-| Tests | concern | strong client/guard coverage; no test that a cross-origin redirect hop is checked against its own robots.txt (R4) |
-| Simplicity | ok | small modules, no dead code |
+| Correctness | ok | R2 and R3 fixed; empty HTML is `no_text`, reserved IPv6 is blocked |
+| Design | ok | the limits live in `extract.ts` only; the client still knows nothing about HTML |
+| Safety | fail | a 1 MB page of nested tags still blocks the process for ~45 s, beyond the 20 s deadline (R5) |
+| Tests | ok | new tests assert behaviour (no_text, robots per hop, blocked IPv6); the deep-nesting test covers only 22 KB (R5) |
+| Simplicity | ok | one iterative walk, no dead code |
 | Plan fidelity | ok | every divergence is logged under *Deviations* |
-| Agent decisions | ok | D-2/D-3/D-11 (`costly`) each live in one place; D-2's AC4 reading is a logged `[REVIEW]` with a *Decisions* row |
+| Agent decisions | ok | D-2/D-3/D-11 (`costly`) unchanged, each in one place |
 
 ## Findings
 ### R1: Readability is superlinear in nesting depth, so a 22 KB page freezes the server for minutes
@@ -67,6 +78,7 @@ Gates: typecheck ok, lint ok, unit tests ok (596), image fail (environment: Core
 - Effort: small
 - Lesson candidate: Every CPU-bound step on untrusted input must have an input bound or run where the deadline can stop it.
 - Decision: fixed (c5128c8) + lesson proposed
+- Re-review (round 2): partly fixed; the remaining part is R5.
 
 ### R2: Any unexpected exception in the page fetcher becomes `network`, and an empty HTML page hits it
 - Severity: major
@@ -116,3 +128,29 @@ Gates: typecheck ok, lint ok, unit tests ok (596), image fail (environment: Core
 - Effort: small
 - Lesson candidate: no
 - Decision: fixed (bcd7734)
+
+### R5: Deeply nested markup still blocks the process past the deadline, now inside linkedom's parse
+- Severity: blocker
+- Where: `apps/api/src/infrastructure/sources/manual/extract.ts:92`, `apps/api/src/infrastructure/sources/manual/extract.ts:101`
+- Problem: the R1 fix measures depth after `parseHTML(source)`, but linkedom's parse is itself
+  superlinear in nesting depth, and `extractPage` parses the source twice. Measured on this
+  machine (4 cores) through `extractPage` with `text/html`: `'<b>'.repeat(340_000) + 'x'`
+  (996 KB, under the default `FETCH_MAX_BYTES` 1 048 576) takes 41.7 s and 45.7 s in two runs,
+  of which one `parseHTML` alone is 26.6 s; 500 KB of `<b>` parses in 6.0 s; 1 MB of closed
+  `<div>` nesting takes 4.8 s; 256 KB of `<b>` 1.5 s. The body has been read when this runs, so
+  `AbortSignal.timeout(FETCH_TIMEOUT_MS)` (20 s) cannot stop it, and the single Node process
+  (UI, other imports, analysis runner) is frozen for more than twice the deadline; the Pi is
+  slower, and `FETCH_MAX_BYTES` can be raised to 5 MB. This is the same defect class as R1 and
+  breaks the lesson this change proposes ("bound every CPU-bound step on untrusted input").
+  The new test uses depth 2 000 (22 KB), where linkedom is still fast, so it does not catch it.
+- Fix: bound the input before any parse. A linear pre-scan of the decoded source (for example
+  count `<` followed by a letter) above a fixed limit (such as 20 000 tags) skips the DOM
+  entirely and goes to a plain fallback (strip `<script>/<style>` blocks and tags with linear
+  regexes, then `normaliseText`), or caps the HTML handed to `parseHTML`; parse a second time
+  only when the fallback needs it. Add an `extract.test.ts` case with ~1 MB of unclosed `<b>`
+  that must finish quickly. Alternative: run the whole extraction in a `worker_thread` and
+  terminate it at the remaining deadline (`timeout`), which bounds every future parser case too
+  but costs a worker per import and more code.
+- Effort: small
+- Lesson candidate: no (covered by the lesson proposed from R1; its test should use the maximum body size)
+- Decision: open
