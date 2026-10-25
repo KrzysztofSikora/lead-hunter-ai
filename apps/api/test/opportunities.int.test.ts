@@ -81,6 +81,9 @@ describe('opportunity list (FR-11 AC1, FR-12 AC1)', () => {
     expect(exclusive.json().items.map((i: { id: number }) => i.id)).toEqual([1]);
     const scored = await get('/api/opportunities?minScore=0');
     expect(scored.json().total).toBe(2);
+    // an empty value means "not given", not 0
+    const empty = await get('/api/opportunities?minScore=&page=');
+    expect(empty.json()).toMatchObject({ total: 3, page: 1 });
 
     const bad = await get('/api/opportunities?pageSize=0');
     expect(bad.statusCode).toBe(400);

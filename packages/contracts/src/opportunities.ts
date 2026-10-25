@@ -168,13 +168,17 @@ export const OpportunityDetail = z
   .strict();
 export type OpportunityDetail = z.infer<typeof OpportunityDetail>;
 
+/** `z.coerce.number()` turns `''` into 0; an empty query value means "not given". */
+const emptyAsAbsent = <T extends z.ZodType>(schema: T) =>
+  z.preprocess((value) => (value === '' ? undefined : value), schema);
+
 /** D-9: `from` is inclusive, `to` exclusive, both ISO UTC instants on `createdAt`. */
 export const OpportunityListQuery = z
   .object({
-    page: z.coerce.number().int().min(1).default(1),
-    pageSize: z.coerce.number().int().min(1).max(100).default(20),
+    page: emptyAsAbsent(z.coerce.number().int().min(1).default(1)),
+    pageSize: emptyAsAbsent(z.coerce.number().int().min(1).max(100).default(20)),
     sort: z.enum(['date', 'score']).default('date'),
-    minScore: z.coerce.number().int().min(0).max(100).optional(),
+    minScore: emptyAsAbsent(z.coerce.number().int().min(0).max(100).optional()),
     category: Category.optional(),
     sourceType: SourceType.optional(),
     status: BusinessStatus.optional(),
