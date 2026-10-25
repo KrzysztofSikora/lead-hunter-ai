@@ -6,7 +6,7 @@ import { loadConfigOrExit } from './config.js';
 import { openDb } from '../infrastructure/db/client.js';
 import { runMigrations } from '../infrastructure/db/migrate.js';
 import { createSourceRepository } from '../infrastructure/db/source-repository.js';
-import { createHttpClient } from '../infrastructure/sources/http/client.js';
+import { createHttpClient, HttpFetchError } from '../infrastructure/sources/http/client.js';
 import { createRobotsCheck } from '../infrastructure/sources/manual/robots.js';
 import { anonymiseFeed } from '../infrastructure/sources/rss/anonymise-feed.js';
 import { parseFeed } from '../infrastructure/sources/rss/parse-feed.js';
@@ -30,6 +30,12 @@ async function main(): Promise<number> {
       process.stderr.write(`nie ma źródła ${id}\n`);
       return 1;
     }
+    if (source.nextAllowedAt !== null && source.nextAllowedAt > Date.now()) {
+      process.stderr.write(
+        `źródło prosiło o czekanie do ${new Date(source.nextAllowedAt).toISOString()}\n`,
+      );
+      return 1;
+    }
     const feed = RssConfig.parse(JSON.parse(source.configJson));
     const clock = { now: () => new Date() };
     const http = createHttpClient({
@@ -38,11 +44,18 @@ async function main(): Promise<number> {
     });
     const robots = createRobotsCheck({ http, userAgentToken: 'LeadHunterAI', clock });
     const signal = AbortSignal.timeout(config.fetchTimeoutMs);
-    const response = await http.get(feed.url, {
-      signal,
-      accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8',
-      beforeHop: (hop) => robots.check(hop, signal),
-    });
+    let response;
+    try {
+      response = await http.get(feed.url, {
+        signal,
+        accept: 'application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8',
+        beforeHop: (hop) => robots.check(hop, signal),
+      });
+    } catch (error) {
+      if (!(error instanceof HttpFetchError)) throw error;
+      process.stderr.write(`nie pobrano kanału: ${error.reason}\n`);
+      return 1;
+    }
     if (response.status < 200 || response.status >= 300) {
       process.stderr.write(`kanał odpowiedział ${response.status}\n`);
       return 1;
