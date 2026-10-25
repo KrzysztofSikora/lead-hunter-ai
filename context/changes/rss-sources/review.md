@@ -1,7 +1,14 @@
 # Review: rss-sources
 
-Verdict: CHANGES REQUESTED
-Gates: typecheck ok, lint ok, unit tests ok (626), image not run (no Docker daemon in the sandbox: `Cannot connect to the Docker daemon`), e2e ok (5), mutation n/a (S-10 is not a mutation target) · Round: 1
+Verdict: APPROVE WITH FOLLOW-UPS
+Gates: typecheck ok, lint ok, unit tests ok (629), image not run (no Docker daemon in the sandbox: `Cannot connect to the Docker daemon`), e2e ok (5), mutation n/a (S-10 is not a mutation target) · Round: 2
+
+Round 2 re-checks the fixes for R1–R5 (commits 026e922, 5170138, 5dea73e, 7db1bfc):
+- R1 fixed: `parseDate` returns `null` outside 1970..9999-12-31; parser test covers year 12026 and 1900.
+- R2 fixed: `recordFailure` caps the stored wait at `MAX_SOURCE_BACKOFF_MS` (7 days); integration case (e) asserts the capped `nextAllowedAt` and `GET /api/sources` 200.
+- R3 fixed for `EMAIL` (bounded quantifiers, 1 MiB single token now ~1 ms); the same file still has two quadratic patterns, see R6.
+- R4 fixed: the recorder refuses while `next_allowed_at` is pending and prints `HttpFetchError.reason`.
+- R5 fixed: `.env.example` describes the run interval and the check cooldown correctly.
 
 ## Plan vs diff
 | File | Status | Note |
@@ -36,16 +43,18 @@ Gates: typecheck ok, lint ok, unit tests ok (626), image not run (no Docker daem
 | `docs/source-policy.md`, `README.md`, `CLAUDE.md`, `context/test-plan.md` | done | |
 | `context/roadmap.md` | done | status |
 | `context/changes/rss-sources/evidence/anonymise-sample.txt` | done | |
+| `apps/api/src/infrastructure/sources/rss/anonymise-feed.test.ts` | unplanned | added by the R3 fix; covers e-mail and a 1 MiB single-token body |
+| `context/lessons.md` | unplanned | lesson proposed from R1/R2 |
 
 ## Areas
 | Area | Result (ok / concern / fail) | One-line reason |
 |------|------------------------------|-----------------|
-| Correctness | fail | A feed date or `Retry-After` in year ≥ 10000 is stored and then breaks `GET /api/opportunities` / `GET /api/sources` with 500 (R1, R2) |
-| Design | ok | Port/adapter split, one wiring point (`compose.ts`), shared `ingest`; contracts in one file |
-| Safety | concern | Untrusted source values reach stored state unbounded (R1, R2); recorder skips the per-source interval (R4) |
-| Tests | concern | ACs covered by the integration file, but no case for out-of-range dates or `Retry-After` values from the source |
+| Correctness | ok | R1/R2 fixed and covered by tests; no out-of-range source date reaches stored state |
+| Design | ok | Port/adapter split, one wiring point (`compose.ts`), shared `ingest`; backoff cap in one place |
+| Safety | concern | Anonymiser still quadratic on untrusted feed bodies through `PHONE` and `PERSON_TAG` (R6) |
+| Tests | ok | Fixes come with parser, integration and anonymiser cases |
 | Simplicity | ok | Readable, small functions; no dead code found |
-| Plan fidelity | ok | Every divergence is logged except the folded-in `fetch-feed.ts`, which is cosmetic |
+| Plan fidelity | concern | The 7-day backoff cap is not in `docs/source-policy.md` (R7) |
 | Agent decisions | ok | D-1/D-2/D-4 live in schema + repository, D-10/D-19 in `packages/contracts`; D-21 [REVIEW] deviation has its Decisions row |
 
 ## Findings
@@ -93,3 +102,21 @@ Gates: typecheck ok, lint ok, unit tests ok (626), image not run (no Docker daem
 - Effort: small
 - Lesson candidate: no
 - Decision: fixed (7db1bfc)
+
+### R6: Two anonymiser patterns are still quadratic on a fetched feed
+- Severity: major
+- Where: `apps/api/src/infrastructure/sources/rss/anonymise-feed.ts:8`, `apps/api/src/infrastructure/sources/rss/anonymise-feed.ts:10`
+- Problem: the R3 fix bounded `EMAIL` only. `PHONE = /(?<![\w.-])\+?\d[\d ()-]{7,}\d(?![\w-])/g` scans to the end of a run from every digit that follows a space or `(` when every digit is followed by `-`: measured on `'(1-'.repeat(n)` 15 k chars → 216 ms, 30 k → 903 ms, 60 k → 3.5 s (×4 per doubling, so a 1 MiB body takes minutes). `PERSON_TAG`'s lazy `[\s\S]*?<\/\1>` scans to the end from each unclosed `<author>`: 40 k → 28 ms, 80 k → 109 ms, 160 k → 435 ms (≈ 18 s at 1 MiB). With no entry in the feed, `scrub(xml, null)` runs on the whole body. The docblock still says "Linear string work", and this breaches the lesson "Bound every CPU-bound step on untrusted input" (scope `apps/api/src/infrastructure/sources/**`). Impact is the operator's CLI, not the server.
+- Fix: bound `PHONE` (`[\d ()-]{7,20}`: no phone number is longer) and replace `PERSON_TAG` with an `indexOf` scan for the matching close tag (or bound the body, e.g. `[^<]{0,512}`). Extend the 1 MiB timing test in `anonymise-feed.test.ts` with these two shapes.
+- Effort: small
+- Lesson candidate: no (covered by the existing lesson)
+- Decision: open
+
+### R7: `docs/source-policy.md` does not mention the 7-day backoff cap
+- Severity: minor
+- Where: `docs/source-policy.md:15`
+- Problem: the policy says the next attempt is "nie wcześniej niż `max(Retry-After, odstęp)`", but since the R2 fix it is `min(max(Retry-After, odstęp), 7 dni)` (`MAX_SOURCE_BACKOFF_MS`, `service.ts:27`). The operator reading the policy cannot tell a source may be retried before its stated `Retry-After`.
+- Fix: append "…, najwyżej 7 dni" to that sentence.
+- Effort: small
+- Lesson candidate: no
+- Decision: open
