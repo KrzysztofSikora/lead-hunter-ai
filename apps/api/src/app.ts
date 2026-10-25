@@ -53,7 +53,10 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   // `/api/*` stays JSON; any other GET falls back to the SPA shell (D-12).
   app.setNotFoundHandler((request, reply) => {
-    if (deps.webDistDir && request.method === 'GET' && !request.url.startsWith('/api/')) {
+    const path = request.url.split('?')[0] ?? '';
+    const isApi = path === '/api' || path.startsWith('/api/');
+    const isAsset = path.startsWith('/assets/') || /\.[a-z0-9]+$/i.test(path);
+    if (deps.webDistDir && request.method === 'GET' && !isApi && !isAsset) {
       return reply.sendFile('index.html');
     }
     return reply.code(404).send({ error: 'not_found' });

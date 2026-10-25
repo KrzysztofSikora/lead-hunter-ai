@@ -29,6 +29,15 @@ describe('static serving and SPA fallback (D-12)', () => {
     expect((await app.inject('/api/health')).statusCode).toBe(200);
   });
 
+  it('answers /api and missing assets with the JSON 404, not the shell', async () => {
+    const { app } = await buildTestApp({ overrides: { webDistDir: webDir } });
+    for (const url of ['/api', '/api?x=1', '/assets/nope.js', '/favicon.ico']) {
+      const res = await app.inject(url);
+      expect(res.statusCode, url).toBe(404);
+      expect(res.json()).toEqual({ error: 'not_found' });
+    }
+  });
+
   it('does not serve a shell without a web dist', async () => {
     const { app } = await buildTestApp();
     expect((await app.inject('/')).statusCode).toBe(404);
