@@ -1,3 +1,49 @@
+import type { AnalysedResult, OperatorProfile, SourceType } from '@lead-hunter/contracts';
+import type { ProviderOutput } from '../analysis/ports.js';
+
+/**
+ * What an offer drafter receives (S-07 D-10): data only, never the source URL, contacts, keys
+ * or other opportunities. Source and analysis text are untrusted content (PRD §6.4).
+ */
+export interface OfferInput {
+  source: { title: string; text: string; sourceType: SourceType };
+  /** The current completed analysis, or null when the draft rests on source and profile (D-14). */
+  analysis: Pick<
+    AnalysedResult,
+    | 'category'
+    | 'problem'
+    | 'mvpScope'
+    | 'exclusions'
+    | 'estimatedHours'
+    | 'proposedPrice'
+    | 'pricingAssumptions'
+    | 'requiredClarifications'
+  > | null;
+  profile: Pick<
+    OperatorProfile,
+    | 'skills'
+    | 'serviceTypes'
+    | 'preferredTechnologies'
+    | 'experience'
+    | 'languages'
+    | 'rateRanges'
+    | 'billingModels'
+    | 'minimumJobValue'
+  >;
+  /** The pre-filter language; null means the model follows the source. */
+  targetLanguage: 'pl' | 'en' | null;
+}
+
+/** The offer-model side of a provider (S-07 D-6): the model is fixed at construction. */
+export interface OfferDrafter {
+  readonly name: 'mock' | 'anthropic' | 'openai-compatible';
+  readonly paid: boolean;
+  readonly model: string;
+  readonly offerPromptVersion: string;
+  readonly demo: boolean;
+  draftOffer(input: OfferInput): Promise<ProviderOutput>;
+}
+
 /** One `offer_drafts` row; JSON columns are still text here (S-07 D-1). */
 export interface OfferDraftRow {
   id: number;

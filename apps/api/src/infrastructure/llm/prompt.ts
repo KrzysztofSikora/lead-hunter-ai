@@ -52,6 +52,11 @@ function strip(node: unknown): unknown {
   return out;
 }
 
+/** Any contract schema as JSON Schema for the model (same stripping as the analysis schema). */
+export function toModelSchema(schema: z.ZodType): Json {
+  return strip(z.toJSONSchema(schema, { io: 'input' })) as Json;
+}
+
 let cached: Json | undefined;
 
 /**
@@ -60,7 +65,7 @@ let cached: Json | undefined;
  * parse still enforces them, so this only guides the model.
  */
 export function outputJsonSchema(): Json {
-  cached ??= strip(z.toJSONSchema(OpportunityAnalysis, { io: 'input' })) as Json;
+  cached ??= toModelSchema(OpportunityAnalysis);
   return cached;
 }
 
@@ -69,7 +74,8 @@ export function systemPrompt(): string {
 }
 
 /** JSON-escaped, so `<` never appears raw inside the data block and the block cannot be closed. */
-const escapeJson = (value: unknown): string => JSON.stringify(value).replaceAll('<', '\\u003c');
+export const escapeJson = (value: unknown): string =>
+  JSON.stringify(value).replaceAll('<', '\\u003c');
 
 /** The one user message: source data and the profile fragment only (FR-08 AC3, FR-24 AC3). */
 export function buildUserMessage(input: AnalysisInput): string {

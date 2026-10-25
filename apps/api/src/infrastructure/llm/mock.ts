@@ -1,4 +1,4 @@
-import type { Category, EvidenceLevel } from '@lead-hunter/contracts';
+import type { Category, EvidenceLevel, OfferDraftContent } from '@lead-hunter/contracts';
 import {
   hasHardwareCue,
   hasHiringCue,
@@ -7,6 +7,8 @@ import {
   matchTerms,
 } from '../../modules/analysis/cues.js';
 import type { AnalysisInput, LlmProvider, ProviderOutput } from '../../modules/analysis/ports.js';
+import type { OfferDrafter, OfferInput } from '../../modules/offers/ports.js';
+import { OFFER_PROMPT_VERSION } from './offer-prompt.js';
 
 const PREFIX = 'DEMO / MOCK: ';
 const MIN_CHARS = 80;
@@ -90,16 +92,24 @@ function evidenceOf(text: string, profileTerms: number): EvidenceLevel {
  * D-15: keyword rules over the source text. Deterministic, offline, and never invents names, URLs
  * or contacts. It reads no configuration or environment (TR-02). Results are rules, not AI.
  */
-export class MockProvider implements LlmProvider {
+export class MockProvider implements LlmProvider, OfferDrafter {
   readonly name = 'mock' as const;
   readonly paid = false;
   readonly model = 'mock-rules';
   readonly promptVersion = 'mock-rules-1';
+  readonly offerPromptVersion = `mock-${OFFER_PROMPT_VERSION}`;
   readonly demo = true;
 
   analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
     return Promise.resolve({
       output: this.analyse(input),
+      usage: { inputTokens: null, outputTokens: null },
+    });
+  }
+
+  draftOffer(input: OfferInput): Promise<ProviderOutput> {
+    return Promise.resolve({
+      output: mockOffer(input),
       usage: { inputTokens: null, outputTokens: null },
     });
   }
@@ -160,4 +170,100 @@ export class MockProvider implements LlmProvider {
       countries: [],
     };
   }
+}
+
+const LINE_MAX = 300;
+const HOURS_PER_DAY = 6;
+
+const QUESTION_FALLBACKS = [
+  'Jaki jest dokładny zakres pierwszej wersji?',
+  'Do kiedy potrzebny jest działający efekt?',
+  'Kto po stronie klienta odbiera i testuje wynik?',
+];
+
+const MESSAGES = {
+  pl: {
+    subject: `${PREFIX}propozycja realizacji`,
+    message: `${PREFIX}Dzień dobry, zainteresowało mnie to zlecenie. Mogę zająć się pierwszą działającą wersją. Podaję wstępny zakres i szacunek; chętnie doprecyzuję szczegóły.`,
+    proposal: (scope: string[], exclusions: string[], questions: string[]) =>
+      [
+        `# ${PREFIX}Propozycja współpracy B2B`,
+        '## Zakres',
+        ...scope.map((item) => `- ${item}`),
+        '## Poza zakresem',
+        ...(exclusions.length ? exclusions.map((item) => `- ${item}`) : ['- do ustalenia']),
+        '## Pytania',
+        ...questions.map((item) => `- ${item}`),
+        '## Rozliczenie',
+        'Szacunek z założeniami podany w szkicu; ostateczna wycena po doprecyzowaniu.',
+      ].join('\n'),
+  },
+  en: {
+    subject: `${PREFIX}proposal`,
+    message: `${PREFIX}Hello, this project caught my interest. I can take on a first working version. Below is a rough scope and estimate; happy to clarify the details.`,
+    proposal: (scope: string[], exclusions: string[], questions: string[]) =>
+      [
+        `# ${PREFIX}B2B proposal`,
+        '## Scope',
+        ...scope.map((item) => `- ${item}`),
+        '## Out of scope',
+        ...(exclusions.length ? exclusions.map((item) => `- ${item}`) : ['- to be agreed']),
+        '## Questions',
+        ...questions.map((item) => `- ${item}`),
+        '## Pricing',
+        'An estimate with its assumptions is given in the draft; the final quote follows the clarifications.',
+      ].join('\n'),
+  },
+} as const;
+
+const clip = (items: readonly string[]): string[] => items.map((item) => item.slice(0, LINE_MAX));
+
+/** Deterministic templates from the analysis and the profile; no name, URL or contact (TR-02). */
+function mockOffer({ analysis, profile, targetLanguage }: OfferInput): OfferDraftContent {
+  const language = targetLanguage ?? profile.languages[0] ?? 'pl';
+  const texts = MESSAGES[language === 'en' ? 'en' : 'pl'];
+  const mvpScope = clip(
+    analysis?.mvpScope.length ? analysis.mvpScope : [`${PREFIX}pierwsza działająca wersja`],
+  ).slice(0, 10);
+  const exclusions = clip(analysis?.exclusions ?? []).slice(0, 10);
+  const asked = (analysis?.requiredClarifications ?? []).map(
+    (item) => `Proszę o doprecyzowanie: ${item}`,
+  );
+  const questions = clip([...new Set([...asked, ...QUESTION_FALLBACKS])]).slice(0, 6);
+  const hours = analysis?.estimatedHours ?? null;
+  const minDays = hours ? Math.max(1, Math.ceil(hours.min / HOURS_PER_DAY)) : 7;
+  const maxDays = hours ? Math.max(minDays, Math.ceil(hours.max / HOURS_PER_DAY)) : 21;
+  const priced = analysis?.proposedPrice ?? null;
+
+  return {
+    language,
+    problem: `${PREFIX}problem klienta opisany w źródle (szablon, nie analiza AI).`,
+    plan: [
+      `${PREFIX}doprecyzować wymagania`,
+      `${PREFIX}zbudować pierwszą działającą wersję`,
+      `${PREFIX}przekazać wynik z instrukcją`,
+    ],
+    valueProposition: `${PREFIX}szybka, sprawdzona pierwsza wersja bez zobowiązań poza uzgodnionym zakresem.`,
+    mvpScope,
+    exclusions,
+    timeline: {
+      minDays: Math.min(minDays, 365),
+      maxDays: Math.min(maxDays, 730),
+      assumptions: [
+        `${PREFIX}szacunek zakłada ${HOURS_PER_DAY} godzin pracy dziennie i brak zmian zakresu`,
+      ],
+    },
+    pricing: {
+      model: profile.billingModels[0] ?? 'UNKNOWN',
+      range: priced,
+      assumptions: clip(
+        analysis?.pricingAssumptions.length
+          ? analysis.pricingAssumptions
+          : [`${PREFIX}brak stawki w profilu — wycena po doprecyzowaniu`],
+      ).slice(0, 6),
+    },
+    questions,
+    message: { subject: texts.subject, body: texts.message },
+    proposal: { body: texts.proposal(mvpScope, exclusions, questions) },
+  };
 }

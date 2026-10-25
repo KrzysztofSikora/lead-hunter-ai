@@ -1,8 +1,13 @@
-import { ANALYSIS_SCHEMA_VERSION, OpportunityAnalysis } from '@lead-hunter/contracts';
+import {
+  ANALYSIS_SCHEMA_VERSION,
+  OfferDraftContent,
+  OpportunityAnalysis,
+} from '@lead-hunter/contracts';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { profile } from '../../../test/helpers/analysis.js';
 import type { AnalysisInput } from '../../modules/analysis/ports.js';
+import type { OfferInput } from '../../modules/offers/ports.js';
 import { MockProvider } from './mock.js';
 
 const fixture = (name: string): string =>
@@ -112,5 +117,58 @@ describe('MockProvider (D-15)', () => {
     if (result.verdict !== 'ANALYSED') throw new Error('expected ANALYSED');
     expect(result.evidenceLevel).toBe('EXPLICIT_PROBLEM');
     expect(result.category).toBe('UNMET_NEED');
+  });
+});
+
+describe('MockProvider.draftOffer', () => {
+  const offer = (
+    targetLanguage: OfferInput['targetLanguage'],
+    analysis: OfferInput['analysis'],
+  ): OfferInput => {
+    const p = profile();
+    return {
+      source: { title: 'DEMO', text: 'DEMO', sourceType: 'manual_text' },
+      analysis,
+      profile: {
+        skills: p.skills,
+        serviceTypes: p.serviceTypes,
+        preferredTechnologies: p.preferredTechnologies,
+        experience: p.experience,
+        languages: p.languages,
+        rateRanges: p.rateRanges,
+        billingModels: p.billingModels,
+        minimumJobValue: p.minimumJobValue,
+      },
+      targetLanguage,
+    };
+  };
+  const analysed: NonNullable<OfferInput['analysis']> = {
+    category: 'DIRECT_GIG',
+    problem: 'DEMO',
+    mvpScope: ['DEMO: zakres'],
+    exclusions: [],
+    estimatedHours: { min: 20, max: 60 },
+    proposedPrice: { minMinor: 200_000, maxMinor: 900_000, currency: 'PLN' },
+    pricingAssumptions: ['DEMO: założenie'],
+    requiredClarifications: ['zakres', 'termin', 'budżet', 'a', 'b', 'c', 'd'],
+  };
+
+  it.each<[OfferInput['targetLanguage'], OfferInput['analysis'], string]>([
+    ['pl', analysed, 'pl'],
+    ['en', analysed, 'en'],
+    ['en', null, 'en'],
+    [null, null, 'pl'],
+  ])('is a contract-valid draft without URLs or e-mails (%s, %j)', async (lang, analysis, code) => {
+    const { output } = await new MockProvider().draftOffer(offer(lang, analysis));
+    const content = OfferDraftContent.parse(output);
+    expect(content.language).toBe(code);
+    expect(content.message.body.startsWith('DEMO / MOCK: ')).toBe(true);
+    expect(content.questions.length).toBeGreaterThanOrEqual(3);
+    expect(content.questions.length).toBeLessThanOrEqual(6);
+    expect(JSON.stringify(content)).not.toMatch(/https?:\/\/|www\.|@/);
+    expect(await new MockProvider().draftOffer(offer(lang, analysis))).toEqual({
+      output,
+      usage: { inputTokens: null, outputTokens: null },
+    });
   });
 });

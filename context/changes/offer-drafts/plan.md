@@ -345,7 +345,7 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Contracts, table and spend
-- [ ] Phase 2: Offer prompt and adapters
+- [x] Phase 2: Offer prompt and adapters
 - [ ] Phase 3: Generate a draft
 - [ ] Phase 4: Draft actions and the no-send proof
 - [ ] Phase 5: Draft panel and the e2e draft step
@@ -362,6 +362,12 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
   opportunity detail needs `OfferDraftRow`; Phase 2 adds `OfferInput` and `OfferDrafter` to it.
 - [minor] D-18: the brief's `llm.analyses` now counts every stored LLM call (analyses and drafts),
   so `reported` never exceeds it; the field name stays (contract unchanged).
+- [minor] Phase 2: `OfferInput` has no `schemaVersion` (the plan's shape did not list one); `escapeJson`
+  in `prompt.ts` is exported so the offer prompt reuses it. `createOfferDrafter` and
+  `createLlmProvider` share one private `build`.
+- [minor] Phase 2: the offer prompt asks for the plan sections (`plan`, `valueProposition`, scope,
+  timeline, pricing, `questions`) in Polish (working notes for the operator, D-2) and for
+  `message`/`proposal` in the target or source language; the plan only fixed the latter.
 - [FOLLOW-UP] S-14: Pipeline/Insights "sent" should count `SENT_MANUALLY` drafts (S-08 D-9).
 
 ## Review response
