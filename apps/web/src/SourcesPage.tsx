@@ -174,7 +174,7 @@ function jobCost(run: JobRun): string {
 }
 
 /** D-13: the schedule, the cycle button and the last runs; refetches every 3 s while one runs. */
-function Jobs({ onFinished }: { onFinished: () => void }) {
+function Jobs({ onFinished, version }: { onFinished: () => void; version: number }) {
   const [jobs, setJobs] = useState<JobList | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [starting, setStarting] = useState(false);
@@ -189,7 +189,8 @@ function Jobs({ onFinished }: { onFinished: () => void }) {
       () => setLoadFailed(true),
     );
   }, []);
-  useEffect(load, [load]);
+  // `version` changes when a row action started a run elsewhere on the page (R3).
+  useEffect(load, [load, version]);
 
   const running = jobs?.running ?? false;
   useEffect(() => {
@@ -282,6 +283,7 @@ export function SourcesPage() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [adding, setAdding] = useState(false);
   const [addMessage, setAddMessage] = useState<string | null>(null);
+  const [jobsVersion, setJobsVersion] = useState(0);
   const [name, setName] = useState('');
   const [url, setUrl] = useState('');
 
@@ -339,13 +341,20 @@ export function SourcesPage() {
   return (
     <section>
       <h2>{t.title}</h2>
-      <Jobs onFinished={load} />
+      <Jobs onFinished={load} version={jobsVersion} />
       {data.items.length === 0 ? (
         <p>{t.empty}</p>
       ) : (
         <ul className={styles.list}>
           {data.items.map((source) => (
-            <SourceItem key={source.id} source={source} onChanged={load} />
+            <SourceItem
+              key={source.id}
+              source={source}
+              onChanged={() => {
+                load();
+                setJobsVersion((v) => v + 1);
+              }}
+            />
           ))}
         </ul>
       )}
