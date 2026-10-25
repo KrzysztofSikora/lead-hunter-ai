@@ -67,7 +67,6 @@ export interface JobRunRepository {
   startCycle(trigger: JobTrigger, at: number, scheduledFor: number | null): number | 'slot_taken';
   /** Writes only a row still `running`, so an `interrupted` row is never rewritten (D-3). */
   finishCycle(id: number, summary: CycleSummary): void;
-  isRunning(): boolean;
   /** Newest first. A cycle's counters are the sums over its child runs (D-8, D-11). */
   list(query: JobRunQuery): { items: JobRunRow[]; total: number };
 }

@@ -163,12 +163,6 @@ export function createJobRunRepository(db: BetterSQLite3Database): JobRunReposit
       });
       return { items, total };
     },
-    isRunning() {
-      return (
-        db.select({ id: jobRuns.id }).from(jobRuns).where(eq(jobRuns.status, 'running')).get() !==
-        undefined
-      );
-    },
   };
 }
 
