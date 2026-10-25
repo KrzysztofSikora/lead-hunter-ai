@@ -33,7 +33,7 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Status: proposed in the PR for pipeline-and-payments
 
 ## Bound every CPU-bound step on untrusted input, or run it where the deadline can stop it
-- Why: Readability is superlinear in nesting depth, so a 22 KB page blocked the single Node process for two minutes; an `AbortSignal` deadline cannot interrupt synchronous code.
-- Seen in: url-import-guard, R1
+- Why: Readability is superlinear in nesting depth, so a 22 KB page blocked the single Node process for two minutes; an `AbortSignal` deadline cannot interrupt synchronous code. The parser itself (linkedom) was superlinear too, so bound the input before the first parse, and test with a body of the maximum allowed size, not a small one.
+- Seen in: url-import-guard, R1, R5
 - Scope: `apps/api/src/infrastructure/sources/**` and any parser or extractor of fetched content
 - Status: proposed in the PR for url-import-guard
