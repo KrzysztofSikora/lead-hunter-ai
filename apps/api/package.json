@@ -12,6 +12,7 @@
     "discover": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/discover.ts"
   },
   "dependencies": {
+    "@fastify/static": "10.1.7",
     "@fastify/swagger": "9.9.2",
     "@lead-hunter/config": "workspace:*",
     "@lead-hunter/contracts": "workspace:*",

@@ -438,11 +438,12 @@ pnpm@12.15.0` in the root `package.json`.
 - [x] Phase 1: Workspace, tooling and layer rules
 - [x] Phase 2: Env config and logger with redaction
 - [x] Phase 3: API server, database, health, OpenAPI and CLIs
-- [ ] Phase 4: Web shell, static serving and e2e smoke
+- [x] Phase 4: Web shell, static serving and e2e smoke
 - [ ] Phase 5: Docker image, compose, CI and docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 4) Judge the Polish wording of the shell and whether it reads as an honest "nothing here yet" on a laptop and a phone-width window — run: `pnpm build && pnpm start`, open http://127.0.0.1:8080 — evidence: `context/changes/repo-skeleton/evidence/shell-360.png`
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -457,6 +458,8 @@ pnpm@12.15.0` in the root `package.json`.
 - [minor] (Phase 3) Plan-review finding 6 applied: `buildApp` takes `deps.onRoute`; the OpenAPI test normalises `:param` to `{param}`. `buildApp` is async and calls `app.ready()`.
 - [REVIEW] (Phase 3) D-6 moves the dev DB to `apps/api/data/lead-hunter.db` while tech-stack *Local development* says `./data/dev.db`; tech-stack needs updating at the PR.
 - [minor] (Phase 3) Added `src/version.ts` (reads the package version for health) and `src/cli/config.ts` (shared Polish exit-on-ConfigError helper) beyond the plan's file list.
+- [REVIEW] (Phase 4) `pnpm exec playwright install chromium` failed in the sandbox (download blocked; Chrome for Testing 156 / build 1248). An older Chromium (1243) exists in `/opt/pw-browsers`. `playwright.config.ts` reads an optional `E2E_CHROMIUM_PATH` (empty by default, so CI uses the pinned download); the local e2e run and `shell-360.png` used the 1243 headless shell. The CI `e2e` job (Phase 5) must confirm the pinned browser.
+- [minor] (Phase 4) Added `e2e/tsconfig.json` and put `tsc -p e2e/tsconfig.json` in the root `typecheck`, so `playwright.config.ts` and the specs are typechecked. Added `apps/web/src/css.d.ts` for CSS module typings and `@lead-hunter/contracts` as a web dependency. D-18 differs from the test plan (fixed port 4317, no password hash on loopback) as plan-review finding 13 noted.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

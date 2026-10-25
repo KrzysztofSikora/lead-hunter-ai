@@ -1,3 +1,4 @@
+import fastifyStatic from '@fastify/static';
 import swagger from '@fastify/swagger';
 import type { Config } from '@lead-hunter/config';
 import Fastify, { type FastifyInstance, type FastifyServerOptions } from 'fastify';
@@ -13,6 +14,8 @@ export interface AppDeps {
   config: Pick<Config, 'nodeEnv'>;
   healthProbe: HealthProbe;
   version: string;
+  /** Directory of the built web app; static serving and the SPA fallback are off without it. */
+  webDistDir?: string;
   logger?: FastifyServerOptions['logger'];
   /** Called for every registered route; the OpenAPI test uses it to compare against the document. */
   onRoute?: (route: { method: string; url: string; hidden: boolean }) => void;
@@ -44,8 +47,17 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     app.get('/api/openapi.json', { schema: { hide: true } }, async () => app.swagger());
   }
 
-  // Static serving and the SPA fallback (D-12) replace this for non-/api paths in Phase 4.
-  app.setNotFoundHandler((_request, reply) => reply.code(404).send({ error: 'not_found' }));
+  if (deps.webDistDir) {
+    await app.register(fastifyStatic, { root: deps.webDistDir, wildcard: false });
+  }
+
+  // `/api/*` stays JSON; any other GET falls back to the SPA shell (D-12).
+  app.setNotFoundHandler((request, reply) => {
+    if (deps.webDistDir && request.method === 'GET' && !request.url.startsWith('/api/')) {
+      return reply.sendFile('index.html');
+    }
+    return reply.code(404).send({ error: 'not_found' });
+  });
 
   await app.ready();
   return app;

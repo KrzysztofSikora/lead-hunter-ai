@@ -1,5 +1,6 @@
-import { accessSync, constants, mkdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { accessSync, constants, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { buildApp } from './app.js';
 import { loadConfigOrExit } from './cli/config.js';
 import { openDb } from './infrastructure/db/client.js';
@@ -12,6 +13,8 @@ function fail(message: string): never {
   process.stderr.write(`${message}\n`);
   process.exit(1);
 }
+
+const WEB_DIST_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '../../web/dist');
 
 async function main(): Promise<void> {
   const config = loadConfigOrExit();
@@ -40,6 +43,7 @@ async function main(): Promise<void> {
     config,
     healthProbe: createHealthProbe(sqlite),
     version: VERSION,
+    ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });
 
