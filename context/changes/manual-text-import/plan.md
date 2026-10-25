@@ -362,10 +362,14 @@ rendered as text (React escaping), never as HTML.
 - [x] Phase 1: Import API, identity rules and storage
 - [x] Phase 2: Opportunity list and detail API
 - [x] Phase 3: Okazje list and opportunity view in the web app
-- [ ] Phase 4: Import view, e2e and README
+- [x] Phase 4: Import view, e2e and README
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 4) Fresh install, 360 px: *Okazje* shows the empty text, "Sprawdzone źródła: 0", "Błędy źródeł: brak", no example opportunity — run: `pnpm build && pnpm e2e` or open /okazje on a fresh `DATA_DIR` — evidence: `context/changes/manual-text-import/evidence/empty-360.png`
+- [ ] (Phase 4) Import a post with a URL containing `?utm_source=x#frag`, then the same URL without them: second time "Już zaimportowane" with a working link; the view shows the URL as first pasted, "brak analizy — w kolejce" — run: /import on the running app — evidence: `context/changes/manual-text-import/evidence/duplicate-360.png`
+- [ ] (Phase 4) With 3+ imports try each filter, both sorts and *Następna*; filter survives reload; Polish labels read well; no horizontal scroll — run: /okazje on the running app — evidence: `context/changes/manual-text-import/evidence/list-360.png` (one import only; 3+ imports are for the person)
+- [ ] (Phase 4) Paste `<script>alert(1)</script>` and an "ignore previous instructions" line: shown verbatim as text, nothing executes — run: /import, then open the opportunity — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->

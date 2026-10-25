@@ -23,6 +23,7 @@ export const strings = {
     label: 'Nawigacja',
     start: 'Start',
     opportunities: 'Okazje',
+    import: 'Import',
     profile: 'Profil',
   },
   opportunities: {
@@ -81,6 +82,28 @@ export const strings = {
     sourceTypes: {
       manual_text: 'Wklejony tekst',
       manual_url: 'Wklejony adres URL',
+    },
+  },
+  import: {
+    title: 'Import ogłoszenia',
+    textLabel: 'Treść ogłoszenia',
+    urlLabel: 'Adres URL (opcjonalnie)',
+    urlHint:
+      'Adres zostanie zapisany jako źródło; pobieranie strony dojdzie później — wklej treść.',
+    submit: 'Importuj',
+    submitting: 'Importowanie…',
+    failed: 'Nie udało się zaimportować. Spróbuj ponownie.',
+    created: 'Zaimportowano —',
+    duplicate: 'Już zaimportowane —',
+    openCreated: 'Zobacz okazję',
+    openDuplicate: 'Zobacz istniejącą okazję',
+    errors: {
+      too_big: 'Wartość jest za długa.',
+      invalid_format: 'Podaj poprawny adres URL (http lub https).',
+      invalid_type: 'Podaj poprawną wartość.',
+      invalid_value: 'Nieprawidłowa wartość.',
+      unrecognized_keys: 'Nieznane pole.',
+      generic: 'Nieprawidłowa wartość.',
     },
   },
   opportunity: {
