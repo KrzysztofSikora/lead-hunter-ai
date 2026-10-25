@@ -1,0 +1,14 @@
+{
+  "name": "@lead-hunter/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "fastify": "5.12.7"
+  },
+  "devDependencies": {
+    "undici": "8.12.3"
+  }
+}

@@ -435,7 +435,7 @@ pnpm@12.15.0` in the root `package.json`.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Workspace, tooling and layer rules
+- [x] Phase 1: Workspace, tooling and layer rules
 - [ ] Phase 2: Env config and logger with redaction
 - [ ] Phase 3: API server, database, health, OpenAPI and CLIs
 - [ ] Phase 4: Web shell, static serving and e2e smoke
@@ -446,6 +446,10 @@ pnpm@12.15.0` in the root `package.json`.
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] (Phase 1) pnpm 12.15.0 does not honour `onlyBuiltDependencies`: `pnpm install` failed with `ERR_PNPM_IGNORED_BUILDS` for esbuild. `pnpm approve-builds` wrote `allowBuilds` instead, so `pnpm-workspace.yaml` uses `allowBuilds: {esbuild: true, better-sqlite3: true}`. Same intent as the plan and roadmap (better-sqlite3 stays approved).
+- [minor] (Phase 1) Plan-review finding 5 applied: fastify (api), zod (contracts) and jsdom (web) are added in Phase 1 so the phase is green. Finding 10 applied: `apps/api/test/network-isolation.test.ts` asserts that an unmocked `fetch` rejects.
+- [minor] (Phase 1) Root `typecheck` is `pnpm -r typecheck && tsc -p scripts/tsconfig.json`, so `scripts/` is typechecked too (it is not a workspace package).
+- [minor] (Phase 1) The `source` export condition is wired in tsconfig (`customConditions`) and in the package Vitest configs, but no cross-package import exists yet, so tsx and Vitest resolution through `source` is still unverified. Phase 2 (api imports config/contracts) is the first real test of it.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
