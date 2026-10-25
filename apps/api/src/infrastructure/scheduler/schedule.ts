@@ -19,19 +19,29 @@ export interface SchedulerOptions {
 
 /**
  * A slot that finds the lock busy is tried again until the window ends (plan-review round 2 #1);
- * the slot index (D-5) makes a repeat after a success harmless. Returns the cancel function.
+ * the slot index (D-5) makes a repeat after a success harmless. Returns the cancel function, or
+ * `null` when the first attempt already settled. A throwing retry stops the timer and goes to `onError`.
  */
 export function retryWhileBusy(
   attempt: () => 'busy' | 'done',
-  { retryMs = 30_000, windowMs = 30 * MINUTE_MS, onGiveUp }: RetryOptions = {},
-): () => void {
-  if (attempt() === 'done') return () => undefined;
+  { retryMs = 30_000, windowMs = 30 * MINUTE_MS, onGiveUp, onError, onSettled }: RetryOptions = {},
+): (() => void) | null {
+  if (attempt() === 'done') return null;
   const deadline = Date.now() + windowMs;
+  const settle = (): void => {
+    clearInterval(timer);
+    onSettled?.();
+  };
   const timer = setInterval(() => {
-    if (attempt() === 'done') clearInterval(timer);
-    else if (Date.now() >= deadline) {
-      clearInterval(timer);
-      onGiveUp?.();
+    try {
+      if (attempt() === 'done') settle();
+      else if (Date.now() >= deadline) {
+        settle();
+        onGiveUp?.();
+      }
+    } catch (error) {
+      settle();
+      onError?.(error);
     }
   }, retryMs);
   timer.unref();
@@ -42,6 +52,9 @@ export interface RetryOptions {
   retryMs?: number;
   windowMs?: number;
   onGiveUp?(): void;
+  onError?(error: unknown): void;
+  /** Called once when the retry ends by itself (done, window over or error), not on cancel. */
+  onSettled?(): void;
 }
 
 export interface Scheduler {

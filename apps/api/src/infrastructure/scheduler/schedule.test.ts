@@ -148,4 +148,20 @@ describe('retryWhileBusy', () => {
     expect(attempt).toHaveBeenCalledTimes(3);
     expect(onGiveUp).toHaveBeenCalledTimes(1);
   });
+
+  it('reports a throwing retry instead of crashing, and stops', async () => {
+    vi.useFakeTimers();
+    const onError = vi.fn();
+    const onSettled = vi.fn();
+    let calls = 0;
+    const attempt = vi.fn((): 'busy' | 'done' => {
+      if (++calls === 2) throw new Error('SQLITE_BUSY');
+      return 'busy';
+    });
+    retryWhileBusy(attempt, { retryMs: 30_000, windowMs: 30 * 60_000, onError, onSettled });
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(attempt).toHaveBeenCalledTimes(2);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(onSettled).toHaveBeenCalledTimes(1);
+  });
 });

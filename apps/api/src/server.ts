@@ -145,7 +145,8 @@ async function main(): Promise<void> {
     times: config.discoveryTimes,
     onSlot: (slot) => {
       const at = new Date(slot).toISOString();
-      const cancel = retryWhileBusy(
+      const slotRetry: { cancel: (() => void) | null } = { cancel: null };
+      slotRetry.cancel = retryWhileBusy(
         () => {
           const started = sourceRuntime.jobs.startCycle('schedule', slot);
           if (started.kind === 'busy') {
@@ -161,9 +162,18 @@ async function main(): Promise<void> {
             );
           return 'done';
         },
-        { onGiveUp: () => logWarn(`scheduled slot ${at} skipped: a run stayed in progress`) },
+        {
+          onGiveUp: () => logWarn(`scheduled slot ${at} skipped: a run stayed in progress`),
+          onError: (error) =>
+            logger.error(
+              `scheduled slot ${at} retry failed: ${error instanceof Error ? error.message : 'error'}`,
+            ),
+          onSettled: () => {
+            if (slotRetry.cancel) retries.delete(slotRetry.cancel);
+          },
+        },
       );
-      retries.add(cancel);
+      if (slotRetry.cancel) retries.add(slotRetry.cancel);
     },
     // D-4: work held back by the daily limit resumes on a later tick.
     analysisTick: () => runner.kick(),
