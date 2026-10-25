@@ -1,7 +1,9 @@
 # Review: llm-providers
 
-Verdict: CHANGES REQUESTED
-Gates: typecheck ok, lint ok, unit tests ok (39 files, 497 tests), e2e ok (4), image fail (sandbox: corepack cannot fetch pnpm through the proxy, "self-signed certificate in certificate chain"; environmental, same as the logged Phase 2/4 deviations), mutation n/a (S-05 is not a mutation target) · Round: 1
+Verdict: APPROVE
+Gates: typecheck ok, lint ok, unit tests ok (39 files, 501 tests), e2e ok (4), image fail (sandbox: corepack cannot fetch pnpm through the proxy, "self-signed certificate in certificate chain"; environmental, unchanged since round 1 and the logged Phase 2/4 deviations), mutation n/a (S-05 is not a mutation target) · Round: 2
+
+Round 1 (previous verdict CHANGES REQUESTED, 497 tests) findings R1–R4 are re-checked below; the plan-vs-diff table is from round 1, plus the round 2 rows.
 
 ## Plan vs diff
 | File | Status | Note |
@@ -38,15 +40,18 @@ Gates: typecheck ok, lint ok, unit tests ok (39 files, 497 tests), e2e ok (4), i
 | `docs/llm.md`, `README.md`, `context/test-plan.md` | done | see R2, R3 for two inaccuracies in `docs/llm.md` |
 | `context/roadmap.md` | unplanned | status column only |
 | `context/changes/llm-providers/{plan,plan-review}.md` | unplanned | workflow artifacts |
+| `apps/api/src/infrastructure/llm/{anthropic,openai-compatible,parse-json}.ts`, `modules/analysis/{ports,service,output-guard}.ts` + tests (round 2) | done | R1/R2 fixes, logged under *Review response* |
+| `apps/web/src/OpportunityPage.tsx`, `docs/llm.md` (round 2) | done | R3/R4 fixes |
+| `context/lessons.md` (round 2) | unplanned | R2 lesson proposed, status `proposed` |
 
 ## Areas
 | Area | Result (ok / concern / fail) | One-line reason |
 |------|------------------------------|-----------------|
-| Correctness | fail | guard output can break the schema and is stored unvalidated (R1); billed refusals/truncations escape the cap (R2) |
+| Correctness | ok | guard is length-safe (shortest e-mail/`www.` match is 5 chars, the short replacement 3) and the result is re-validated before `saveComplete`; refusal, truncation, empty and non-JSON answers keep their usage and are costed (R1, R2 fixed) |
 | Design | ok | adapters behind the port, pure budget module, one `complete()` path for reuse and provider answers |
 | Safety | ok | key only in auth header, SDK text never stored, escaped data block, no tools; secret-echo check |
-| Tests | concern | broad and behavioural, but no test for a guard edit that crosses a schema limit (R1) or for cost of a refusal/truncation (R2) |
-| Simplicity | ok | small modules, no dead code found |
+| Tests | ok | new guard test crosses `SHORT`/`LONG` with the round 1 reproduction; one integration test per billed failure kind asserts the stored cost and `spentMicroUsd` |
+| Simplicity | ok | small modules, no dead code found; `parseBilledJson` keeps usage in one place for both adapters |
 | Plan fidelity | ok | every planned file present or absent with a reason; deviations logged |
 | Agent decisions | ok | D-4/D-10/D-13 (costly) each live in one repository method / route / contract block |
 
@@ -86,3 +91,27 @@ Gates: typecheck ok, lint ok, unit tests ok (39 files, 497 tests), e2e ok (4), i
 - Effort: small
 - Lesson candidate: no
 - Decision: fixed (09c75ad)
+
+## Round 2 re-check
+- R1 fixed: `output-guard.ts:137` uses `[…]` for a match shorter than `[usunięto]`; the regex can only match 5+ characters, so no field grows. `service.ts:104-106` re-parses the guarded result and a failure is stored `FAILED` `invalid_output: guard` with the billed cost (`service.ts:265`). Link notes are capped at 5 plus a count. On the reuse path a rejected guard makes `tryReuse` return `false`, which falls through to a provider call; with a length-safe guard that path is practically unreachable, so it is not a finding.
+- R2 fixed: both adapters build `usage` before the `stop_reason`/`finish_reason` checks and pass it on `ProviderError`; `parseBilledJson` turns any parse failure into `not_json` (or keeps `empty`) with usage; the runner costs it with the same `paid ? costMicroUsd : 0` rule as a valid answer. Tests: `analysis-llm.int.test.ts:214-225` (refusal 1, truncated 4001, not JSON 4 micro-USD), adapter test expects `not_json`.
+- R3 fixed: `docs/llm.md:27` writes `` `\u003c` ``; plan D-6 too.
+- R4 fixed: `OpportunityPage.tsx:29-31` resets to loading on `id` change (unmounting `Detail` and its buttons); `RequestButton` clears its timer on unmount.
+
+### R5: `docs/llm.md` error table omits `invalid_output: guard`
+- Severity: minor
+- Where: `docs/llm.md:57`, `apps/api/src/modules/analysis/service.ts:106`
+- Problem: the round 2 fix added a new stored reason `invalid_output: guard`, but the error-code table that the operator is asked to read (Phase 4 human check) lists only `not_json`, `<pola>` and `secret_echo`. The code is practically unreachable now, but a card showing it would have no explanation.
+- Fix: add `guard` to the `invalid_output` row (e.g. "wynik po usunięciu wymyślonych adresów nie spełnia schematu").
+- Effort: small
+- Lesson candidate: no
+- Decision: open
+
+### R6: Polish plural is wrong in the capped link note
+- Severity: minor
+- Where: `apps/api/src/modules/analysis/output-guard.ts:173`
+- Problem: the note always says "adresów". With 6 removed addresses the card reads "Usunięto jeszcze 1 adresów spoza tekstu źródła.", and with 7–9 it should be "adresy". This is operator-facing text on the card.
+- Fix: use a neutral wording that avoids the plural ("Usunięto więcej adresów spoza tekstu źródła; łącznie: N.") or a small `one/few/many` choice.
+- Effort: small
+- Lesson candidate: no
+- Decision: open
