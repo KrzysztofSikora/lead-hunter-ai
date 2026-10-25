@@ -1,7 +1,19 @@
 # Review: repo-skeleton
 
-Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (85/85), e2e ok (local Chromium 1243 via `E2E_CHROMIUM_PATH`; the pinned download is blocked in the sandbox), image fail (sandbox network: `apt-get` has no DNS, and with the toolchain removed corepack's pnpm download fails on the proxy's TLS interception; not a code defect, never built anywhere yet), mutation not re-run (see `mutation.md`) · Round: 1
+Verdict: APPROVE
+Gates: typecheck ok, lint ok, unit tests ok (87/87), e2e ok (2/2, local Chromium 1243 via `E2E_CHROMIUM_PATH`; the pinned download is blocked in the sandbox), image fail (sandbox only: corepack's download of pnpm 12.15.0 fails on the proxy's TLS interception, `self-signed certificate in certificate chain`; not a code defect, the CI `image` job and the Pi human check must confirm it), mutation not re-run (no change to `packages/config/src/env.ts`; see `mutation.md`) · Round: 2
+
+## Round 2 (re-review after `/fix-review`)
+Diff checked: `e4b2952..HEAD` (9 files). Every round-1 finding marked `fixed` was confirmed:
+
+| Finding | Commit | Verified by |
+|---------|--------|-------------|
+| R1 | 5ee7993 | `docker compose config` on a scratch copy whose `.env` is the template with every key uncommented: effective env is `HOST: 0.0.0.0`, `DATA_DIR: /data`, `NODE_ENV: production`, `PORT: "8080"`. The `.env.example` comment is now true. The empty template hash plus the pinned `0.0.0.0` makes the container refuse to start until a hash is set, which is FR-23 AC4 working as intended; `README.md:18` tells the operator to set it. |
+| R2 | 939dcc6 | `apps/api/package.json` has `version: 0.1.0`; the new `test/version.test.ts` ties `VERSION` to the manifest and rejects the fallback; the runtime image copies `apps/api/package.json`, so `version.ts` resolves `../package.json` from `dist/` there too. |
+| R3 | 2da780e | Both `apt-get install python3 make g++` blocks are gone from `Dockerfile`; this matches plan-review finding 4 and is logged in *Deviations* (review round 1). |
+| R4 | 85712e6 | `app.ts` drops the query before matching, treats `/api` and `/api/*` as API, and skips the fallback for `/assets/*` and paths with an extension; `static.int.test.ts` asserts the JSON 404 for `/api`, `/api?x=1`, `/assets/nope.js` and `/favicon.ico`, and still serves the shell for client routes. |
+
+No new findings. The lesson proposed from R1 (`context/lessons.md`) is well-formed and carries the `proposed` status for the PR.
 
 ## Plan vs diff
 | File | Status | Note |
@@ -11,7 +23,7 @@ Gates: typecheck ok, lint ok, unit tests ok (85/85), e2e ok (local Chromium 1243
 | `vitest.config.ts`, `stryker.config.mjs`, `playwright.config.ts` | done | Stryker `plugins` and `E2E_CHROMIUM_PATH` logged |
 | `packages/contracts/**` | done | D-9 strict schema + test |
 | `packages/config/**` | done | D-3, D-4, D-15 |
-| `apps/api/src/app.ts`, `server.ts` | done | `deps.onRoute` seam (plan-review 6, logged) |
+| `apps/api/src/app.ts`, `server.ts` | done | `deps.onRoute` seam (plan-review 6, logged); SPA fallback fixed in round 1 (R4) |
 | `apps/api/src/infrastructure/db/*`, `logging/logger.ts` | done | D-7, D-11 |
 | `apps/api/src/modules/health/*` | done | D-9 |
 | `apps/api/src/cli/migrate.ts`, `cli/discover.ts` | done | D-21 |
@@ -19,31 +31,33 @@ Gates: typecheck ok, lint ok, unit tests ok (85/85), e2e ok (local Chromium 1243
 | `apps/api/drizzle.config.ts`, `migrations/**` | done | `0000_neat_red_shift` (`app_meta`) |
 | `apps/api/test/*` (cli, db, health, lint-layers, logging, openapi, static, setup, helpers) | done | |
 | `apps/api/test/network-isolation.test.ts` | unplanned | plan-review 10, logged |
-| `apps/api/package.json`, `tsconfig*.json`, `vitest.config.ts` | done | |
+| `apps/api/test/version.test.ts` | unplanned | added for R2, logged (review round 1 deviation) |
+| `apps/api/package.json`, `tsconfig*.json`, `vitest.config.ts` | done | `version` 0.1.0 (R2) |
 | `apps/web/**` (index.html, vite/vitest config, App, strings, api/health) | done | D-13 |
 | `apps/web/src/css.d.ts`, `e2e/tsconfig.json`, `scripts/tsconfig.json` | unplanned | logged |
 | `e2e/smoke.spec.ts` | done | |
 | `scripts/check-tracked.ts` (+ test), `scripts/mutation-changed.sh` | done | D-19, D-20 |
-| `Dockerfile` | diverged | plan-review finding 4 (drop the `python3 make g++` toolchain) not applied and not logged; see R3 |
+| `Dockerfile` | done | toolchain removed per plan-review finding 4 (R3) |
 | `.dockerignore` | done | |
-| `docker-compose.yml` | diverged | plan-review finding 1's primary fix (`environment:` block) not applied; only the template keys are commented out (logged), and the template now claims compose sets them; see R1 |
+| `docker-compose.yml` | done | `environment:` pins NODE_ENV, HOST, PORT, DATA_DIR (R1, plan-review finding 1) |
 | `.github/workflows/ci.yml` | done | five jobs, `fetch-depth: 0` on `mutation-report` |
-| `.env.example` | done | keys commented out (logged) |
+| `.env.example` | done | keys commented out (logged); the compose comment is now accurate |
 | `.gitignore` | done | `data/` added |
 | `README.md`, `deploy/README.md`, `CLAUDE.md` | done | |
-| `context/roadmap.md` | done | status column only |
+| `context/roadmap.md` | done | status column only (`review`) |
+| `context/lessons.md` | unplanned | lesson proposed from R1 |
 | `pnpm-lock.yaml` | unplanned | expected by-product of install |
 | `context/changes/repo-skeleton/{plan,plan-review,mutation}.md`, `evidence/*` | done | `docker-smoke.txt` records NOT RUN |
 
 ## Areas
 | Area | Result | One-line reason |
 |------|--------|-----------------|
-| Correctness | concern | Compose lets a copied template override the container's `HOST`/`DATA_DIR` (R1); health `version` is always `0.0.0` (R2) |
+| Correctness | ok | Compose now pins the container env (R1); health reports the real version (R2); `/api` and missing assets get the JSON 404 (R4) |
 | Design | ok | Layers hold (`app.ts` gets infrastructure through `deps`, lint fixture proves it); decisions live in one place each |
-| Safety | ok | D-4 refusal in one `superRefine`; redaction canary covers top-level, nested and header paths; no secrets tracked |
-| Tests | ok | Behavioural, deterministic, failure paths covered (503, JSON 404, config refusal, unmocked fetch); mutation decisions plausible |
-| Simplicity | ok | Small files, no dead code beyond the Dockerfile toolchain (R3) |
-| Plan fidelity | concern | Two plan-review fixes silently not (fully) applied (R1, R3); the image and container smoke were never run |
+| Safety | ok | D-4 refusal in one `superRefine` and no longer bypassable through a copied `.env`; redaction canary covers top-level, nested and header paths; no secrets tracked |
+| Tests | ok | Behavioural, deterministic, failure paths covered (503, JSON 404 incl. `/api` and assets, config refusal, unmocked fetch, version vs manifest); mutation decisions plausible |
+| Simplicity | ok | Small files, no dead code |
+| Plan fidelity | ok | Plan-review findings 1 and 4 now applied and logged; the image and container smoke remain unverified here (logged `[REVIEW]`, CI `image` job and Pi human check) |
 | Agent decisions | ok | D-3/D-4/D-6/D-7/D-9/D-11 each implemented in one place and swappable as claimed; D-6 tech-stack mismatch is a logged `[REVIEW]` |
 
 ## Findings
