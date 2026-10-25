@@ -12,7 +12,7 @@ ręczną kontrolę (patrz `context/changes/rss-sources/plan.md`, *Human checks*)
 | Dostęp | `GET` kanału RSS 2.0 lub Atom przez chroniony klient HTTP (ochrona SSRF, tylko http/https, przekierowania sprawdzane na każdym kroku) |
 | robots.txt | sprawdzany przed pobraniem kanału, wynik w pamięci 24 h; zakaz lub niedostępny plik = błąd źródła `robots_disallowed` / `robots_unavailable` |
 | Odstęp | co najmniej `SOURCE_MIN_INTERVAL_MINUTES` (domyślnie 60, zakres 60–1440) między przebiegami jednego źródła, także ręcznymi; **Sprawdź** czeka 60 s od ostatniej próby |
-| Ponowienia | tylko `429` i `503`, do `SOURCE_MAX_ATTEMPTS` zapytań (domyślnie 3) z opóźnieniem wykładniczym; `Retry-After` powyżej 30 s kończy próbę od razu. Następna próba nie wcześniej niż `max(Retry-After, odstęp)` |
+| Ponowienia | tylko `429` i `503`, do `SOURCE_MAX_ATTEMPTS` zapytań (domyślnie 3) z opóźnieniem wykładniczym; `Retry-After` powyżej 30 s kończy próbę od razu. Następna próba nie wcześniej niż `max(Retry-After, odstęp)`, najwyżej 7 dni |
 | Limity | czas jednego zapytania `FETCH_TIMEOUT_MS` (20 s), rozmiar odpowiedzi `FETCH_MAX_BYTES` (1 MiB), co najwyżej 200 wpisów na kanał, dwa zapytania równolegle |
 | Kodowanie | treść XML czytana jako UTF-8, niezależnie od deklaracji w nagłówku XML |
 | Zapisujemy | źródło, adres wpisu, tytuł, skrócony tekst (do `IMPORT_MAX_TEXT_CHARS`), datę publikacji lub brak, czas pobrania, skrót treści. Nie zapisujemy autora ani danych kanału |
