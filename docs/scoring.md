@@ -33,6 +33,39 @@ Reguły, w kolejności:
    2 pozycje w `unknowns`;
 3. `MEDIUM` — pozostałe przypadki.
 
+## Filtr wstępny (D-6)
+
+Zanim sygnał trafi do analizy, przechodzi twarde, wyjaśnialne reguły
+(`modules/analysis/prefilter.ts`). Wygrywa pierwsza reguła, która odrzuca; nieznane dane przechodzą.
+Odrzucony sygnał dostaje status analizy `SKIPPED`, a w UI powód (nie jest usuwany).
+
+| Kolejność | Reguła | Tekst w UI | Kiedy |
+|-----------|--------|------------|-------|
+| 1 | `no_text` | brak treści do analizy | pusty tekst |
+| 2 | `seeking_work` | oferta wykonawcy, nie zlecenie | tekst zaczyna się od „SEEKING WORK” |
+| 3 | `spam` | wygląda na spam | ponad 10 linków albo fraza ze znanej listy |
+| 4 | `language` | język spoza profilu | wykryty język (`pl` / `en`) nie jest w profilu; brak wykrycia przepuszcza |
+| 5 | `too_old` | zbyt stare | data publikacji starsza niż limit dni; brak daty przepuszcza |
+| 6 | `excluded_technology` | wykluczona technologia | tekst zawiera technologię wykluczoną w profilu |
+| 7 | `excluded_category` | wykluczona kategoria | tekst zawiera kategorię wykluczoną w profilu |
+| 8 | `no_profile_match` | brak dopasowania do profilu | zero dopasowań i źródło inne niż import ręczny |
+
+Liczba dopasowanych terminów z profilu ustala kolejność kolejki analiz.
+
+## Straż wyniku modelu (D-14)
+
+Po walidacji schematu, niezależnie od dostawcy (`modules/analysis/output-guard.ts`), wszystko,
+czego źródło nie powiedziało, jest usuwane lub obniżane, a każda zmiana trafia do notatek straży:
+
+- **Fakty „ze źródła”** (`sourceFacts`) zostają tylko wtedy, gdy występują w tekście
+  (bez rozróżniania wielkości liter i białych znaków); puste fakty są usuwane.
+- **Budżet ze źródła** zostaje tylko wtedy, gdy cytat występuje w tekście **i** zawiera obie kwoty
+  (`minMinor`, `maxMinor`); inaczej jest usuwany, a opłacalność liczy się jako brak danych.
+- **Poziom dowodu** `DIRECT_REQUEST` bez sygnału zlecenia lub płatności w tekście spada do
+  `EXPLICIT_PROBLEM`.
+- **Kategoria** płatna (`DIRECT_GIG`, `B2B_SUBCONTRACT`) bez takiego sygnału zmienia się na
+  `UNMET_NEED`.
+
 ## Wersje
 
 Rozbicie niesie `version: 1`. Zmiana tabel powyżej podnosi wersję; zapisane wyniki zachowują
