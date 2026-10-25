@@ -7,7 +7,7 @@ import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
 import { createAnalysisRepository } from '../../src/infrastructure/db/analysis-repository.js';
-import { MockProvider } from '../../src/infrastructure/llm/mock.js';
+import { createLlmProvider } from '../../src/infrastructure/llm/create-provider.js';
 import { createAnalysisRunner, type AnalysisRunner } from '../../src/modules/analysis/service.js';
 import type { LlmProvider } from '../../src/modules/analysis/ports.js';
 import { createProfileService } from '../../src/modules/profile/service.js';
@@ -85,9 +85,7 @@ export async function buildTestApp(
   const provider =
     options.provider !== undefined
       ? (options.provider ?? undefined)
-      : config.llm?.provider === 'mock'
-        ? new MockProvider()
-        : undefined;
+      : createLlmProvider(config.llm, { maxRetries: 0 });
   const runner = createAnalysisRunner({
     repository: createAnalysisRepository(db),
     provider,

@@ -342,12 +342,14 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Config, prices, budget rules and the AC4 guard
-- [ ] Phase 2: Anthropic and OpenAI-compatible adapters (checkpoint)
+- [x] Phase 2: Anthropic and OpenAI-compatible adapters (checkpoint)
 - [ ] Phase 3: Runner — budget, cost, reuse, failures
 - [ ] Phase 4: Retry route, UI and docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 2) One real analysis with Anthropic: does the structured-output schema (root `anyOf`, no lengths/ranges) get accepted, and is usage reported? Note that `LLM_MONTHLY_BUDGET_USD` is not enforced until Phase 3, so use a small test key — run: `.env` with `LLM_PROVIDER=anthropic`, `LLM_API_KEY=<key>`, `pnpm dev`, import `apps/api/test/fixtures/llm/synthetic-direct-pl.txt`, open the card — evidence: `context/changes/llm-providers/evidence/real-providers.md` (provider, model, tokens, schema accepted yes/no; no key)
+- [ ] (Phase 2) One real analysis with an OpenAI-compatible endpoint (Groq free tier or Ollama): was `json_object` accepted and usage reported? — run: `.env` with `LLM_PROVIDER=openai-compatible`, `LLM_BASE_URL`, `LLM_MODEL` (try `LLM_JSON_MODE=off` if rejected), same import as above — evidence: `context/changes/llm-providers/evidence/real-providers.md` (closes the `UNVERIFIED` note)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -355,6 +357,11 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 - [REVIEW] (Phase 1, plan-review #3) D-3 blocks a paid model without a price (`price_unknown`), which differs from the roadmap's "unknown model → cost 'brak danych'"; "brak danych" still applies to free providers and to answers without usage. Implemented in `budgetGate` (Phase 1).
 - [REVIEW] (Phase 1, plan-review #5) FR-08 AC4 is only partly covered: URLs and e-mails are removed in every text field and the buyer is never confirmed unless named in the source (`output-guard.ts`), but person and company names in free prose are not detected; they rely on the card's "wniosek modelu" label (TR-01, S-06).
 - [minor] (Phase 1, plan-review #10) Logger `SECRET_KEYS` not extended with `llmApiKey`: nothing logs the config object, and the Phase 3 canary test is the proof. Note `*.apiKey` is one level deep, so a logged `config` (two levels) would not be redacted; nothing logs it.
+- [minor] (Phase 2, plan-review #1) The model schema is an allow-list transform of `z.toJSONSchema` (`oneOf` → `anyOf`; only `type`, `properties`, `required`, `additionalProperties`, `items`, `anyOf`, `const`, `enum`, `description` kept; lengths, ranges and `countries` pattern dropped, Zod still enforces them). The root stays an `anyOf`; whether Anthropic accepts a root-level `anyOf` is `UNVERIFIED` and is a Phase 2 human check; fallback D-7 B (prompt-only JSON) is a one-line change in `anthropic.ts` (remove `format`).
+- [minor] (Phase 2, plan-review #9) `ProviderError.message` is `<kind>[ <status>]`, so the existing `reasonOf` in `service.ts` already stores `provider_error: auth 401` and never SDK text, before Phase 3 reworks it.
+- [minor] (Phase 2) The Anthropic SDK 1.3.0 sends the key as `authorization: Bearer …`, not `x-api-key`; the test asserts the header the SDK really sends. `AnalysisServiceStatus.provider` was widened to the three names already in Phase 2 (typecheck needed it); the remaining D-13 fields stay in Phase 3.
+- [minor] (Phase 2) undici's `MockAgent` hides request bodies from reply callbacks under Node 24's `fetch`, so the two tests that read what was sent (injection boundary, no key/tools/URL, `json_object`) talk to a loopback `http` server allowed through `agent.enableNetConnect(host)`; status/timeouts/retries still use `MockAgent`.
+- [minor] (Phase 2) `pnpm docker:build` fails in this sandbox at `pnpm install` inside the image (corepack: self-signed certificate in chain from the proxy), also on the unchanged baseline, so the image gate could not be run here; the new dependencies are plain JS packages with exact pins and a frozen lockfile. Run it on a machine with direct registry access.
 - [minor] (Phase 1) `LLM_PRICES` syntax is validated only for real providers; with `LLM_PROVIDER=mock` all other LLM variables are ignored.
 
 ## Review response

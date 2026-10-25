@@ -25,6 +25,7 @@ class RecordingProvider implements LlmProvider {
   readonly model = 'recording';
   readonly promptVersion = 'recording-1';
   readonly demo = true;
+  readonly paid = false;
   readonly inputs: AnalysisInput[] = [];
   private readonly inner = new MockProvider();
 

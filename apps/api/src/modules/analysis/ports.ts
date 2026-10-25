@@ -31,8 +31,31 @@ export interface ProviderOutput {
   usage: { inputTokens: number | null; outputTokens: number | null };
 }
 
+/** Why a provider call failed; the runner stores only the kind, never an SDK message (D-9). */
+export type ProviderErrorKind =
+  | 'auth'
+  | 'rate_limited'
+  | 'unavailable'
+  | 'timeout'
+  | 'bad_request'
+  | 'refusal'
+  | 'truncated'
+  | 'empty';
+
+export class ProviderError extends Error {
+  constructor(
+    readonly kind: ProviderErrorKind,
+    readonly status?: number,
+  ) {
+    super(status === undefined ? kind : `${kind} ${status}`);
+    this.name = 'ProviderError';
+  }
+}
+
 export interface LlmProvider {
-  readonly name: 'mock';
+  readonly name: 'mock' | 'anthropic' | 'openai-compatible';
+  /** A paid provider needs a monthly cap before it may run (FR-09 AC1). */
+  readonly paid: boolean;
   readonly model: string;
   readonly promptVersion: string;
   /** True for results that are rules, not AI analysis; every view labels them DEMO / MOCK. */

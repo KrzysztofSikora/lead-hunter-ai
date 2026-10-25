@@ -197,7 +197,7 @@ export type PrefilterRule = z.infer<typeof PrefilterRule>;
 export const AnalysisServiceStatus = z
   .object({
     configured: z.boolean(),
-    provider: z.enum(['mock']).nullable(),
+    provider: z.enum(['mock', 'anthropic', 'openai-compatible']).nullable(),
     demo: z.boolean(),
     dailyLimit: z.number().int(),
     analysedToday: z.number().int(),
