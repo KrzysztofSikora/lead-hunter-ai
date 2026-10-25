@@ -125,6 +125,21 @@ describe('URL import (FR-03)', () => {
     expect(rows().opps).toHaveLength(0);
   });
 
+  it('checks the robots.txt of the origin a redirect leads to (D-6)', async () => {
+    const a = site();
+    const b = site();
+    a.answer('/robots.txt', 200, ALLOW_ALL);
+    a.answer(PAGE, 302, '', { location: b.pageUrl });
+    b.answer('/robots.txt', 200, 'User-agent: LeadHunterAI\nDisallow: /\n');
+    b.answer(PAGE, 200, 'x', HTML);
+    const { post } = await setup();
+
+    const res = await post({ url: a.pageUrl });
+    expect(res.statusCode).toBe(422);
+    expect(res.json()).toEqual({ result: 'fetch_failed', reason: 'robots_disallowed' });
+    expect(b.requests).toEqual(['/robots.txt']);
+  });
+
   it('refuses when robots.txt cannot be read (RFC 9309)', async () => {
     const { answer, requests, pageUrl } = site();
     answer('/robots.txt', 503, 'busy');
