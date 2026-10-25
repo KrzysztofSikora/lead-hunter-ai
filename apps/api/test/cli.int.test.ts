@@ -1,9 +1,11 @@
 import { PASSWORD_HASH_PATTERN } from '@lead-hunter/config';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { openDb } from '../src/infrastructure/db/client.js';
+import { jobLocks } from '../src/infrastructure/db/schema.js';
 import { verifyPassword } from '../src/infrastructure/auth/scrypt-password.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -30,6 +32,27 @@ describe('command-line entry points', () => {
     const r = run('src/cli/discover.ts', {});
     expect(r.status).toBe(0);
     expect(r.stdout.trim()).toBe('brak skonfigurowanych źródeł');
+  });
+
+  it('discover prints "przebieg w toku" and exits 1 while another process holds the lock (D-14)', () => {
+    expect(run('src/cli/migrate.ts', {}).status).toBe(0);
+    const { sqlite, db } = openDb(join(dataDir, 'lead-hunter.db'));
+    // The test process itself: alive, on this host, with a fresh heartbeat.
+    db.insert(jobLocks)
+      .values({
+        name: 'discovery',
+        ownerHost: hostname(),
+        ownerPid: process.pid,
+        ownerToken: 'test-token',
+        acquiredAt: Date.now(),
+        heartbeatAt: Date.now(),
+      })
+      .run();
+    sqlite.close();
+
+    const r = run('src/cli/discover.ts', {});
+    expect(r.status).toBe(1);
+    expect(r.stdout.trim()).toBe('przebieg w toku');
   });
 
   it('db:migrate creates the database file', () => {

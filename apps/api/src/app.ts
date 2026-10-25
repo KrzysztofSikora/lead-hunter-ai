@@ -9,6 +9,8 @@ import {
 } from 'fastify-type-provider-zod';
 import { registerValidationErrorHandler } from './http-errors.js';
 import { registerAnalysisRoutes, type AnalysisRouteDeps } from './modules/analysis/routes.js';
+import { registerJobRoutes, type ScheduleInfo } from './modules/jobs/routes.js';
+import type { JobsService } from './modules/jobs/service.js';
 import { registerAuth } from './modules/auth/routes.js';
 import type { AuthDeps } from './modules/auth/service.js';
 import { registerHealthRoutes } from './modules/health/routes.js';
@@ -34,6 +36,8 @@ export interface AppDeps {
   pipeline: PipelineDeps;
   analysis: AnalysisRouteDeps;
   sources: SourceService;
+  jobs: JobsService;
+  schedule: ScheduleInfo;
   /** Called after an import created a new opportunity; the analysis runner is kicked here (D-4). */
   onSignalCreated?: () => void;
   version: string;
@@ -80,7 +84,8 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerOpportunityRoutes(app, deps.opportunities);
   registerPipelineRoutes(app, deps.pipeline);
   registerAnalysisRoutes(app, deps.analysis);
-  registerSourceRoutes(app, deps.sources);
+  registerSourceRoutes(app, deps.sources, deps.jobs);
+  registerJobRoutes(app, { jobs: deps.jobs, schedule: deps.schedule });
 
   if (deps.config.nodeEnv !== 'production') {
     app.get('/api/openapi.json', { schema: { hide: true } }, async () => app.swagger());

@@ -13,7 +13,7 @@ export type Refused =
   | { ok: false; refused: 'too_soon'; nextAllowedAt: string }
   | {
       ok: false;
-      refused: 'disabled' | 'exists' | 'not_found';
+      refused: 'disabled' | 'exists' | 'not_found' | 'busy';
     };
 export type Done<T> = { ok: true; value: T };
 export type Outcome<T> = Done<T> | Refused;
@@ -70,6 +70,7 @@ async function act<T>(
       return { ok: false, refused: 'too_soon', nextAllowedAt: body.nextAllowedAt };
     }
     if (body?.error === 'disabled') return { ok: false, refused: 'disabled' };
+    if (body?.error === 'busy') return { ok: false, refused: 'busy' };
   }
   throw new Error(`source ${action} failed: ${response.status}`);
 }

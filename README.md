@@ -38,7 +38,7 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
 ## Co działa / Co wymaga kluczy / Co wymaga ręcznej weryfikacji
 
 - **Co działa:** serwer, `GET /api/health`, migracje Drizzle, OpenAPI poza produkcją, redakcja
-  sekretów w logach, polska powłoka UI, `pnpm discover` (uruchamia raz każde włączone źródło; bez źródeł pisze `brak skonfigurowanych źródeł`); logowanie operatora
+  sekretów w logach, polska powłoka UI, `pnpm discover` (uruchamia raz każde włączone źródło; bez źródeł pisze `brak skonfigurowanych źródeł`; gdy trwa inny przebieg, pisze `przebieg w toku` i kończy się kodem 1; blokada po awarii CLI w osobnym kontenerze `docker compose run` zwalnia się po 2 minutach); logowanie operatora
   (hasło w `OPERATOR_PASSWORD_HASH`, sesja w ciasteczku `HttpOnly` + `SameSite=Strict` ważna 30 dni
   bez aktywności, wylogowanie, limit 5 prób na 15 minut); każdy `/api/*` poza health i logowaniem
   wymaga sesji; profil operatora (`GET`/`PUT /api/profile`, widok *Profil* w UI, przykładowy profil
@@ -71,8 +71,9 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   ostatniej próby i błąd z powodem. Wpisy trafiają do *Okazji* z nazwą źródła, bez duplikatów po
   ponownym odczycie. Odstęp między przebiegami jednego źródła: `SOURCE_MIN_INTERVAL_MINUTES`
   (domyślnie 60), ponowienia przy 429/503: `SOURCE_MAX_ATTEMPTS` (domyślnie 3). Zasady dostępu,
-  regulaminy i limity: [`docs/source-policy.md`](docs/source-policy.md). Harmonogram automatycznych
-  przebiegów dojdzie ze slice'em S-12; do tego czasu przebiegi są ręczne lub przez `pnpm discover`.
+  regulaminy i limity: [`docs/source-policy.md`](docs/source-policy.md). Automatyczne przebiegi:
+  codziennie o 08:00 i 18:00 (Europe/Warsaw), zmiana przez `DISCOVERY_TIMES`; przebieg pominięty,
+  gdy aplikacja była wyłączona, nie jest nadrabiany.
 - **Co wymaga kluczy:** Anthropic (`LLM_PROVIDER=anthropic`, `LLM_API_KEY`, `LLM_MONTHLY_BUDGET_USD`);
   serwer OpenAI-compatible (`LLM_BASE_URL`, `LLM_MODEL`, klucz opcjonalny); skrzynka IMAP ze
   slice'em S-11. Zmienne analizy: `LLM_*`, `ANALYSIS_DAILY_LIMIT`, `PREFILTER_MAX_AGE_DAYS`

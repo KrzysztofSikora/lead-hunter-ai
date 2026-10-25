@@ -23,6 +23,11 @@ import { createHttpClient } from './infrastructure/sources/http/client.js';
 import { createPageFetcher } from './infrastructure/sources/manual/page-fetcher.js';
 import { createRobotsCheck } from './infrastructure/sources/manual/robots.js';
 import { createSourceRuntime } from './infrastructure/sources/compose.js';
+import {
+  retryWhileBusy,
+  startScheduler,
+  type Scheduler,
+} from './infrastructure/scheduler/schedule.js';
 import { createLoggerOptions } from './infrastructure/logging/logger.js';
 import { VERSION } from './version.js';
 
@@ -96,6 +101,8 @@ async function main(): Promise<void> {
     onSignalCreated: () => runner.kick(),
     logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
   });
+  // The list shows the next slot; the scheduler starts after the app, so it is read lazily.
+  const running: { scheduler?: Scheduler } = {};
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
@@ -119,6 +126,11 @@ async function main(): Promise<void> {
     pipeline: { repository: createPipelineRepository(db), clock },
     analysis: runner,
     sources: sourceRuntime.service,
+    jobs: sourceRuntime.jobs,
+    schedule: {
+      times: config.discoveryTimes,
+      nextRunAt: () => running.scheduler?.nextRunAt() ?? null,
+    },
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });
@@ -126,15 +138,59 @@ async function main(): Promise<void> {
   logger = app.log;
   logInfo = (message) => app.log.info(message);
   logWarn = (message) => app.log.warn(message);
-  const ANALYSIS_INTERVAL_MS = 10 * 60_000;
-  // D-4: work held back by the daily limit resumes on a later tick; S-12 replaces this timer.
-  const timer = setInterval(() => runner.kick(), ANALYSIS_INTERVAL_MS);
-  timer.unref();
+  // D-2: a lock left by a dead process is freed before this one schedules anything.
+  if (sourceRuntime.lock.releaseStale())
+    logWarn('released a stale discovery lock (interrupted run)');
+  const retries = new Set<() => void>();
+  const scheduler = startScheduler({
+    times: config.discoveryTimes,
+    onSlot: (slot) => {
+      const at = new Date(slot).toISOString();
+      const slotRetry: { cancel: (() => void) | null } = { cancel: null };
+      slotRetry.cancel = retryWhileBusy(
+        () => {
+          const started = sourceRuntime.jobs.startCycle('schedule', slot);
+          if (started.kind === 'busy') {
+            logWarn(`scheduled slot ${at}: a run is in progress, trying again`);
+            return 'busy';
+          }
+          if (started.kind === 'slot_taken') logInfo(`slot ${at} already ran`);
+          else
+            started.done.catch((error: unknown) =>
+              logger.error(
+                `scheduled cycle failed: ${error instanceof Error ? error.message : 'error'}`,
+              ),
+            );
+          return 'done';
+        },
+        {
+          onGiveUp: () => logWarn(`scheduled slot ${at} skipped: a run stayed in progress`),
+          onError: (error) =>
+            logger.error(
+              `scheduled slot ${at} retry failed: ${error instanceof Error ? error.message : 'error'}`,
+            ),
+          onSettled: () => {
+            if (slotRetry.cancel) retries.delete(slotRetry.cancel);
+          },
+        },
+      );
+      if (slotRetry.cancel) retries.add(slotRetry.cancel);
+    },
+    // D-4: work held back by the daily limit resumes on a later tick.
+    analysisTick: () => runner.kick(),
+    onError: (error) =>
+      logger.error(`scheduler error: ${error instanceof Error ? error.message : 'error'}`),
+  });
+
+  running.scheduler = scheduler;
 
   const shutdown = async (): Promise<void> => {
-    clearInterval(timer);
-    await runner.idle().catch(() => undefined);
+    scheduler.stop();
+    for (const cancel of retries) cancel();
     await app.close();
+    // D-3: only a lock this process holds is released; a running cycle is not awaited.
+    sourceRuntime.jobs.shutdown(Date.now());
+    await runner.idle().catch(() => undefined);
     sqlite.close();
     process.exit(0);
   };

@@ -24,6 +24,7 @@
     "@lead-hunter/contracts": "workspace:*",
     "@mozilla/readability": "0.6.0",
     "better-sqlite3": "13.0.3",
+    "croner": "10.0.1",
     "drizzle-orm": "0.45.4",
     "fast-xml-parser": "5.11.2",
     "fastify": "5.12.7",

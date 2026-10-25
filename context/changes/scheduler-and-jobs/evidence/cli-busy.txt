@@ -1,0 +1,3 @@
+$ pnpm discover   # while another run holds the lock (synthetic lock row, live owner)
+przebieg w toku
+exit code: 1

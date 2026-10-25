@@ -1,11 +1,17 @@
 import type { Config } from '@lead-hunter/config';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { hostname } from 'node:os';
+import type { JobsService } from '../../modules/jobs/service.js';
+import { createJobsService } from '../../modules/jobs/service.js';
+import type { JobLock } from '../../modules/jobs/ports.js';
 import type { SourceStatusReader } from '../../modules/opportunities/ports.js';
 import type { Clock } from '../../modules/shared/clock.js';
 import { createSourceService, type SourceService } from '../../modules/sources/service.js';
+import { createJobRunRepository } from '../db/job-run-repository.js';
 import { createSignalRepository } from '../db/signal-repository.js';
 import { createSourceRepository } from '../db/source-repository.js';
 import { createSourceStatusReader } from '../db/source-status-reader.js';
+import { createJobLock, type JobLockOptions } from '../scheduler/job-lock.js';
 import type { HttpClient } from './http/client.js';
 import { createRobotsCheck } from './manual/robots.js';
 import { createRssAdapter } from './rss/adapter.js';
@@ -21,6 +27,9 @@ export interface SourceRuntimeDeps {
   onSignalCreated?: () => void;
   logger?: { info(message: string): void; warn(message: string): void };
   sleep?: (ms: number) => Promise<void>;
+  /** Tests: another identity or a shorter staleness for the job lock. */
+  jobLock?: Partial<Omit<JobLockOptions, 'db' | 'clock'>>;
+  heartbeatMs?: number;
 }
 
 /** The one place the sources module meets its infrastructure; server, CLI and tests call it. */
@@ -32,7 +41,14 @@ export function createSourceRuntime({
   onSignalCreated,
   logger,
   sleep,
-}: SourceRuntimeDeps): { service: SourceService; statusReader: SourceStatusReader } {
+  jobLock,
+  heartbeatMs,
+}: SourceRuntimeDeps): {
+  service: SourceService;
+  statusReader: SourceStatusReader;
+  jobs: JobsService;
+  lock: JobLock;
+} {
   const adapter = createRssAdapter({
     http,
     robots: createRobotsCheck({ http, userAgentToken: 'LeadHunterAI', clock }),
@@ -51,5 +67,14 @@ export function createSourceRuntime({
     ...(onSignalCreated ? { onSignalCreated } : {}),
     ...(logger ? { logger } : {}),
   });
-  return { service, statusReader: createSourceStatusReader(db) };
+  const lock = createJobLock({ db, clock, host: hostname(), pid: process.pid, ...jobLock });
+  const jobs = createJobsService({
+    lock,
+    runs: createJobRunRepository(db),
+    sources: service,
+    clock,
+    ...(heartbeatMs === undefined ? {} : { heartbeatMs }),
+    ...(logger ? { logger } : {}),
+  });
+  return { service, statusReader: createSourceStatusReader(db), jobs, lock };
 }

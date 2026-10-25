@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "f6ec2022-97ad-4509-8310-56d366122535",
+  "id": "585bab8b-6237-41bd-951b-f0cc688b4b1f",
   "prevId": "3ec2f156-fd3c-45a2-9aec-cf95b952a13c",
   "tables": {
     "activity_events": {
@@ -201,20 +201,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "cost_micro_usd": {
-          "name": "cost_micro_usd",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reused_from_analysis_id": {
-          "name": "reused_from_analysis_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -253,19 +239,6 @@
           ],
           "onDelete": "cascade",
           "onUpdate": "no action"
-        },
-        "analyses_reused_from_analysis_id_analyses_id_fk": {
-          "name": "analyses_reused_from_analysis_id_analyses_id_fk",
-          "tableFrom": "analyses",
-          "tableTo": "analyses",
-          "columnsFrom": [
-            "reused_from_analysis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
-          "onUpdate": "no action"
         }
       },
       "compositePrimaryKeys": {},
@@ -285,6 +258,58 @@
         "value": {
           "name": "value",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
+    "job_locks": {
+      "name": "job_locks",
+      "columns": {
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_host": {
+          "name": "owner_host",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_pid": {
+          "name": "owner_pid",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "owner_token": {
+          "name": "owner_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "acquired_at": {
+          "name": "acquired_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "heartbeat_at": {
+          "name": "heartbeat_at",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
@@ -386,6 +411,35 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "trigger": {
+          "name": "trigger",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "parent_run_id": {
+          "name": "parent_run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "scheduled_for": {
+          "name": "scheduled_for",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "skipped": {
+          "name": "skipped",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false,
+          "default": 0
         }
       },
       "indexes": {
@@ -393,6 +447,28 @@
           "name": "job_runs_source_idx",
           "columns": [
             "source_id",
+            "started_at"
+          ],
+          "isUnique": false
+        },
+        "job_runs_slot_uq": {
+          "name": "job_runs_slot_uq",
+          "columns": [
+            "job_type",
+            "scheduled_for"
+          ],
+          "isUnique": true
+        },
+        "job_runs_parent_idx": {
+          "name": "job_runs_parent_idx",
+          "columns": [
+            "parent_run_id"
+          ],
+          "isUnique": false
+        },
+        "job_runs_started_idx": {
+          "name": "job_runs_started_idx",
+          "columns": [
             "started_at"
           ],
           "isUnique": false
@@ -405,6 +481,19 @@
           "tableTo": "sources",
           "columnsFrom": [
             "source_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "job_runs_parent_run_id_job_runs_id_fk": {
+          "name": "job_runs_parent_run_id_job_runs_id_fk",
+          "tableFrom": "job_runs",
+          "tableTo": "job_runs",
+          "columnsFrom": [
+            "parent_run_id"
           ],
           "columnsTo": [
             "id"
@@ -618,14 +707,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "analysis_force": {
-          "name": "analysis_force",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
         },
         "follow_up_at": {
           "name": "follow_up_at",
@@ -988,13 +1069,20 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
+        },
+        "job_run_id": {
+          "name": "job_run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         }
       },
       "indexes": {
-        "raw_signals_content_hash_idx": {
-          "name": "raw_signals_content_hash_idx",
+        "raw_signals_job_run_idx": {
+          "name": "raw_signals_job_run_idx",
           "columns": [
-            "content_hash"
+            "job_run_id"
           ],
           "isUnique": false
         }
@@ -1006,6 +1094,19 @@
           "tableTo": "sources",
           "columnsFrom": [
             "source_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "raw_signals_job_run_id_job_runs_id_fk": {
+          "name": "raw_signals_job_run_id_job_runs_id_fk",
+          "tableFrom": "raw_signals",
+          "tableTo": "job_runs",
+          "columnsFrom": [
+            "job_run_id"
           ],
           "columnsTo": [
             "id"
