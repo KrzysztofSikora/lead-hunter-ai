@@ -142,6 +142,9 @@ export function buildCard(data: OpportunityDetail): CardSection[] {
     },
     origin: {
       items: [
+        ...(source.name === null
+          ? []
+          : [item('sourceName', t.items.sourceName, source.name, 'source')]),
         source.url
           ? item('link', t.items.sourceLink, source.url, 'source', { href: source.url })
           : item('link', t.items.sourceLink, t.pastedText, null),

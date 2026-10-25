@@ -1,4 +1,4 @@
-import type { FetchFailureReason } from '@lead-hunter/contracts';
+import type { FetchFailureReason, SourceFailureReason } from '@lead-hunter/contracts';
 
 /** `150000` + `PLN` → `1 500,00 PLN` (U+00A0 groups); amounts are never converted between currencies. */
 export function formatMinor(minor: number, currency: string): string {
@@ -61,6 +61,22 @@ export const strings = {
     sourcesChecked: (n: number) => `Sprawdzone źródła: ${n}`,
     sourceErrorsNone: 'Błędy źródeł: brak',
     sourceErrors: 'Błędy źródeł:',
+    sourceFailure: {
+      blocked_address: 'adres prywatny lub lokalny jest zablokowany',
+      blocked_url: 'adres lub przekierowanie jest niedozwolone',
+      robots_disallowed: 'robots.txt serwisu zabrania pobierania',
+      robots_unavailable: 'nie udało się odczytać robots.txt serwisu',
+      timeout: 'serwis odpowiadał zbyt długo',
+      too_large: 'odpowiedź jest zbyt duża',
+      http_status: 'serwis zwrócił błąd',
+      unsupported_content: 'odpowiedź nie jest tekstem',
+      no_text: 'brak treści',
+      too_many_redirects: 'zbyt wiele przekierowań',
+      network: 'błąd połączenia z serwisem',
+      invalid_feed: 'odpowiedź nie jest poprawnym kanałem RSS/Atom',
+      rate_limited: 'serwis ogranicza liczbę zapytań, kolejna próba później',
+      internal: 'błąd wewnętrzny, szczegóły w logach',
+    } satisfies Record<SourceFailureReason, string>,
     filters: 'Filtry',
     minScore: 'Min. ocena',
     category: 'Kategoria',
@@ -128,6 +144,7 @@ export const strings = {
       manual_text: 'Wklejony tekst',
       manual_url: 'Wklejony adres URL',
       manual_fetch: 'Pobrana strona (jednorazowo)',
+      rss: 'Kanał RSS/Atom',
     },
   },
   prefilterRules: {
@@ -212,6 +229,7 @@ export const strings = {
     items: {
       title: 'Tytuł',
       businessStatus: 'Status',
+      sourceName: 'Źródło',
       sourceLink: 'Oryginalny link lub sposób importu',
       goToSource: 'Przejdź do źródła',
       pastedNoLink: 'wklejony tekst — brak linku',

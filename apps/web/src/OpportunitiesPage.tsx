@@ -313,8 +313,10 @@ function Results({ data, onPage }: { data: OpportunityList; onPage: (page: numbe
             <p>{t.sourceErrors}</p>
             <ul>
               {data.sources.errors.map((error) => (
-                <li key={`${error.source}-${error.at}`}>
-                  {error.source}: {error.message} ({formatWarsaw(error.at)})
+                <li key={`${error.sourceId}-${error.at}`}>
+                  {error.source}: {t.sourceFailure[error.reason]}
+                  {error.httpStatus === undefined ? '' : ` (HTTP ${error.httpStatus})`} (
+                  {formatWarsaw(error.at)})
                 </li>
               ))}
             </ul>
@@ -335,8 +337,9 @@ function Results({ data, onPage }: { data: OpportunityList; onPage: (page: numbe
               <Link to={`/okazje/${item.id}`}>{item.source.title}</Link>
             </h3>
             <p className={styles.meta}>
-              {t.sourceTypes[item.source.type]} · {t.detected} {formatWarsaw(item.createdAt)} ·{' '}
-              {t.businessStatus[item.businessStatus]}
+              {t.sourceTypes[item.source.type]}
+              {item.source.name !== null && ` — ${item.source.name}`} · {t.detected}{' '}
+              {formatWarsaw(item.createdAt)} · {t.businessStatus[item.businessStatus]}
             </p>
             <p className={styles.meta}>
               {analysisLabel(item)} ·{' '}

@@ -317,7 +317,7 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Feed parser and retry rules
-- [ ] Phase 2: Contracts, schema and shared ingest
+- [x] Phase 2: Contracts, schema and shared ingest
 - [ ] Phase 3: Sources service, RSS adapter, routes and CLI (checkpoint)
 - [ ] Phase 4: Sources view
 - [ ] Phase 5: Fixture recorder and documentation
@@ -331,6 +331,9 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 - [minor] (Phase 1) Plan: `ports.ts` holds the port types of *Design*. Plan-review #6: only `FeedItem` goes in now; `SourceAdapter`/`AdapterOutcome`/`RssConfig` arrive with Phase 2/3 (`RssConfig` in contracts `sources.ts`).
 - [minor] (Phase 1) Plan-review #11 applied: `cdataPropName` keeps CDATA out of the XML-level decode (fixture `synthetic-edge.xml`); the parser decodes bytes as UTF-8 whatever the XML declaration says — to be noted in `docs/source-policy.md` (Phase 5).
 - [minor] (Phase 1) Parser also drops `<script>`/`<style>` content (linear `indexOf` scan, no regex backtracking) and merges consecutive block tags into one line break; not named in D-13 but within its intent.
+- [minor] (Phase 2) `SourceFailureReason` also has `internal` (plan-review #4: an unexpected exception in a run is recorded, not left `running`); it lives in `opportunities.ts` next to `FetchFailureReason` (re-exported from `sources.ts`) to avoid a circular import. `ImportResult.matchedBy` gains `external_id` (additive; manual import never returns it).
+- [minor] (Phase 2) `SourceAdapter`/`AdapterOutcome`/`SourceRepository` port types move to Phase 3 where they are first used; Phase 2 only adds `RssConfig` to contracts. `ingest` candidate shape per plan-review #7 (`IngestCandidate` in `modules/signals/ingest.ts`; claims `canonical_url`, `external_id` and `content_hash` on both paths).
+- [minor] (Phase 2) The card's *origin* section shows a "Źródło" row with the source name when the signal has one (D-19, AC6); `OpportunityPage.tsx` needed no change.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

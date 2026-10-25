@@ -54,7 +54,9 @@ export {
   OpportunityListQuery,
   OpportunitySummary,
   PrefilterOutcome,
+  SourceError,
   SourceFacts,
+  SourceFailureReason,
   SourcesStatus,
   SourceType,
 } from './opportunities.js';
@@ -80,3 +82,13 @@ export {
   PipelineItem,
   PipelineResponse,
 } from './pipeline.js';
+export {
+  CreateSourceRequest,
+  RssConfig,
+  Source,
+  SourceHealth,
+  SourceList,
+  SourcePreset,
+  SourceRunResult,
+  UpdateSourceRequest,
+} from './sources.js';

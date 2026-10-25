@@ -26,6 +26,8 @@ export interface OpportunityRow {
   createdAt: number;
   updatedAt: number;
   sourceType: SourceType;
+  /** The configured source's name; null for manual imports (S-10 D-19). */
+  sourceName: string | null;
   sourceUrl: string | null;
   canonicalUrl: string | null;
   title: string;
