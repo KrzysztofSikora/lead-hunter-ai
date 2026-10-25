@@ -2,7 +2,8 @@
 export const FIXTURE_ENTRIES = 5;
 
 const ENTRY_OPEN = /<(item|entry)[\s>]/g;
-const EMAIL = /[^\s<>"'&;@]+@[^\s<>"'&;@]+\.[^\s<>"'&;@]+/g;
+// Bounded by RFC lengths (64 local part, 255 domain) so each start position scans a constant run.
+const EMAIL = /[^\s<>"'&;@]{1,64}@[^\s<>"'&;@]{1,255}\.[^\s<>"'&;@]{1,63}/g;
 const URL_IN_TEXT = /https?:\/\/(?:(?!&(?:quot|lt|gt|apos|#\d+|#x[\da-f]+);)[^\s"'<>\\])+/gi;
 const PHONE = /(?<![\w.-])\+?\d[\d ()-]{7,}\d(?![\w-])/g;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
