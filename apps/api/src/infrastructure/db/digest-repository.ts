@@ -6,11 +6,11 @@ import {
   type BusinessStatus,
   type Category,
   type EvidenceLevel,
-  type SourceFailureReason,
 } from '@lead-hunter/contracts';
 import { and, count, desc, eq, gte, inArray, isNotNull, notInArray, sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { DigestCandidateRow, DigestRepository } from '../../modules/digest/ports.js';
+import { toSourceErrors } from './source-error.js';
 import { analyses, opportunities, rawSignals, sources } from './schema.js';
 
 /** S-13 D-3: statuses of rows that still wait for a decision. */
@@ -39,19 +39,7 @@ export function createDigestRepository(db: BetterSQLite3Database): DigestReposit
         .where(eq(sources.enabled, true))
         .orderBy(desc(sources.lastErrorAt))
         .all();
-      const errors = rows.flatMap((row) =>
-        row.reason === null || row.errorAt === null
-          ? []
-          : [
-              {
-                sourceId: row.id,
-                source: row.name,
-                reason: row.reason as SourceFailureReason,
-                ...(row.status === null ? {} : { httpStatus: row.status }),
-                at: new Date(row.errorAt).toISOString(),
-              },
-            ],
-      );
+      const errors = toSourceErrors(rows);
       const notChecked = rows.filter((row) => row.lastAttemptAt === null).length;
       return {
         ok: rows.length - notChecked - errors.length,
@@ -162,6 +150,7 @@ export function createDigestRepository(db: BetterSQLite3Database): DigestReposit
       const row = db
         .select({
           n: count(),
+          reported: sql<number>`count(${analyses.inputTokens})`,
           input: sql<number | null>`sum(${analyses.inputTokens})`,
           output: sql<number | null>`sum(${analyses.outputTokens})`,
         })
@@ -170,6 +159,7 @@ export function createDigestRepository(db: BetterSQLite3Database): DigestReposit
         .get();
       return {
         analyses: row?.n ?? 0,
+        reported: row?.reported ?? 0,
         inputTokens: row?.input ?? null,
         outputTokens: row?.output ?? null,
       };

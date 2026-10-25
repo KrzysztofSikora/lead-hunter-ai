@@ -26,6 +26,7 @@ export interface DigestRepository {
   /** Analyses stored since `since`; a token sum is null when no row reported tokens. */
   llmUsageSince(since: number): {
     analyses: number;
+    reported: number;
     inputTokens: number | null;
     outputTokens: number | null;
   };

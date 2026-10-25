@@ -113,7 +113,7 @@ describe('GET /api/digest/today (FR-16)', () => {
       top: [],
       bestNextStep: null,
       followUpsDue: [],
-      llm: { analyses: 0, inputTokens: null, outputTokens: null },
+      llm: { analyses: 0, reported: 0, inputTokens: null, outputTokens: null },
       weakSignals: [],
     });
   });
@@ -195,7 +195,7 @@ describe('GET /api/digest/today (FR-16)', () => {
 
     expect(body.followUpsDue.map((item: { id: number }) => item.id)).toEqual([contacted]);
     expect(body.bestNextStep).toMatchObject({ kind: 'follow_up', opportunityId: contacted });
-    expect(body.llm).toEqual({ analyses: 9, inputTokens: 1500, outputTokens: 300 });
+    expect(body.llm).toEqual({ analyses: 9, reported: 2, inputTokens: 1500, outputTokens: 300 });
   });
 
   it('survives a completed row without a score moved to QUALIFIED (plan-review 1)', async () => {
@@ -214,13 +214,19 @@ describe('GET /api/digest/today (FR-16)', () => {
 
   it('applies minScore and rejects a bad one (FR-10 AC6, minimum score only)', async () => {
     const t = await setup();
-    t.seed({ title: 'DEMO alfa bravo charlie', score: 92 });
+    const alfa = t.seed({ title: 'DEMO alfa bravo charlie', score: 92 });
     t.seed({ title: 'DEMO delta echo foxtrot', score: 70 });
 
     const strict = (await t.today('?minScore=90')).json();
     expect(strict.minScore).toBe(90);
     expect(strict.top).toHaveLength(1);
     expect(strict.newAboveThreshold).toBe(1);
+    expect(strict.bestNextStep).toEqual({
+      kind: 'opportunity',
+      opportunityId: alfa,
+      title: strict.top[0].title,
+      nextAction: 'DEMO krok',
+    });
 
     expect((await t.today('?minScore=')).json().minScore).toBe(65);
     expect((await t.today('?minScore=abc')).statusCode).toBe(400);

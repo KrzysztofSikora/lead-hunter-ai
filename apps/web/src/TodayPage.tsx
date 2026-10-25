@@ -121,7 +121,7 @@ function Brief({ data }: { data: DigestToday }) {
         {t.cost}
         {llm.inputTokens === null && llm.outputTokens === null
           ? ''
-          : ` (${t.tokens(llm.inputTokens, llm.outputTokens)})`}
+          : ` (${t.tokens(llm.inputTokens, llm.outputTokens, llm.reported, llm.analyses)})`}
       </p>
 
       <section aria-labelledby="due-title">

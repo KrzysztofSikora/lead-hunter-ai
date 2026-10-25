@@ -149,8 +149,8 @@ export const strings = {
     bestFollowUp: (title: string, on: string) => `follow-up do ${on}: ${title}`,
     bestNone: 'brak',
     cost: 'Koszt analizy dzisiaj: brak danych',
-    tokens: (input: number | null, output: number | null) =>
-      `tokeny: wejście ${input ?? 'brak danych'}, wyjście ${output ?? 'brak danych'}`,
+    tokens: (input: number | null, output: number | null, reported: number, analyses: number) =>
+      `tokeny${reported < analyses ? ` (${reported} z ${analyses} analiz)` : ''}: wejście ${input ?? 'brak danych'}, wyjście ${output ?? 'brak danych'}`,
     dueTitle: 'Na dziś: follow-up',
     dueNone: 'Brak follow-upów na dziś.',
     sourceErrorsTitle: 'Błędy źródeł',

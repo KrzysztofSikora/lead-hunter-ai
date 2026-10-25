@@ -74,6 +74,8 @@ export const DigestToday = z
     llm: z
       .object({
         analyses: count,
+        /** How many of them reported tokens; the sums cover only those. */
+        reported: count,
         inputTokens: count.nullable(),
         outputTokens: count.nullable(),
       })
