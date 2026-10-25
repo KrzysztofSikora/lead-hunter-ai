@@ -1,6 +1,7 @@
 import {
   OpportunityAnalysis,
   ScoreBreakdown,
+  upgradeStoredAnalysis,
   type OpportunityDetail,
   type OpportunityList,
   type OpportunityListQuery,
@@ -101,10 +102,11 @@ const toEvidence = (row: EvidenceRow): OpportunityDetail['evidence'][number] => 
 function parseStored<T>(
   schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } },
   json: string | null,
+  upgrade: (value: unknown) => unknown = (value) => value,
 ): T | null {
   if (json === null) return null;
   try {
-    const parsed = schema.safeParse(JSON.parse(json));
+    const parsed = schema.safeParse(upgrade(JSON.parse(json)));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
@@ -122,7 +124,9 @@ function toLatestAnalysis(row: AnalysisAttemptRow): OpportunityDetail['latestAna
     createdAt: iso(row.createdAt),
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
-    result: parseStored(OpportunityAnalysis, row.resultJson),
+    result: parseStored(OpportunityAnalysis, row.resultJson, (value) =>
+      upgradeStoredAnalysis(value, row.schemaVersion),
+    ),
     breakdown: parseStored(ScoreBreakdown, row.breakdownJson),
     guardNotes: row.guardNotesJson === null ? [] : parseNotes(row.guardNotesJson),
     error: row.error,

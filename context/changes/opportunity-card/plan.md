@@ -235,7 +235,7 @@ storing (lesson). Notes and reasons are operator text, never logged.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Analysis schema v2 with MVP scope and exclusions
+- [x] Phase 1: Analysis schema v2 with MVP scope and exclusions
 - [ ] Phase 2: Activity events and the actions API
 - [ ] Phase 3: The twelve-element card with provenance tags
 - [ ] Phase 4: Card actions, history and e2e
@@ -245,6 +245,7 @@ storing (lesson). Notes and reasons are operator text, never logged.
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] Phase 1: `apps/api/test/analysis.int.test.ts` pinned `schemaVersion: 1`; now 2. `docs/scoring.md` does not describe the analysis schema, so no doc line was added.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

@@ -7,6 +7,7 @@ export {
   MonetizationModel,
   MoneyRange,
   OpportunityAnalysis,
+  upgradeStoredAnalysis,
   PrefilterRule,
   SCORE_COMPONENT_MAX,
   SCORING_VERSION,

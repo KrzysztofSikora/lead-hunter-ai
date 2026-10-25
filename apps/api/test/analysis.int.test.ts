@@ -98,7 +98,7 @@ describe('analysis of a pasted post (FR-08 AC6, FR-10 AC1, AC4)', () => {
       provider: 'mock',
       model: 'mock-rules',
       promptVersion: 'mock-rules-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       inputTokens: null,
       outputTokens: null,
       error: null,
