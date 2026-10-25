@@ -55,7 +55,7 @@ Gates: typecheck ok, lint ok, unit tests ok (24 files, 217 tests), e2e ok (4 tes
 - Fix: delete `ImportPage.test.tsx` (the e2e covers created/duplicate/link; the field-error rendering is a human check). Alternative: keep it, log a `[REVIEW]` deviation and let the person amend the test budget at the PR.
 - Effort: small
 - Lesson candidate: Add a test file only if the plan lists it or a `[REVIEW]` deviation records why; the test-plan budget binds implementers too.
-- Decision: open
+- Decision: fixed (71f019b)
 
 ### R2: `minScore=` (empty) silently becomes `minScore=0` and hides every unscored opportunity
 - Severity: minor
@@ -64,7 +64,7 @@ Gates: typecheck ok, lint ok, unit tests ok (24 files, 217 tests), e2e ok (4 tes
 - Fix: treat an empty string as absent or reject it, e.g. `z.preprocess((v) => (v === '' ? undefined : v), z.coerce.number().int().min(0).max(100).optional())`, and the same for `page`/`pageSize` for consistency.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (68bce4d)
 
 ### R3: A page beyond the last one shows "Razem: N" with an empty list and "Strona 5 z 1"
 - Severity: minor
@@ -73,7 +73,7 @@ Gates: typecheck ok, lint ok, unit tests ok (24 files, 217 tests), e2e ok (4 tes
 - Fix: when `items.length === 0 && total > 0`, render a link/button to the last page (`Math.ceil(total / PAGE_SIZE)`), or clamp `page` in `goTo`/`readQuery` after load.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (69f699e)
 
 ### R4: Title cut at 200 UTF-16 units can split an emoji into a lone surrogate
 - Severity: minor
@@ -82,7 +82,7 @@ Gates: typecheck ok, lint ok, unit tests ok (24 files, 217 tests), e2e ok (4 tes
 - Fix: `Array.from(line.trim()).slice(0, TITLE_MAX_CHARS).join('')`, plus one row in the `deriveTitle` unit test.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (459ade3)
 
 ### R5: Three UI strings are never used
 - Severity: minor
@@ -91,4 +91,4 @@ Gates: typecheck ok, lint ok, unit tests ok (24 files, 217 tests), e2e ok (4 tes
 - Fix: remove them (S-06 can add what it needs).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (ea927ed)
