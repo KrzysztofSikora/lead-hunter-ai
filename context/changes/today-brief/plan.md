@@ -216,10 +216,12 @@ and errors.
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Digest API
-- [ ] Phase 2: Today view
+- [x] Phase 2: Today view
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 2) Today at 360 px and on a laptop with a few demo imports: sections in §11.1 order, Polish wording reads naturally, the "wniosek modelu" label on next steps is clear — run: `docker compose up --build`, log in, open `/` after importing a few DEMO posts on `/import` — evidence: `context/changes/today-brief/evidence/today-360.jpg` (360 px, one contacted lead with a follow-up due)
+- [ ] (Phase 2) With no opportunities: the empty-state text, source count and errors appear and nothing else pretends to be a lead — run: open `/` on a fresh database — evidence: none (asserted by `e2e/smoke.spec.ts` step 1)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -234,6 +236,10 @@ and errors.
   to `DigestToday` there.
 - [FOLLOW-UP] A plain-text rendering of the brief (D-1 B) when Telegram/e-mail notifications (FR-29)
   are built.
+
+- [minor] Phase 2: `Item` of `PipelinePage.tsx` is exported and reused for the due follow-ups (smaller diff than a copy); the strings `dueTitle` / `dueNone` moved to the `today` group, `dueLoadFailed` was dropped (the digest has one load-failure text). The health line loads independently of the digest, so a failing digest keeps it visible.
+- [minor] Phase 2: with a non-empty TOP the "Błędy źródeł" section follows the follow-ups; with an empty TOP the errors are part of the FR-12 empty-state block, so they are not repeated.
+- [minor] Phase 2: the e2e `evidence()` of the main path takes an optional directory; the Today screenshot goes to `today-brief/evidence/`, and the S-08 `today-360.jpg` stays as committed (now stale, showing the old Start view). The evidence run rewrote other changes' screenshots, which were restored with `git restore`.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

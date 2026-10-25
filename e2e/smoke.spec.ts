@@ -35,6 +35,7 @@ test('the operator logs in, keeps the session over a reload and logs out on a ph
   await page.getByLabel('Hasło').fill(E2E_PASSWORD);
   await page.getByRole('button', { name: 'Zaloguj' }).click();
   await expect(page.getByText('Serwer działa')).toBeVisible();
+  await expect(page.getByText('Brak zweryfikowanych okazji dla tego okresu')).toBeVisible();
 
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

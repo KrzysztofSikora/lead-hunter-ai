@@ -5,40 +5,15 @@ import { ImportPage } from './ImportPage.js';
 import { LoginForm } from './LoginForm.js';
 import { OpportunitiesPage } from './OpportunitiesPage.js';
 import { OpportunityPage } from './OpportunityPage.js';
-import { PipelinePage, DueFollowUps } from './PipelinePage.js';
+import { PipelinePage } from './PipelinePage.js';
 import { ProfilePage } from './ProfilePage.js';
 import { SourcesPage } from './SourcesPage.js';
+import { TodayPage } from './TodayPage.js';
 import { getSession, logout } from './api/auth.js';
 import { setUnauthorizedHandler } from './api/client.js';
-import { fetchHealth } from './api/health.js';
 import { strings } from './strings.pl.js';
 
-type Status = 'loading' | 'ok' | 'error';
 type View = 'checking' | 'login' | 'ready' | 'error';
-
-function StatusView() {
-  const [status, setStatus] = useState<Status>('loading');
-
-  useEffect(() => {
-    let active = true;
-    fetchHealth().then(
-      (health) => active && setStatus(health.status === 'ok' ? 'ok' : 'error'),
-      () => active && setStatus('error'),
-    );
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  return (
-    <>
-      <p role="status" className={status === 'error' ? styles.error : styles.status}>
-        {strings.status[status]}
-      </p>
-      <DueFollowUps />
-    </>
-  );
-}
 
 function Shell({ onLogout }: { onLogout: () => void }) {
   return (
@@ -57,7 +32,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         </button>
       </nav>
       <Routes>
-        <Route path="/" element={<StatusView />} />
+        <Route path="/" element={<TodayPage />} />
         <Route path="/okazje" element={<OpportunitiesPage />} />
         <Route path="/okazje/:id" element={<OpportunityPage />} />
         <Route path="/lejek" element={<PipelinePage />} />
