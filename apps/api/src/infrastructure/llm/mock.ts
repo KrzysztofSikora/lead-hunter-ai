@@ -20,10 +20,10 @@ const HOURS: Record<Category, { min: number; max: number }> = {
   PRODUCT_HYPOTHESIS: { min: 60, max: 200 },
 };
 
-// Space or dot only join groups of three digits; a comma or dot before 1-2 digits is the decimal part.
-const NUMBER = String.raw`(\d{1,3}(?:[ .]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)`;
+// Space, dot or comma join groups of three digits; a comma or dot before 1-2 digits is the decimal part.
+const NUMBER = String.raw`(\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)`;
 const BUDGET = new RegExp(
-  String.raw`(?<!\d)${NUMBER}(?:\s*[-–]\s*${NUMBER})?\s*(PLN|zł|EUR|€|USD|\$)(?![\p{L}\p{N}])`,
+  String.raw`(?<!\d[ .,]?)${NUMBER}(?:\s*[-–]\s*${NUMBER})?\s*(PLN|zł|EUR|€|USD|\$)(?![\p{L}\p{N}])`,
   'iu',
 );
 const CURRENCY = { pln: 'PLN', zł: 'PLN', eur: 'EUR', '€': 'EUR', usd: 'USD', $: 'USD' } as const;

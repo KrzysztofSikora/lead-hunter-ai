@@ -61,12 +61,21 @@ describe('MockProvider (D-15)', () => {
     ['Budżet: 1.500,00 zł', 150_000, 150_000],
     ['Budżet 1 500 - 2 500 zł', 150_000, 250_000],
     ['Budżet 99,50 PLN', 9_950, 9_950],
-    ['start w 2026 500 zł', 50_000, 50_000],
+    ['Budget: 1,500 USD', 150_000, 150_000],
+    ['Budget: 1,500.50 USD', 150_050, 150_050],
   ])('reads the amount in "%s" as minor units', async (snippet, minMinor, maxMinor) => {
     const text = `DEMO: Szukam programisty do pilnego zlecenia, płatne za wykonanie. ${snippet}. Odezwij się.`;
     const result = await run(text);
     if (result.verdict !== 'ANALYSED') throw new Error('expected ANALYSED');
     expect(result.sourceBudget).toMatchObject({ minMinor, maxMinor });
+  });
+
+  it('states no budget when a number would start in the middle of another', async () => {
+    const text =
+      'DEMO: Szukam programisty do pilnego zlecenia, płatne za wykonanie. start w 2026 500 zł. Odezwij się.';
+    const result = await run(text);
+    if (result.verdict !== 'ANALYSED') throw new Error('expected ANALYSED');
+    expect(result.sourceBudget).toBeNull();
   });
 
   it('says INSUFFICIENT_DATA below 80 characters', async () => {
