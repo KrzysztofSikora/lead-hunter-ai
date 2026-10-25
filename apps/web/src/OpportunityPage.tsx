@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import type { LatestAnalysis, OpportunityDetail } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
@@ -24,6 +24,11 @@ export function OpportunityPage() {
   const { id } = useParams();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
   const [reloads, setReloads] = useState(0);
+
+  // Another opportunity must not keep showing the previous one (and its buttons) while it loads.
+  useEffect(() => {
+    setLoad({ state: 'loading' });
+  }, [id]);
 
   useEffect(() => {
     let active = true;
@@ -172,6 +177,8 @@ function RequestButton({
 }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const reload = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(reload.current), []);
   const press = () => {
     setBusy(true);
     setMessage(null);
@@ -187,7 +194,7 @@ function RequestButton({
                 ? t.requestNotConfigured
                 : t.notFound,
         );
-        if (outcome === 'queued') setTimeout(onRequested, 1500);
+        if (outcome === 'queued') reload.current = setTimeout(onRequested, 1500);
       },
       () => {
         setBusy(false);
