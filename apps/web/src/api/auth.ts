@@ -2,10 +2,15 @@ import { LoginRequest, ThrottledError } from '@lead-hunter/contracts';
 
 export type LoginResult = 'ok' | 'invalid' | 'not_configured' | { throttled: number };
 
-/** `true` when the browser holds a valid session. Uses plain `fetch`: a 401 here is an answer. */
+/**
+ * `true` when the browser holds a valid session, `false` after a 401. Any other answer throws:
+ * a server that is down is not a logged-out operator. Plain `fetch`: a 401 here is an answer.
+ */
 export async function getSession(): Promise<boolean> {
   const response = await fetch('/api/auth/session', { credentials: 'same-origin' });
-  return response.status === 200;
+  if (response.status === 200) return true;
+  if (response.status === 401) return false;
+  throw new Error(`session check failed: ${response.status}`);
 }
 
 export async function login(password: string): Promise<LoginResult> {

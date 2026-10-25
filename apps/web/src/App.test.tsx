@@ -77,14 +77,21 @@ it('shows the login form without a session and the shell after logging in', asyn
   expect(await screen.findByText(strings.status.ok)).toBeTruthy();
 });
 
-it('shows the login form when the session check cannot reach the server', async () => {
+it('shows the server error, not the login form, when the session check cannot reach the server', async () => {
   stubApi({
     '/api/auth/session': () => {
       throw new TypeError('network');
     },
   });
   render(<App />);
-  expect(await screen.findByRole('heading', { name: strings.login.title })).toBeTruthy();
+  expect(await screen.findByText(strings.status.error)).toBeTruthy();
+  expect(screen.queryByRole('heading', { name: strings.login.title })).toBeNull();
+});
+
+it('shows the server error when the session check answers 5xx', async () => {
+  stubApi({ '/api/auth/session': session(503) });
+  render(<App />);
+  expect(await screen.findByText(strings.status.error)).toBeTruthy();
 });
 
 it('returns to the login form after logout', async () => {

@@ -7,7 +7,7 @@ import { fetchHealth } from './api/health.js';
 import { strings } from './strings.pl.js';
 
 type Status = 'loading' | 'ok' | 'error';
-type View = 'checking' | 'login' | 'ready';
+type View = 'checking' | 'login' | 'ready' | 'error';
 
 function Shell({ onLogout }: { onLogout: () => void }) {
   const [status, setStatus] = useState<Status>('loading');
@@ -43,7 +43,7 @@ export function App() {
     let active = true;
     getSession().then(
       (authenticated) => active && setView(authenticated ? 'ready' : 'login'),
-      () => active && setView('login'),
+      () => active && setView('error'),
     );
     return () => {
       active = false;
@@ -63,6 +63,11 @@ export function App() {
       <h1>{strings.appName}</h1>
       <p>{strings.tagline}</p>
       {view === 'login' && <LoginForm onLoggedIn={() => setView('ready')} />}
+      {view === 'error' && (
+        <p role="status" className={styles.error}>
+          {strings.status.error}
+        </p>
+      )}
       {view === 'ready' && <Shell onLogout={handleLogout} />}
     </main>
   );
