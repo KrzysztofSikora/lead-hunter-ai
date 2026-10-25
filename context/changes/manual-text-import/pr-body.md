@@ -1,55 +1,73 @@
-# docs(manual-text-import): plan for manual text import, duplicate recognition and the Okazje list
+# feat(manual-text-import): paste a job post, get a deduplicated opportunity in a filterable list
 
-Roadmap item S-03 (manual text import): the operator pastes a job post (optionally with its URL, stored but not fetched), gets a raw signal plus a `NEW` opportunity with `analysisStatus = PENDING`, duplicates are recognised, and a filterable, sortable, paginated *Okazje* list shows them with an honest empty state. The plan targets FR-02 AC1–AC4, FR-06 AC1–AC3, FR-11 AC1 and FR-12 AC1 (list part). **Nothing is implemented in this PR; it holds the plan and its reviews only.**
+Roadmap S-03. The operator can paste the text of a post (optionally with its URL, which is stored but not fetched) and gets a stored raw signal plus a `NEW` opportunity with `analysisStatus = PENDING`. Re-imports are recognised by canonical URL or content hash. The new *Okazje* view lists opportunities with filters, sort and pagination, and shows an honest empty state. A minimal read-only `/okazje/:id` view is the target of the "już zaimportowane" link. PRD ACs covered: FR-02 AC1–AC4, FR-06 AC1–AC3, FR-11 AC1, FR-12 AC1 (list part).
 Closes #4
 
-> **Status:** Draft: plan review still says NEEDS CHANGES after 2 rounds. Nothing was implemented (phases ticked 0/4). Review the plan in this PR, answer the points below, then run `.claude/workflow/address-pr <PR number>`.
+> **Status:** Ready for review
 
 ## ⚠ Needs your decision
-- **Plan review round 2, #1 (blocker): the exact source URL is not kept.** The plan stores only the canonical URL (D-2, D-8: `source.url` = canonical URL), but FR-06 AC3 (`prd.md:107`) requires the exact source URL. Canonicalisation drops the fragment, so a hash-routed board link `https://site/#/job/123` becomes `https://site/` and no longer opens the post; it also drops `ref`, which some sites need. Rebuilding the query through `URLSearchParams` re-encodes values (`?q=a%20b&redirect=/a/b` → `?q=a+b&redirect=%2Fa%2Fb`). Suggested fix: store the pasted (trimmed) URL in `raw_signals.source_url` and `opportunity_evidence.url`, use `canonical_url` only for identity, make `source.url` the source URL, filter query parameters on the raw `&`-split string, assert it in Phase 2, and list fragment-routed URLs merging into one identity under *Risks*. Costly: a data-shape change that cannot be repaired for rows imported before it.
-- **Plan review round 2, #2 (major): a malformed URL would give a 500.** The user-info `.refine` on `url` calls `new URL(value)`, which throws on `'not a url'` (Zod 4.6.7 keeps running later checks after `z.httpUrl()` fails). The throw is not a Zod error, so `http-errors.ts:16` rethrows it. Fix: make the refine total (`URL.canParse`) or use `z.httpUrl({ abort: true })`, and add `url: "nie-adres"` → 400 to the AC4 table.
-- **D-14 (costly):** where identity is looked up so a URL or text first seen in a duplicate import is still recognised → chose **`signal_identities` table, `PRIMARY KEY (kind, value)`, first owner wins, URL wins over hash on conflict**. Alternatives: B: look up `opportunity_evidence` columns (no new table, but a value can sit under two opportunities and needs a tie rule); C: one signal per import with unique columns (against FR-02 AC2 "one signal"). Switching costs: schema, migration `0003`, service and Phase 1 tests.
-- **D-1 (costly):** one opportunity per distinct signal identity; a duplicate adds a `REPEAT_IMPORT` evidence row only when it brings a new URL or text hash → chose **this rule**. Alternatives: B: duplicates add nothing; C: always add a row. Switching costs: `opportunity_evidence` shape and service. See also review #3 below (what a `REPEAT_IMPORT` row stores is undefined).
-- **D-2 (costly):** identity order canonical URL, then content hash; canonical form per the roadmap list; content hash = SHA-256 of NFKC, lower-cased, whitespace-collapsed text → chose **the roadmap's list exactly, no `www.` stripping or parameter sorting**. Alternatives: B: also sort parameters and strip `www.`; C: hash the raw text. Switching costs: stored identity values.
-- **D-3 (costly):** source recorded as `raw_signals.source_type` (`manual_text` / `manual_url`), no `sources` table or `external_id` yet → chose **this**. Alternatives: B: create `sources` now and seed a "manual" row; C: `source_id` to a seeded row only. Switching costs: S-10's schema decided early.
-- **D-4 (costly):** `opportunities` gets four nullable analysis columns now (`category`, `evidence_level`, `score` 0–100, `confidence`) because FR-11 AC1 filters on them → chose **this**. Alternatives: B: status columns only; C: all §14 columns. Switching costs: migration.
-- **D-5 (costly, public API):** `POST /api/signals/import`, 201 `created` / 200 `duplicate` / 400 → chose **a discriminated result with 200 for a duplicate**. Alternatives: B: 409 for a duplicate; C: `POST /api/opportunities`. Switching costs: contracts, route, UI.
-- **D-8 (costly, public API):** DTO separates `source {…}` facts from `analysis {…} | null` inferences → chose **grouped fields**. Alternatives: B: flat fields plus a `fieldOrigins` map; C: flat fields. Switching costs: contracts and every consumer.
-- **D-9 (costly, public API):** list API `GET /api/opportunities` with offset pagination and ISO-instant `from`/`to` → chose **offset pagination**. Alternatives: B: cursor pagination; C: Warsaw calendar-day dates. Switching costs: contracts, repository, UI.
-- **D-10 (costly, public API):** `sources: { checked, errors[] }` in the list response, stubbed to `{ 0, [] }` through a `SourceStatusReader` port → chose **this**. Alternatives: B: fixed UI sentence; C: separate `/api/sources/summary`. Switching costs: contracts, UI. Risk: S-12's plan must replace `source-status.ts` or the empty state under-reports.
-- **D-11 (costly, public API):** minimal read-only `/okazje/:id` backed by `GET /api/opportunities/:id` as the link target → chose **this**. Alternatives: B: link to the list with the row highlighted; C: no link (breaks FR-02 AC2). Switching costs: contracts, route, view.
-- **Plan review round 2, #3 (minor):** what a `REPEAT_IMPORT` evidence row holds is not defined (full text vs excerpt vs URL; which signal `raw_signal_id` points to; nullable or not). It is the only copy of a second pasted text. Suggested: `source_fact` = full normalised snippet (or the source URL when no text came), `raw_signal_id` = the primary signal, NOT NULL.
-- **Plan review round 2, #4–#7 (minor, not applied):** #4 type `transaction` as synchronous (`transaction<T>(fn: (tx) => T): T`, no `await`; better-sqlite3 throws on a promise); #5 Phase 2 test table goes beyond the test budget (TR-06 only): cut to one main-path list test or record a decision (FR-25 AC2 could justify it); #6 add the `scrollWidth - clientWidth` overflow assertion on `/okazje` and `/import` to the e2e test; #7 `z.httpUrl()` rejects punycode TLDs (`xn--p1ai`), mention under *Risks* or skip.
+No `[STUCK]` or `[REVIEW]` deviations; *Deviations* in the plan is empty. Plan review ended READY WITH NOTES; code review ended APPROVE (round 2, 0 open findings). What is left for you are the costly decisions (public API and stored data shape), most important first:
 
-Reply in a review comment, e.g. `D-3: take B`, `R1: fix it`, `drop the lessons commit`,
+- **D-14 (costly, data shape):** identity lives in a `signal_identities` table (`PRIMARY KEY (kind, value)`): the first opportunity to see a URL or text hash owns it; on a URL/hash conflict the URL wins. → chose **one identity table**. Alternatives: B: look up `opportunity_evidence` columns with indexes (no new table, but a value can sit under two opportunities and needs a tie rule); C: one signal per import with unique columns (against FR-02 AC2 "one signal"). Switching costs: `schema.ts`, migration `0003_*`, `signal-repository.ts`, `service.ts`. S-09/S-10 will claim identities the same way.
+- **D-2 (costly, stored identity values):** the canonical URL drops the fragment, default port, trailing slash and `utm_*`/`fbclid`/`gclid`/`ref`; the content hash is SHA-256 of NFKC, lower-cased, whitespace-collapsed text. → chose **the roadmap list, no extra rules**. Alternatives: B: also sort query parameters and strip `www.`; C: hash the raw text. Switching costs: `identity.ts` plus re-computing stored values. Known consequences (plan *Risks*): on hash-routed boards (`https://site/#/job/123` vs `/456`) different posts merge into one opportunity (the second URL is kept as evidence), and identical text at two URLs merges.
+- **D-1 (costly, data shape):** a duplicate creates no signal or opportunity; it adds a `REPEAT_IMPORT` evidence row only when it brings a new URL or new text, and that row is the only copy of the second pasted text. → chose **evidence-on-new-info**. Alternatives: B: duplicates add nothing; C: always add a row. Switching costs: `service.ts`, `isNewEvidence`.
+- **D-3 / D-4 (costly, data shape):** `raw_signals.source_type` text (`manual_text` / `manual_url`) without a `sources` table; `opportunities` carries only status plus four nullable analysis columns (category, evidence level, score, confidence). → chose **minimal, additive**. Alternatives: D-3 B/C: create/seed `sources` now; D-4 B/C: fewer or all §14 columns now. Switching costs: schema and migration; S-10 and S-04 extend additively.
+- **D-5 / D-8 / D-9 / D-10 / D-11 (costly, public API):** `POST /api/signals/import` (201 `created` / 200 `duplicate` / 400), source-facts vs `analysis` DTO grouping, offset-paginated list query, `sources { checked: 0, errors: [] }` stub, `GET /api/opportunities/:id`. → chose the shapes in `packages/contracts/src/opportunities.ts`. Alternatives: 409 for duplicates; flat DTO with `fieldOrigins`; cursor pagination; fixed UI sentence for sources; link to list instead of detail view. Switching costs: the contracts file, both modules, web client. **S-12 must replace `source-status.ts`**, otherwise the empty state under-reports sources.
+- **Plan-review notes not written back into the plan** (all minor, from [plan-review.md](context/changes/manual-text-import/plan-review.md)): #1 and #2 are respected by the code (`deriveTitle(text, sourceUrl)`, query taken from `URL#search`), but the plan text still shows the old wording. #3: `z.httpUrl()` also rejects `localhost`, IP-literal hosts and `example.com.` with `invalid_format` (UI message: "Podaj poprawny adres URL (http lub https)."). This is not stated in D-5. Tell me if you want any of these as a follow-up change, e.g. `R3: fix it`.
+
+Reply in a review comment, e.g. `D-3: take B`, `R4: fix it`, `drop the lessons commit`,
 then run `.claude/workflow/address-pr <PR number>`.
 
 ## Human checks
-Not yet recorded in the plan's *Human checks* section (`/implement` fills it, and it did not run). The plan's Phase 4 lists these, to run after implementation (evidence goes to `context/changes/manual-text-import/evidence/`, which does not exist yet):
-- [ ] At 360 px open *Okazje* on a fresh install: the empty text, "Sprawdzone źródła: 0" and "Błędy źródeł: brak" are shown, no example opportunity; evidence `evidence/empty-360.png`.
-- [ ] Import a pasted post with a URL containing `?utm_source=x#frag`, then the same URL without them: second time "Już zaimportowane" with a working link; the opportunity view shows the canonical URL, "wklejony tekst"/link label, "brak analizy — w kolejce"; evidence `evidence/duplicate-360.png`.
-- [ ] With 3+ imports, try each filter, both sorts and *Następna*: results match, the filter survives a reload, Polish labels read well, no horizontal scroll; evidence `evidence/list-360.png`.
-- [ ] Paste a text containing `<script>alert(1)</script>` and an "ignore previous instructions" line: it is shown verbatim as text, nothing executes.
+- [ ] (Phase 4) Fresh install, 360 px: *Okazje* shows the empty text, "Sprawdzone źródła: 0", "Błędy źródeł: brak", no example opportunity. Run: `pnpm build && pnpm e2e`, or open `/okazje` on a fresh `DATA_DIR`. Evidence: [empty-360.png](context/changes/manual-text-import/evidence/empty-360.png)
+- [ ] (Phase 4) Import a post with a URL containing `?utm_source=x#frag`, then the same URL without them: the second time "Już zaimportowane" with a working link; the view shows the URL as first pasted and "brak analizy — w kolejce". Run: `/import` on the running app. Evidence: [duplicate-360.png](context/changes/manual-text-import/evidence/duplicate-360.png)
+- [ ] (Phase 4) With 3+ imports try each filter, both sorts and *Następna*; the filter survives a reload; Polish labels read well; no horizontal scroll. Run: `/okazje` on the running app. Evidence: [list-360.png](context/changes/manual-text-import/evidence/list-360.png) (one import only; 3+ imports are for you)
+- [ ] (Phase 4) Paste `<script>alert(1)</script>` and an "ignore previous instructions" line: shown verbatim as text, nothing executes. Run: `/import`, then open the opportunity. Evidence: none
 
 ## Other decisions made by the agent (cheap to change)
 | ID | Question | Chosen | Alternatives |
 |----|----------|--------|--------------|
-| D-6 | Maximum text length | Env `IMPORT_MAX_TEXT_CHARS`, 1 000–200 000, default 20 000; route schema built from config | B: fixed constant in contracts; C: check in the service |
-| D-7 | Title and snippet of a manual signal | snippet = whole trimmed text; title = first non-blank line cut to 200 chars, URL-only → the URL; `publishedAt` null, `availability` `NOT_CHECKED` | B: optional title field; C: title null |
-| D-12 | Data fetching in the web app | Plain `apiFetch` + `useEffect`; filters, sort, page in the URL query | B: add `@tanstack/react-query`; C: component state only |
-| D-13 | e2e coverage | One more test in `e2e/smoke.spec.ts` (4th of 5 login attempts), screenshots as evidence | B: no e2e; C: a new spec file |
+| D-6 | Maximum text length | env `IMPORT_MAX_TEXT_CHARS` (1 000–200 000, default 20 000), schema built from config so OpenAPI shows the real limit | fixed constant in contracts; check in the service |
+| D-7 | Title and snippet of a manual signal | snippet = trimmed text; title = first non-blank line cut to 200 code points; URL-only → title = URL as pasted; `publishedAt` null, `availability` `NOT_CHECKED` | optional title field in the form; null title |
+| D-12 | Data fetching in the web app | plain `apiFetch` + `useEffect`; filters, sort and page in the URL query | add TanStack Query now; filters in component state |
+| D-13 | e2e coverage | one more test in `e2e/smoke.spec.ts` (4th of 5 login attempts), screenshots as evidence | no e2e; a new spec file |
 
 ## Quality
-- Gates: not run yet; no code was written (phases ticked 0/4).
-- Review: not run (`review.md` does not exist). Plan review: NEEDS CHANGES after round 2 (round 1 also NEEDS CHANGES; its blocker, identity across URL and hash, was fixed by D-14, and findings #2–#7 were applied, see `plan.md#review-response`).
-- Mutation: not run (`mutation.md` does not exist).
+- Gates (from [review.md](context/changes/manual-text-import/review.md)): typecheck ok, lint ok, unit tests ok (23 files, 214 tests), e2e ok (4 tests), **image not run**: `corepack` inside `docker build` cannot fetch pnpm 12.15.0 through the sandbox's TLS proxy (`self-signed certificate in certificate chain`). This is environment, not this change, which touches no `package.json` or lockfile; the CI `image` job is the authority.
+- Review: APPROVE, round 2. Round 1 raised 5 findings (1 major, 4 minor); fixed 5, deferred 0, rejected 0:
+  - R1 (major) unplanned component test `ImportPage.test.tsx` outside the test budget, removed (71f019b)
+  - R2 empty `minScore=` silently became `0`, now means absent (68bce4d)
+  - R3 page beyond the last one, *Poprzednia* now stays in range (69f699e). The out-of-range page itself still shows "Razem: N" with no items; the reviewer accepted this because the way back is one click.
+  - R4 title cut split an emoji, now cut by code points (459ade3)
+  - R5 three unused UI strings removed (ea927ed)
+- Mutation: skipped: S-03 is not a mutation target in the test plan (no `mutation.md`); `bug` mutants: none.
 - Proposed lessons: none.
 
 ## Follow-ups
-None recorded in the plan's *Deviations*. Items the plan defers to other changes: fetching, robots.txt and SSRF guard (S-09); analysis and scoring (S-04); full opportunity card (S-06); status changes (S-08); `sources` table and job runs (S-10/S-12); grouping similar signals (FR-30, P1); delete/export (S-15).
+- Out-of-range list page (`?page=N` beyond the last) still renders "Razem: N" with an empty list (see R3 above); acceptable, optional polish.
+- S-12 must replace the `source-status.ts` stub (D-10).
+- S-09 will fill `snippet`/`content_hash` for URL-only signals; whether it merges opportunities when the fetched hash is already owned is for its plan.
+- Hash-routed boards merge posts through the fragment-dropping rule (see D-2); revisiting is a roadmap decision for S-09/S-10.
+- The e2e uses the 4th of 5 login attempts per 15 minutes; a later e2e test needs a shared login (storage state).
 
 ## Commits
 ```
+cf48ff7 docs(manual-text-import): review
+bbd50d8 docs(manual-text-import): triage review round 1
+ea927ed fix(manual-text-import): drop unused UI strings (R5)
+459ade3 fix(manual-text-import): cut derived title by code points (R4)
+69f699e fix(manual-text-import): previous page never leaves the valid range (R3)
+68bce4d fix(manual-text-import): empty list query values mean not given (R2)
+71f019b fix(manual-text-import): remove component test outside the test budget (R1)
+7bfba6f docs(manual-text-import): review
+5377651 feat(manual-text-import): import view, e2e flow and README
+8b5e63f feat(manual-text-import): Okazje list and opportunity view in the web app
+21b5eec feat(manual-text-import): opportunity list and detail API
+06f38e8 feat(manual-text-import): manual import API with identity rules and storage
+f91d53a docs(manual-text-import): plan-review
+5781e48 docs(manual-text-import): plan
+72be6b0 docs(manual-text-import): plan-review
+5c3b386 docs(manual-text-import): pr-body
 bd1c128 docs(manual-text-import): plan-review
 5e39139 docs(manual-text-import): plan
 9dba6a6 docs(manual-text-import): plan-review
@@ -58,15 +76,17 @@ bd1c128 docs(manual-text-import): plan-review
 
 <details><summary>Run</summary>
 
-Branch `change/manual-text-import`, base `main`, started 2026-10-25T10:35:23+00:00.
+Base main, branch `change/manual-text-import`, started 2026-10-25 10:52 UTC; no failed step, no stop.
 
-| Step | Attempt | Result | Cost |
-|------|---------|--------|------|
-| plan (opus) | 1 | success, 19 turns | $1.79 |
-| plan-review (opus) | 1 | success; round 1 NEEDS CHANGES | $0.72 |
-| plan revise (opus) | 1 | success, 10 turns | $0.66 |
-| plan-review (opus) | 1 | success; round 2 NEEDS CHANGES | $1.03 |
-| pr-body (sonnet) | 1 | this document | - |
+| Step | Model | Result | Cost |
+|------|-------|--------|------|
+| plan-review (round 1) | opus | NEEDS CHANGES | $0.41 |
+| plan (revise) | opus | success, 10 turns | $0.51 |
+| plan-review (round 2) | opus | READY WITH NOTES | $0.54 |
+| implement, phases 1–4 | sonnet | success, 19 / 13 / 14 / 17 turns | $0.62 + $0.38 + $0.42 + $0.37 |
+| review (round 1) | opus | APPROVE WITH FOLLOW-UPS, 5 findings | $1.47 |
+| fix-review | sonnet | success, 11 turns | $0.18 |
+| review (round 2) | opus | APPROVE, 0 open | $0.26 |
 
-Failed step: none. Draft reason: plan review still says NEEDS CHANGES after 2 rounds. Phases ticked: 0/4.
+Phases ticked: 4/4. Total of listed steps: about $5.16 (pr-body step not included).
 </details>
