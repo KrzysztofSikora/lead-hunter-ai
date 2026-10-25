@@ -25,7 +25,7 @@ than building on it.
 | S-11 | #12 | email-alerts | slice | FR-05 | S-10 | L | todo |
 | S-12 | #13 | scheduler-and-jobs | slice | FR-17, FR-18 AC1–AC2 | S-10 | M | done |
 | S-13 | #14 | today-brief | slice | FR-16 | S-08, S-12 | M | done |
-| S-16 | #17 | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13 | M | in-progress |
+| S-16 | #17 | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13 | M | review |
 | S-14 | #15 | insights | slice | FR-19 | S-08 | M | todo |
 | S-15 | #16 | data-ownership-backup | slice | FR-21, FR-22 | S-08 | M | todo |
 
