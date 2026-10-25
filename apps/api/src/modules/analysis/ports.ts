@@ -84,6 +84,7 @@ export interface CompletedAnalysis {
     countries: string | null;
     amountMaxMinor: number | null;
     amountCurrency: string | null;
+    /** Applied only while the opportunity is still `NEW` (D-17). */
     businessStatus: BusinessStatus | null;
   };
   at: number;
@@ -102,7 +103,16 @@ export interface FailedAnalysis {
 /** Each write is one transaction (Phase 3 implements it). */
 export interface AnalysisRepository {
   pendingWithoutPrefilter(): PendingOpportunity[];
-  savePrefilter(id: number, result: PrefilterResult, at: number): void;
+  /**
+   * With a rule the opportunity becomes `SKIPPED`; `moveTo` is the business status it takes, applied
+   * only while it is still `NEW` (D-5, D-17).
+   */
+  savePrefilter(
+    id: number,
+    result: PrefilterResult,
+    at: number,
+    moveTo: BusinessStatus | null,
+  ): void;
   /** Passed the pre-filter, still `PENDING`, best matches first (FR-07 AC3). */
   nextWaiting(limit: number): WaitingOpportunity[];
   countSince(at: number): number;

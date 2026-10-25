@@ -6,6 +6,10 @@ import { loadConfigOrExit } from './cli/config.js';
 import { openDb } from './infrastructure/db/client.js';
 import { randomTokenSource } from './infrastructure/auth/token-source.js';
 import { verifyPassword } from './infrastructure/auth/scrypt-password.js';
+import { createAnalysisRepository } from './infrastructure/db/analysis-repository.js';
+import { MockProvider } from './infrastructure/llm/mock.js';
+import { createAnalysisRunner } from './modules/analysis/service.js';
+import { createProfileService } from './modules/profile/service.js';
 import { createHealthProbe } from './infrastructure/db/health-probe.js';
 import { runMigrations } from './infrastructure/db/migrate.js';
 import { createOpportunityRepository } from './infrastructure/db/opportunity-repository.js';
@@ -47,6 +51,21 @@ async function main(): Promise<void> {
   }
 
   const hash = config.operatorPasswordHash;
+  const clock = { now: () => new Date() };
+  const profileDeps = { repository: createProfileRepository(db), clock };
+  // The profile row is created by the profile routes at build time; read lazily.
+  const profileService = createProfileService(profileDeps);
+  let logger: { error: (message: string) => void } = { error: () => undefined };
+  const runner = createAnalysisRunner({
+    repository: createAnalysisRepository(db),
+    provider: config.llmProvider === 'mock' ? new MockProvider() : undefined,
+    profile: { get: () => profileService.get().profile },
+    clock,
+    dailyLimit: config.analysisDailyLimit,
+    maxAgeDays: config.prefilterMaxAgeDays,
+    onError: (error) =>
+      logger.error(`analysis drain failed: ${error instanceof Error ? error.message : 'error'}`),
+  });
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
@@ -57,14 +76,23 @@ async function main(): Promise<void> {
       clock: { now: () => new Date() },
       tokens: randomTokenSource,
     },
-    profile: { repository: createProfileRepository(db), clock: { now: () => new Date() } },
-    signals: { repository: createSignalRepository(db), clock: { now: () => new Date() } },
+    profile: profileDeps,
+    signals: { repository: createSignalRepository(db), clock },
+    onSignalCreated: () => runner.kick(),
     opportunities: { repository: createOpportunityRepository(db), sourceStatus: noSourcesYet },
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });
 
+  logger = app.log;
+  const ANALYSIS_INTERVAL_MS = 10 * 60_000;
+  // D-4: work held back by the daily limit resumes on a later tick; S-12 replaces this timer.
+  const timer = setInterval(() => runner.kick(), ANALYSIS_INTERVAL_MS);
+  timer.unref();
+
   const shutdown = async (): Promise<void> => {
+    clearInterval(timer);
+    await runner.idle().catch(() => undefined);
     await app.close();
     sqlite.close();
     process.exit(0);
@@ -73,6 +101,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => void shutdown());
 
   await app.listen({ host: config.host, port: config.port });
+  runner.kick();
 }
 
 main().catch((error: unknown) => {

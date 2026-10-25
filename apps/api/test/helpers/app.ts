@@ -6,6 +6,11 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
+import { createAnalysisRepository } from '../../src/infrastructure/db/analysis-repository.js';
+import { MockProvider } from '../../src/infrastructure/llm/mock.js';
+import { createAnalysisRunner, type AnalysisRunner } from '../../src/modules/analysis/service.js';
+import type { LlmProvider } from '../../src/modules/analysis/ports.js';
+import { createProfileService } from '../../src/modules/profile/service.js';
 import { createOpportunityRepository } from '../../src/infrastructure/db/opportunity-repository.js';
 import { createProfileRepository } from '../../src/infrastructure/db/profile-repository.js';
 import { createSignalRepository } from '../../src/infrastructure/db/signal-repository.js';
@@ -65,11 +70,33 @@ export async function buildTestApp(
     noPassword?: boolean;
     /** Reuse the database in this dir (a restart); the first app's connection stays open. */
     dir?: string;
+    /** Replaces the provider chosen by `LLM_PROVIDER`; `null` means none. */
+    provider?: LlmProvider | null;
+    /** Kick the runner after every created import, as the server does. Tests drain by hand otherwise. */
+    autoKick?: boolean;
   } = {},
-): Promise<{ app: FastifyInstance; config: Config; dir: string }> {
+): Promise<{ app: FastifyInstance; config: Config; dir: string; runner: AnalysisRunner }> {
   const { dir, sqlite, db } = openTestDb(options.dir);
   const config = loadConfig({ DATA_DIR: dir, ...options.env });
   const hash = await getTestHash();
+  const clock = options.clock ?? { now: () => new Date() };
+  const profileDeps = { repository: createProfileRepository(db), clock };
+  const profileService = createProfileService(profileDeps);
+  const provider =
+    options.provider !== undefined
+      ? (options.provider ?? undefined)
+      : config.llmProvider === 'mock'
+        ? new MockProvider()
+        : undefined;
+  const runner = createAnalysisRunner({
+    repository: createAnalysisRepository(db),
+    provider,
+    profile: { get: () => profileService.get().profile },
+    clock,
+    dailyLimit: config.analysisDailyLimit,
+    maxAgeDays: config.prefilterMaxAgeDays,
+    onError: () => undefined,
+  });
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
@@ -80,19 +107,14 @@ export async function buildTestApp(
       clock: options.clock ?? { now: () => new Date() },
       tokens: randomTokenSource,
     },
-    profile: {
-      repository: createProfileRepository(db),
-      clock: options.clock ?? { now: () => new Date() },
-    },
-    signals: {
-      repository: createSignalRepository(db),
-      clock: options.clock ?? { now: () => new Date() },
-    },
+    profile: profileDeps,
+    signals: { repository: createSignalRepository(db), clock },
+    ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),
     opportunities: { repository: createOpportunityRepository(db), sourceStatus: noSourcesYet },
     ...options.overrides,
   });
   cleanups.push(() => app.close());
-  return { app, config, dir };
+  return { app, config, dir, runner };
 }
 
 /** Logs in with TEST_PASSWORD and returns the value for a `cookie` request header. */

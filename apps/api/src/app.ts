@@ -26,6 +26,8 @@ export interface AppDeps {
   profile: ProfileDeps;
   signals: SignalDeps;
   opportunities: OpportunityDeps;
+  /** Called after an import created a new opportunity; the analysis runner is kicked here (D-4). */
+  onSignalCreated?: () => void;
   version: string;
   /** Directory of the built web app; static serving and the SPA fallback are off without it. */
   webDistDir?: string;
@@ -64,6 +66,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerSignalRoutes(app, {
     ...deps.signals,
     importMaxTextChars: deps.config.importMaxTextChars,
+    ...(deps.onSignalCreated ? { onCreated: deps.onSignalCreated } : {}),
   });
 
   registerOpportunityRoutes(app, deps.opportunities);

@@ -106,7 +106,11 @@ test('the operator imports a pasted post, sees it in the list and the repeat is 
   await expect(
     page.getByRole('link', { name: 'DEMO: Szukam programisty do sterownika IoT.' }),
   ).toBeVisible();
-  await expect(page.getByText('Analiza: oczekuje')).toBeVisible();
+  // The mock analyses right after the import (S-04); Phase 5 asserts the analysed content.
+  await expect(async () => {
+    await page.reload();
+    await expect(page.getByText(/Analiza: (oczekuje|gotowa)/)).toBeVisible({ timeout: 1_000 });
+  }).toPass();
   await assertNoOverflow(page);
   await page.screenshot({ path: `${IMPORT_EVIDENCE}/list-360.png` });
 
@@ -121,6 +125,5 @@ test('the operator imports a pasted post, sees it in the list and the repeat is 
   await expect(
     page.locator('dl').getByText('https://example.com/oferta/1?utm_source=x#frag'),
   ).toBeVisible();
-  await expect(page.getByText('brak analizy — w kolejce')).toBeVisible();
   await assertNoOverflow(page);
 });

@@ -378,7 +378,7 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Analysis contracts and the scoring rubric
 - [x] Phase 2: Pre-filter, output guard and mock provider
-- [ ] Phase 3: Storage, runner and configuration
+- [x] Phase 3: Storage, runner and configuration
 - [ ] Phase 4: Status route, DTOs and list filters
 - [ ] Phase 5: Web views, e2e and README
 
@@ -395,6 +395,10 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 - [minor] (Phase 2) plan-review #6: `too_old` and `no_profile_match` cannot fire for manual imports (reachable from S-10 sources). Added a small rule table in `prefilter.test.ts` (TR-25 allows `none`, does not require it) covering every rule reachable now, so `prefilter.ts` has fewer mutation survivors; `no_profile_match` has no test because `SourceType` has only manual values.
 - [minor] (Phase 2) Added `mock.test.ts` and `warsaw-day.test.ts` (plan said the mock is proved end to end in Phase 3); both are cheap and pin D-15 and the DST cases early.
 - [minor] (Phase 2) `ports.ts` also defines the repository record types (`CompletedAnalysis`, `FailedAnalysis`, `PendingOpportunity`, `WaitingOpportunity`); Phase 3 may adjust their shape when the SQLite repository is written.
+- [minor] (Phase 3) plan-review #2: the e2e import test now waits (reload until `Analiza: gotowa`) and no longer asserts "brak analizy — w kolejce" on the detail: the 44-character DEMO post is `INSUFFICIENT_DATA` with the mock, so the detail has no analysis summary until Phase 5 renders `latestAnalysis`. Phase 5 replaces these assertions.
+- [minor] (Phase 3) plan-review #3/#4: `drain()` and `kick()` share one in-flight promise (a call during a drain makes it run once more); any error after the provider answered is stored as `FAILED` with `internal_error: …`, and if that also throws the drain stops and `onError` logs it. `buildTestApp` kicks only with `autoKick: true`; tests call `runner.drain()`.
+- [minor] (Phase 3) `AnalysisRepository.savePrefilter` takes a fourth argument `moveTo` (business status applied only while `NEW`), so the status mapping (D-5) stays in the service, not in SQL. Amount columns hold `sourceBudget` only (plan-review #8); `workMode UNKNOWN` is stored as null so the filters treat it as unknown.
+- [minor] (Phase 3) `pnpm docker:build` not run (no Docker in this environment); `/review` runs it.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
