@@ -85,11 +85,12 @@ test('main path: import, analysis, card, contact with follow-up, payment, pipeli
   await page.getByRole('link', { name: 'Lejek' }).click();
   const totals = page.getByRole('term').filter({ hasText: /./ });
   await expect(totals.first()).toBeVisible();
-  const total = (name: string) => page.locator('dt', { hasText: name }).locator('xpath=..');
-  await expect(total('Kontakt (wysłane)')).toContainText('1');
-  await expect(total('Wygrane')).toContainText('0');
-  await expect(total('Opłacone')).toContainText('1');
-  await expect(total('Opłacone')).toContainText(/1\s500,00 PLN/);
+  const total = (name: string) =>
+    page.locator('dt', { hasText: name }).locator('xpath=following-sibling::dd[1]');
+  await expect(total('Kontakt (wysłane)')).toHaveText('1');
+  await expect(total('Wygrane')).toHaveText('0');
+  // count "1" then the sum "1 500,00 PLN", exactly
+  await expect(total('Opłacone')).toHaveText(/^1\s*1\s500,00\sPLN$/);
   await expect(page.getByRole('heading', { name: 'Skontaktowano się (1)' })).toBeVisible();
   await assertNoOverflow(page);
   await evidence(page, 'pipeline-360.jpg');
