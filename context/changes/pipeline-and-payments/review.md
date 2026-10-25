@@ -114,7 +114,7 @@ Round 2 covers the fix commits `c625db4..4c343f0`; the round-1 *Plan vs diff* be
 - Fix: A (matches option B and the plan's claim): in `checkMove`, from `REJECTED`/`EXPIRED` allow only main targets up to `CONTACTED` (still `back`, note required), and add the three-step case `NEW → REJECTED → MEETING` (refused) to `status.test.ts` and the integration test. B (keeps reopening to any stage with a note as a deliberate correction): leave the code, fix the plan's R1 entry and D-1 to say reopening with a note may skip the contact, and add a test pinning that.
 - Effort: small
 - Lesson candidate: no (the lesson proposed in round 1 covers it)
-- Decision: open
+- Decision: fixed (bcb7215)
 
 ### R7: Round-1 deviations are outside *Deviations*, and three statements are now stale
 - Severity: minor
@@ -123,4 +123,4 @@ Round 2 covers the fix commits `c625db4..4c343f0`; the round-1 *Plan vs diff* be
 - Fix: move the three entries under *Deviations*; update the Phase 1 note, the D-1 `skipped` sentence and the `status.ts:67` comment to "from a main stage or from `NEEDS_VERIFICATION` (rank 0)"; name D-2 in the R5 entry (additive).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (bcb7215 for the `status.ts` comment; plan.md moved the three entries under *Deviations*, updated the Phase 1 note and D-1, and named D-2)
