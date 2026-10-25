@@ -66,7 +66,7 @@ Gates: typecheck ok, lint ok, unit tests ok (596), image fail (environment: Core
   (always bounded, but more code and a worker per import).
 - Effort: small
 - Lesson candidate: Every CPU-bound step on untrusted input must have an input bound or run where the deadline can stop it.
-- Decision: open
+- Decision: fixed (c5128c8) + lesson proposed
 
 ### R2: Any unexpected exception in the page fetcher becomes `network`, and an empty HTML page hits it
 - Severity: major
@@ -84,7 +84,7 @@ Gates: typecheck ok, lint ok, unit tests ok (596), image fail (environment: Core
   swallowed. Add tests for an empty HTML body.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (c5128c8)
 
 ### R3: The allow-list lets IPv4-compatible and other reserved IPv6 addresses through
 - Severity: minor
@@ -101,7 +101,7 @@ Gates: typecheck ok, lint ok, unit tests ok (596), image fail (environment: Core
   table.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (9c113aa)
 
 ### R4: No test shows that a redirect to another origin is checked against that origin's robots.txt
 - Severity: minor
@@ -115,4 +115,4 @@ Gates: typecheck ok, lint ok, unit tests ok (596), image fail (environment: Core
   `Disallow: /` for `LeadHunterAI` → 422 `robots_disallowed`, B's page never requested.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (bcd7734)
