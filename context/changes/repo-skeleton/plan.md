@@ -439,14 +439,19 @@ pnpm@12.15.0` in the root `package.json`.
 - [x] Phase 2: Env config and logger with redaction
 - [x] Phase 3: API server, database, health, OpenAPI and CLIs
 - [x] Phase 4: Web shell, static serving and e2e smoke
-- [ ] Phase 5: Docker image, compose, CI and docs
+- [x] Phase 5: Docker image, compose, CI and docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 4) Judge the Polish wording of the shell and whether it reads as an honest "nothing here yet" on a laptop and a phone-width window — run: `pnpm build && pnpm start`, open http://127.0.0.1:8080 — evidence: `context/changes/repo-skeleton/evidence/shell-360.png`
 
+- [ ] (Phase 5) On a machine with Docker (ideally the Pi): `mkdir -p data && cp .env.example .env`, set `OPERATOR_PASSWORD_HASH=placeholder`, run `docker compose up -d --build`; after ~30 s `docker compose ps` shows `healthy` and `curl 127.0.0.1:8080/api/health` returns 200; `docker compose restart` keeps `data/lead-hunter.db`; also `docker run --rm --entrypoint id -u`-style check that the user is 1000 and that running without the hash exits non-zero. Note the Pi build time (better-sqlite3 ARM64) — run: commands above — evidence: none (sandbox build blocked, see Deviations)
+- [ ] (Phase 5) After the PR is pushed, the GitHub Actions run shows all five jobs green (`mutation-report` summary reads "no target files changed" or a score) — run: open the PR checks — evidence: none
+
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [REVIEW] (Phase 5) `pnpm docker:build` fails in the sandbox: the build stage's `apt-get update` cannot resolve `deb.debian.org` (no DNS inside the build; base image pull works). Per *Risks*, the Dockerfile was not changed to work around it, so the image, the container smoke (non-root, migrations on start, healthcheck, refusal) and `docker-smoke.txt` are unverified here and left to the CI `image` job and the human check. Evidence file records this. Reviewer: the Dockerfile has never been built; check the CI `image` job first. `docker compose config -q` passes.
+- [minor] (Phase 5) `stryker.config.mjs` adds `plugins: ['@stryker-mutator/vitest-runner']`: with pnpm's isolated `node_modules`, Stryker's default plugin glob does not find the runner ("Cannot find TestRunner plugin vitest"). `pnpm mutation --mutate packages/config/src/env.ts` then runs: score 75.00 % (51 killed, 16 survived, 1 no coverage); report only.
 - [minor] (Phase 1) pnpm 12.15.0 does not honour `onlyBuiltDependencies`: `pnpm install` failed with `ERR_PNPM_IGNORED_BUILDS` for esbuild. `pnpm approve-builds` wrote `allowBuilds` instead, so `pnpm-workspace.yaml` uses `allowBuilds: {esbuild: true, better-sqlite3: true}`. Same intent as the plan and roadmap (better-sqlite3 stays approved).
 - [minor] (Phase 1) Plan-review finding 5 applied: fastify (api), zod (contracts) and jsdom (web) are added in Phase 1 so the phase is green. Finding 10 applied: `apps/api/test/network-isolation.test.ts` asserts that an unmocked `fetch` rejects.
 - [minor] (Phase 1) Root `typecheck` is `pnpm -r typecheck && tsc -p scripts/tsconfig.json`, so `scripts/` is typechecked too (it is not a workspace package).
