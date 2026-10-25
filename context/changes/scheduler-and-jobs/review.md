@@ -52,7 +52,7 @@ Gates: typecheck ok, lint ok, unit tests ok (47 files, 663 tests), e2e ok (5), i
 - Fix: On `busy`, retry `startCycle('schedule', slot)` every 30 s for a bounded window (for example 30 min); the `(job_type, scheduled_for)` unique index already makes repeats idempotent. Add a fake-timer test: a held lock at 08:00 released at 08:01 gives exactly one cycle with `scheduledFor` 08:00. Alternative with less behaviour change: insert a visible `failed` cycle row with reason `busy` and the slot key, so the skip shows in **Przebiegi**. Record the choice as a *Decisions* row.
 - Effort: small
 - Lesson candidate: Answer every plan-review finding of `major` or above with a *Decisions* row or a *Deviations* line before implementing.
-- Decision: open
+- Decision: fixed (1a75730) + lesson proposed
 
 ### R2: After a CLI crash in another container, the UI reports "Przebieg w toku." and disables **Uruchom teraz** until the next slot
 - Severity: minor
@@ -61,7 +61,7 @@ Gates: typecheck ok, lint ok, unit tests ok (47 files, 663 tests), e2e ok (5), i
 - Fix: Derive `running` from a live lock: a lock row exists and is not stale by the `acquire` rule (heartbeat within `LOCK_STALE_MS`, or a live pid on this host). Expose that as `JobLock.isHeld()` and use it in `jobs.list`. Alternatively, keep the button enabled and let the server answer 409 when the lock is really live.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (cd01681)
 
 ### R3: **Przebiegi** does not refresh after **Uruchom źródło**
 - Severity: minor
@@ -70,7 +70,7 @@ Gates: typecheck ok, lint ok, unit tests ok (47 files, 663 tests), e2e ok (5), i
 - Fix: Lift a `reloadJobs` callback (or a `version` counter) into `SourcesPage` and call it from `onChanged` together with `load`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (06331fa)
 
 ### R4: Graceful shutdown frees the lock but does not stop the in-flight cycle
 - Severity: minor
@@ -79,4 +79,4 @@ Gates: typecheck ok, lint ok, unit tests ok (47 files, 663 tests), e2e ok (5), i
 - Fix: In `shutdown`, set a `stopping` flag that the cycle's `shouldContinue` also checks, for example `() => !heart.lost() && !stopping`. Add one assertion to the existing "marks our live cycle interrupted" test: a second enabled source is not started after `shutdown`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (cd01681)
