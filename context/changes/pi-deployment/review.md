@@ -40,7 +40,7 @@ Gates: typecheck ok, lint ok, unit tests ok, e2e ok, image not run (no Docker da
 - Fix: match on argv, not on a substring: `const args = cmd.split("\0"); if (pid === "1" || Number(pid) === process.pid || !(args[0].endsWith("node") && args[1] === "apps/api/dist/server.js")) continue;` (or just require `args[0]` to be `node` and `args[1]` to be the server path). Print the pid with the result so the evidence shows which process was measured.
 - Effort: small
 - Lesson candidate: Identify a process by its exact argv, never by a substring of its cmdline, when an init wrapper or the probe itself can carry the same text.
-- Decision: open
+- Decision: fixed (3ff6a9e)
 
 ### R2: `pi-check.sh perf` exits 1 after a successful run and leaks the cookie jar
 - Severity: major
@@ -49,7 +49,7 @@ Gates: typecheck ok, lint ok, unit tests ok, e2e ok, image not run (no Docker da
 - Fix: make `jar` a global (`JAR=` at the top, like `container-smoke.sh`), or use `rm -f "${jar:-}"`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (3ff6a9e)
 
 ### R3: container smoke step 1 hangs instead of failing if the image starts without a hash
 - Severity: minor
@@ -58,7 +58,7 @@ Gates: typecheck ok, lint ok, unit tests ok, e2e ok, image not run (no Docker da
 - Fix: `out="$(timeout 60 docker run --rm --name "$NAME-nohash" ...)"`, treat exit 124 as "started" and `docker rm -f "$NAME-nohash"` in `cleanup`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (3ff6a9e)
 
 ### R4: README offline section says the panel works over LAN, but the port is loopback-only
 - Severity: minor
@@ -67,4 +67,4 @@ Gates: typecheck ok, lint ok, unit tests ok, e2e ok, image not run (no Docker da
 - Fix: say "na Pi (przeglądarka lokalna albo `ssh -L 8080:127.0.0.1:8080 pi`)" or, if a tailnet peer on the same LAN still works offline, say that and leave it as a human check; adjust the human-check wording to match.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (3ff6a9e)
