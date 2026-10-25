@@ -321,13 +321,15 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 - [x] Phase 2: Contracts, schema and shared ingest
 - [x] Phase 3: Sources service, RSS adapter, routes and CLI (checkpoint)
 - [x] Phase 4: Sources view
-- [ ] Phase 5: Fixture recorder and documentation
+- [x] Phase 5: Fixture recorder and documentation
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 3) Real feeds answer and map as assumed — run (machine with internet): `pnpm dev`, log in, then `curl -b <cookie> -X POST localhost:8080/api/sources -H 'content-type: application/json' -d '{"preset":"hn-freelance"}'`, the same for `wwr-programming`, then `POST /api/sources/<id>/run` for both (or `pnpm discover`); record counts and one sample signal (title, URL, date) in `evidence/real-run.md` — evidence: none yet (agent sandbox cannot reach hnrss.org or weworkremotely.com)
 - [ ] (Phase 3) Preset URLs and terms links in `apps/api/src/modules/sources/presets.ts` are right (hnrss `whoishiring/freelancer` and `jobs?q=contract`; WWR `remote-programming-jobs`, `remote-full-stack-programming-jobs`, `remote-back-end-programming-jobs`, `remote-devops-sysadmin-jobs`; WWR/hnrss terms pages), and the hnrss title pattern `New comment by …` of D-12 holds — run: open each URL, `curl -sI <url>` expects 200 — evidence: none
 - [ ] (Phase 4) Sources view at 360 px and on a laptop: add a preset, toggle off/on, press **Uruchom teraz** and **Sprawdź** (with network, or against an unreachable URL added by hand) and read result and error texts; health (OK / błąd) readable without colour — run: `pnpm dev`, open `/zrodla` after login — evidence: none (agent sandbox has no Playwright Chromium; screenshot with one OK and one failing source to be added by the person)
+- [ ] (Phase 5) Record fixtures and review them — run (machine with internet, sources added): `pnpm fixtures:record <id of hn-freelance>` and `pnpm fixtures:record <id of a WWR source>`; open each file in `apps/api/test/fixtures/feeds/` and confirm it holds no real e-mail, handle, phone number, company link or client name (the anonymiser is best-effort: company names and free text stay), then commit and run `pnpm test` (the files join `parse-feed.test.ts` via `it.each`, D-14) — evidence: `evidence/anonymise-sample.txt` shows the anonymiser on a synthetic input
+- [ ] (Phase 5) `docs/source-policy.md` matches the hnrss and WWR terms pages (entries marked `DO WERYFIKACJI`) — run: open the two terms links in the document — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -346,6 +348,10 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 - [minor] (Phase 3) `createSourceRuntime` (`infrastructure/sources/compose.ts`) is the single wiring point for server, CLI and tests; `SourceFailureReason` has no change. Integration case (e) covers an HTTP-date `Retry-After` (plan-review #5).
 - [minor] (Phase 4) No Playwright screenshot: Chromium is not installed in the agent sandbox and installing tools is off-limits (autonomy §4); the screenshot is part of the open human check. No automated web test (D-17).
 - [minor] (Phase 4) Strings live under `strings.sources`; failure reasons reuse `strings.opportunities.sourceFailure`. A source counts as failing when its last error is not older than its last success.
+- [minor] (Phase 5) Plan-review #8 applied: the recorder is `apps/api/src/cli/fixtures-record.ts` with an API script and a root script that delegates (`pnpm fixtures:record <id>`), not `scripts/`. The anonymising step is a pure function in `infrastructure/sources/rss/anonymise-feed.ts`.
+- [minor] (Phase 5) Plan-review #14 applied: besides e-mail and `dc:creator`/`author`, the anonymiser replaces every URL inside an entry except that entry's own link, and phone-like numbers (ISO dates kept). Company names and free text cannot be detected, so the person's review is an explicit human check.
+- [minor] (Phase 5) Plan-review #10: fixture file is named by preset id (`hn-freelance.xml`); the `context/test-plan.md` cookbook example is updated to match (and to the `/whoishiring/freelancer` path of the preset).
+- [minor] (Phase 5) No automated test for the anonymiser (D-17 budget; the risk is not marked `test`); checked by hand on a synthetic input, output in `evidence/anonymise-sample.txt`. The recorder refuses to write a file that does not parse into at least one entry.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

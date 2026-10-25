@@ -87,5 +87,6 @@ Run the app: `docker compose up --build` (D-14); needs `mkdir -p data` and `.env
 | `pnpm build` | build packages, API and web |
 | `pnpm start` | run the built API (serves the built web) |
 | `pnpm db:migrate` | apply migrations to `${DATA_DIR}/lead-hunter.db` (dev: `apps/api/data/lead-hunter.db`) |
-| `pnpm discover` | source discovery CLI (prints `brak skonfigurowanych źródeł` until sources exist) |
+| `pnpm discover` | run every enabled source once (prints `brak skonfigurowanych źródeł` with none) |
+| `pnpm fixtures:record <source-id>` | record an anonymised feed fixture into `apps/api/test/fixtures/feeds/` (needs internet) |
 | `pnpm docker:build` | build the image `lead-hunter-ai:local` |

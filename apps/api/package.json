@@ -11,7 +11,8 @@
     "db:migrate": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/migrate.ts",
     "db:generate": "drizzle-kit generate",
     "auth:hash": "node --conditions=source --import tsx src/cli/auth-hash.ts",
-    "discover": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/discover.ts"
+    "discover": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/discover.ts",
+    "fixtures:record": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/fixtures-record.ts"
   },
   "dependencies": {
     "@fastify/cookie": "11.1.3",
