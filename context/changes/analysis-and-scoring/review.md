@@ -116,7 +116,7 @@ Round 2 re-checked the fix commits `54c05d7..01de258` against R1-R6. All six are
 - Fix: in `quoteStates`, also require the quote's currency token (`PLN|zł|EUR|€|USD|$`, mapped as in the mock) to map to `budget.currency`, and require the quote not to start or end inside a number in the source (find the squashed quote in the squashed source and reject when the character before its first digit, or after its last digit, is a digit or a `[ .,]` followed/preceded by a digit). Add both cases to `output-guard.test.ts`.
 - Effort: small
 - Lesson candidate: no (covered by the R2 lesson candidate)
-- Decision: open
+- Decision: fixed (2143ff0)
 
 ### R8: Mock reads a comma thousands separator as the start of a new number
 - Severity: minor
@@ -125,4 +125,4 @@ Round 2 re-checked the fix commits `54c05d7..01de258` against R1-R6. All six are
 - Fix: accept a comma as a thousands separator when followed by exactly three digits and not by a decimal pair (`\d{1,3}(?:[ .,]\d{3})+(?:[.,]\d{1,2})?`, and keep the decimal tail rule), and make the start lookbehind also reject a preceding `[ .,]\d` group (e.g. `(?<![\d][ .,]?)`), so a match never begins mid-number. Add "Budget: 1,500 USD" and "1,500.50 USD" to `mock.test.ts`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (476211b)
