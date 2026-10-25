@@ -94,8 +94,9 @@ export function buildCard(data: OpportunityDetail): CardSection[] {
   const component = (key: string) => breakdown?.components.find((c) => c.key === key);
   const skillFit = component('skillFit');
 
-  const excerpt = source.snippet.slice(0, EXCERPT_CHARS);
-  const rest = source.snippet.slice(EXCERPT_CHARS);
+  const chars = Array.from(source.snippet);
+  const excerpt = chars.slice(0, EXCERPT_CHARS).join('');
+  const rest = chars.length > EXCERPT_CHARS;
 
   const scoreItems: CardItem[] = [
     item('score', t.items.scoreTotal, score === null ? null : String(score), 'rules'),
@@ -219,7 +220,7 @@ export function buildCard(data: OpportunityDetail): CardSection[] {
             : null,
           'estimate',
         ),
-        item('assumptions', t.items.assumptions, analysed?.pricingAssumptions, 'estimate'),
+        item('assumptions', t.items.assumptions, analysed?.pricingAssumptions, 'inference'),
         item(
           'sourceBudget',
           t.items.sourceBudget,

@@ -166,12 +166,13 @@ describe('buildCard', () => {
       'missing',
       'questions',
       'nextAction',
+      'assumptions',
     ]) {
       expect(tag(id), id).toBe('inference');
     }
     for (const id of ['title', 'excerpt', 'sourceFacts', 'sourceBudget'])
       expect(tag(id), id).toBe('source');
-    for (const id of ['price', 'hours', 'assumptions']) expect(tag(id), id).toBe('estimate');
+    for (const id of ['price', 'hours']) expect(tag(id), id).toBe('estimate');
     for (const id of [
       'score',
       'confidence',
@@ -211,6 +212,18 @@ describe('buildCard', () => {
     const excerpt = byId(card, 'excerpt');
     expect((excerpt.value as string).length).toBe(600);
     expect(excerpt.more).toHaveLength(700);
+  });
+
+  it('cuts the excerpt by code point, never inside an emoji', () => {
+    const emoji = detail({
+      source: {
+        ...states.analysed!.source,
+        snippet: `${'a'.repeat(599)}😀${'b'.repeat(50)}`,
+      },
+    });
+    const value = byId(buildCard(emoji), 'excerpt').value as string;
+    expect(value.isWellFormed()).toBe(true);
+    expect(Array.from(value)).toHaveLength(600);
   });
 
   it.each(['pending', 'skipped'])('invents nothing without an analysis (%s)', (name) => {
