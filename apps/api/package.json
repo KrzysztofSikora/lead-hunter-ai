@@ -10,6 +10,7 @@
     "typecheck": "tsc -p tsconfig.json",
     "db:migrate": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/migrate.ts",
     "db:generate": "drizzle-kit generate",
+    "auth:hash": "node --conditions=source --import tsx src/cli/auth-hash.ts",
     "discover": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/discover.ts"
   },
   "dependencies": {

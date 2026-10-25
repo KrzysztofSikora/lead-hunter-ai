@@ -1,0 +1,1 @@
+scrypt:15:8:3:<salt>:<key> (matches the pattern, one line)

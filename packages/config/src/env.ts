@@ -12,6 +12,17 @@ export const ENV_VARIABLES = [
   'OPERATOR_PASSWORD_HASH',
 ] as const;
 
+/** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
+export const PASSWORD_HASH_PATTERN =
+  /^scrypt:(\d{1,2}):(\d{1,2}):(\d{1,2}):[A-Za-z0-9_-]{22}:[A-Za-z0-9_-]{43}$/;
+
+function isValidPasswordHash(value: string): boolean {
+  const match = PASSWORD_HASH_PATTERN.exec(value);
+  if (!match) return false;
+  const [ln, r, p] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  return ln >= 10 && ln <= 20 && r >= 1 && r <= 32 && p >= 1 && p <= 16;
+}
+
 // An empty string counts as unset, so `FOO=` in .env falls back to the default.
 const optional = <T extends z.ZodType>(schema: T) =>
   z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
@@ -23,7 +34,11 @@ export const EnvSchema = z
     PORT: optional(z.coerce.number().int().min(1).max(65535)),
     DATA_DIR: optional(z.string()),
     LOG_LEVEL: optional(z.enum(LOG_LEVELS)),
-    OPERATOR_PASSWORD_HASH: optional(z.string()),
+    OPERATOR_PASSWORD_HASH: optional(
+      z.string().refine(isValidPasswordHash, {
+        message: 'nieprawidłowy format — wygeneruj hash poleceniem pnpm auth:hash',
+      }),
+    ),
   })
   .superRefine((env, ctx) => {
     const host = env.HOST ?? '127.0.0.1';

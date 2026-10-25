@@ -258,15 +258,18 @@ Migration `0001_*`: `sessions` as in D-3. No foreign keys. Nothing else changes.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Password hash, `pnpm auth:hash` and config validation
+- [x] Phase 1: Password hash, `pnpm auth:hash` and config validation
 - [ ] Phase 2: Sessions, auth API, guard and throttle
 - [ ] Phase 3: Login form, logout, e2e and docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 1) `pnpm auth:hash` on a terminal: password not echoed, mismatch refused, printed line pasted into `.env` lets `HOST=0.0.0.0 pnpm start` start — run: `pnpm auth:hash` then `HOST=0.0.0.0 pnpm start` — evidence: context/changes/operator-login/evidence/auth-hash-output.txt (piped run only; the TTY prompt needs a person)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] Phase 1: plan-review finding 4 applied: `packages/config` bounds the hash parameters (ln 10–20, r 1–32, p 1–16) after the pattern match; tests cover out-of-range values. The existing canary hashes in `health.int.test.ts` and `logging.int.test.ts` became well-formed hashes (they still contain `LEAK-CANARY`), since a placeholder no longer passes config.
+- [minor] Phase 1: plan-review finding 5 applied: `.env.example` and README say the Docker form needs an existing (possibly empty) `.env`.
 - [FOLLOW-UP] Invalidate all sessions when `OPERATOR_PASSWORD_HASH` changes, or offer "log out
   everywhere" (see *Risks*). Not in S-01's acceptance.
 

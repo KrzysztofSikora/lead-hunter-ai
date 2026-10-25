@@ -15,7 +15,8 @@ the roadmap is tracked as GitHub issues.
 ```sh
 mkdir -p data
 cp .env.example .env
-# w .env ustaw OPERATOR_PASSWORD_HASH (na razie dowolna niepusta wartość zastępcza, do slice'a S-01)
+# w .env ustaw OPERATOR_PASSWORD_HASH: wynik polecenia `pnpm auth:hash` albo, tylko z Dockerem,
+# `docker compose run --rm --no-deps app node apps/api/dist/cli/auth-hash.js` (potrzebuje istniejącego .env)
 docker compose up --build
 ```
 

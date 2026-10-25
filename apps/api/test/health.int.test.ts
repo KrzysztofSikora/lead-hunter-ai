@@ -16,7 +16,10 @@ describe('GET /api/health (FR-20 AC5)', () => {
 
   it('exposes no config values or secrets', async () => {
     const { app, dir } = await buildTestApp({
-      env: { OPERATOR_PASSWORD_HASH: 'hash-LEAK-CANARY', HOST: '0.0.0.0' },
+      env: {
+        OPERATOR_PASSWORD_HASH: `scrypt:15:8:3:LEAK-CANARY${'A'.repeat(11)}:${'B'.repeat(43)}`,
+        HOST: '0.0.0.0',
+      },
     });
     const text = (await app.inject('/api/health')).body;
     expect(text).not.toContain('LEAK-CANARY');
