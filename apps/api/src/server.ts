@@ -19,7 +19,10 @@ import { createPipelineRepository } from './infrastructure/db/pipeline-repositor
 import { createProfileRepository } from './infrastructure/db/profile-repository.js';
 import { createSignalRepository } from './infrastructure/db/signal-repository.js';
 import { createSessionRepository } from './infrastructure/db/session-repository.js';
-import { noSourcesYet } from './infrastructure/sources/source-status.js';
+import { createHttpClient } from './infrastructure/sources/http/client.js';
+import { createPageFetcher } from './infrastructure/sources/manual/page-fetcher.js';
+import { createRobotsCheck } from './infrastructure/sources/manual/robots.js';
+import { createSourceRuntime } from './infrastructure/sources/compose.js';
 import { createLoggerOptions } from './infrastructure/logging/logger.js';
 import { VERSION } from './version.js';
 
@@ -59,6 +62,8 @@ async function main(): Promise<void> {
   // The profile row is created by the profile routes at build time; read lazily.
   const profileService = createProfileService(profileDeps);
   let logger: { error: (message: string) => void } = { error: () => undefined };
+  let logInfo: (message: string) => void = () => undefined;
+  let logWarn: (message: string) => void = () => undefined;
   const runner = createAnalysisRunner({
     repository: createAnalysisRepository(db),
     provider: createLlmProvider(config.llm),
@@ -69,6 +74,27 @@ async function main(): Promise<void> {
     ...llmRunnerDeps(config.llm),
     onError: (error) =>
       logger.error(`analysis drain failed: ${error instanceof Error ? error.message : 'error'}`),
+  });
+  // S-09 D-12: one guarded client for every outbound source request.
+  const http = createHttpClient({
+    userAgent: `LeadHunterAI/${VERSION} (+https://github.com/KrzysztofSikora/lead-hunter-ai)`,
+    maxBytes: config.fetchMaxBytes,
+  });
+  const pageFetcher = createPageFetcher({
+    http,
+    robots: createRobotsCheck({ http, userAgentToken: 'LeadHunterAI', clock }),
+    timeoutMs: config.fetchTimeoutMs,
+    maxTextChars: config.importMaxTextChars,
+    clock,
+    logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
+  });
+  const sourceRuntime = createSourceRuntime({
+    db,
+    config,
+    http,
+    clock,
+    onSignalCreated: () => runner.kick(),
+    logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
   });
   const app = await buildApp({
     config,
@@ -81,22 +107,25 @@ async function main(): Promise<void> {
       tokens: randomTokenSource,
     },
     profile: profileDeps,
-    signals: { repository: createSignalRepository(db), clock },
+    signals: { repository: createSignalRepository(db), clock, pageFetcher },
     onSignalCreated: () => runner.kick(),
     opportunities: {
       repository: createOpportunityRepository(db),
       activity: createActivityRepository(db),
       payments: createPaymentRepository(db),
-      sourceStatus: noSourcesYet,
+      sourceStatus: sourceRuntime.statusReader,
       clock,
     },
     pipeline: { repository: createPipelineRepository(db), clock },
     analysis: runner,
+    sources: sourceRuntime.service,
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });
 
   logger = app.log;
+  logInfo = (message) => app.log.info(message);
+  logWarn = (message) => app.log.warn(message);
   const ANALYSIS_INTERVAL_MS = 10 * 60_000;
   // D-4: work held back by the daily limit resumes on a later tick; S-12 replaces this timer.
   const timer = setInterval(() => runner.kick(), ANALYSIS_INTERVAL_MS);

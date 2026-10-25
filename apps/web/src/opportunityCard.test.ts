@@ -86,6 +86,7 @@ const detail = (overrides: Partial<OpportunityDetail>): OpportunityDetail => ({
   prefilter: null,
   source: {
     type: 'manual_text',
+    name: null,
     url: null,
     canonicalUrl: null,
     title: 'DEMO title',

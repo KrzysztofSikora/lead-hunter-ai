@@ -37,3 +37,15 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: pipeline-and-payments, R1
 - Scope: transition and state-machine code (`packages/contracts/src/status.ts` and its tests)
 - Status: proposed in the PR for pipeline-and-payments
+
+## Bound every CPU-bound step on untrusted input, or run it where the deadline can stop it
+- Why: Readability is superlinear in nesting depth, so a 22 KB page blocked the single Node process for two minutes; an `AbortSignal` deadline cannot interrupt synchronous code. The parser itself (linkedom) was superlinear too, so bound the input before the first parse, and test with a body of the maximum allowed size, not a small one.
+- Seen in: url-import-guard, R1, R5
+- Scope: `apps/api/src/infrastructure/sources/**` and any parser or extractor of fetched content
+- Status: proposed in the PR for url-import-guard
+
+## Bound every date or time that comes from a source to the range the contract can serialise before storing it
+- Why: a feed date and a `Retry-After` date in year 12026 were stored as valid, then made `GET /api/opportunities` and `GET /api/sources` answer 500 for good.
+- Seen in: rss-sources, R1, R2
+- Scope: parsers and services that store source-supplied dates, delays or counts (`apps/api/src/infrastructure/sources/**`, `apps/api/src/modules/sources/**`)
+- Status: proposed in the PR for rss-sources

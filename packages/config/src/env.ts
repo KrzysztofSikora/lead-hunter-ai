@@ -23,6 +23,10 @@ export const ENV_VARIABLES = [
   'LLM_JSON_MODE',
   'ANALYSIS_DAILY_LIMIT',
   'PREFILTER_MAX_AGE_DAYS',
+  'FETCH_TIMEOUT_MS',
+  'FETCH_MAX_BYTES',
+  'SOURCE_MIN_INTERVAL_MINUTES',
+  'SOURCE_MAX_ATTEMPTS',
 ] as const;
 
 /** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
@@ -75,6 +79,10 @@ export const EnvSchema = z
     LLM_JSON_MODE: optional(z.enum(['json_object', 'off'])),
     ANALYSIS_DAILY_LIMIT: optional(z.coerce.number().int().min(1).max(1_000)),
     PREFILTER_MAX_AGE_DAYS: optional(z.coerce.number().int().min(1).max(365)),
+    FETCH_TIMEOUT_MS: optional(z.coerce.number().int().min(1_000).max(60_000)),
+    FETCH_MAX_BYTES: optional(z.coerce.number().int().min(65_536).max(5_242_880)),
+    SOURCE_MIN_INTERVAL_MINUTES: optional(z.coerce.number().int().min(60).max(1_440)),
+    SOURCE_MAX_ATTEMPTS: optional(z.coerce.number().int().min(1).max(5)),
   })
   .superRefine((env, ctx) => {
     const missing = (path: string, message: string) =>
@@ -137,6 +145,14 @@ export interface Config {
   analysisDailyLimit: number;
   /** Sources older than this many days are pre-filtered out (D-6). */
   prefilterMaxAgeDays: number;
+  /** One deadline for everything a URL import fetches: robots.txt, redirects, headers, body (D-8). */
+  fetchTimeoutMs: number;
+  /** Largest single HTTP response body the shared client reads, in bytes (D-8). */
+  fetchMaxBytes: number;
+  /** Shortest time between two attempts on one source (A-03), in minutes (S-10 D-5). */
+  sourceMinIntervalMinutes: number;
+  /** Requests one source run may make while the source answers 429/503 (S-10 D-6). */
+  sourceMaxAttempts: number;
 }
 
 export interface ConfigIssue {
@@ -162,6 +178,10 @@ const EXPECTED: Record<string, string> = {
   IMPORT_MAX_TEXT_CHARS: 'oczekiwano liczby całkowitej 1000–200000',
   ANALYSIS_DAILY_LIMIT: 'oczekiwano liczby całkowitej 1–1000',
   PREFILTER_MAX_AGE_DAYS: 'oczekiwano liczby całkowitej 1–365',
+  FETCH_TIMEOUT_MS: 'oczekiwano liczby całkowitej 1000–60000',
+  FETCH_MAX_BYTES: 'oczekiwano liczby całkowitej 65536–5242880',
+  SOURCE_MIN_INTERVAL_MINUTES: 'oczekiwano liczby całkowitej 60–1440',
+  SOURCE_MAX_ATTEMPTS: 'oczekiwano liczby całkowitej 1–5',
   LLM_PROVIDER: 'oczekiwano: mock, anthropic lub openai-compatible',
   LLM_MONTHLY_BUDGET_USD: 'oczekiwano liczby 0.01–100000 (USD)',
   LLM_PAID: 'oczekiwano true lub false',
@@ -213,6 +233,10 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     importMaxTextChars: v.IMPORT_MAX_TEXT_CHARS ?? 20_000,
     analysisDailyLimit: v.ANALYSIS_DAILY_LIMIT ?? 20,
     prefilterMaxAgeDays: v.PREFILTER_MAX_AGE_DAYS ?? 30,
+    fetchTimeoutMs: v.FETCH_TIMEOUT_MS ?? 20_000,
+    fetchMaxBytes: v.FETCH_MAX_BYTES ?? 1_048_576,
+    sourceMinIntervalMinutes: v.SOURCE_MIN_INTERVAL_MINUTES ?? 60,
+    sourceMaxAttempts: v.SOURCE_MAX_ATTEMPTS ?? 3,
     ...(llm ? { llm } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };

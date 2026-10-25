@@ -46,6 +46,7 @@ export {
   Confidence,
   DEFAULT_IMPORT_MAX_TEXT_CHARS,
   Evidence,
+  FetchFailureReason,
   LatestAnalysis,
   EvidenceLevel,
   ImportResult,
@@ -56,7 +57,9 @@ export {
   OpportunityListQuery,
   OpportunitySummary,
   PrefilterOutcome,
+  SourceError,
   SourceFacts,
+  SourceFailureReason,
   SourcesStatus,
   SourceType,
 } from './opportunities.js';
@@ -82,3 +85,13 @@ export {
   PipelineItem,
   PipelineResponse,
 } from './pipeline.js';
+export {
+  CreateSourceRequest,
+  RssConfig,
+  Source,
+  SourceHealth,
+  SourceList,
+  SourcePreset,
+  SourceRunResult,
+  UpdateSourceRequest,
+} from './sources.js';

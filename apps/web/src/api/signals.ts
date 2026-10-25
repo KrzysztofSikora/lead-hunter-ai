@@ -11,7 +11,7 @@ export async function importSignal(body: ImportRequest): Promise<ImportOutcome> 
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (response.status === 200 || response.status === 201) {
+  if (response.status === 200 || response.status === 201 || response.status === 422) {
     return { ok: true, result: ImportResult.parse(await response.json()) };
   }
   if (response.status === 400) {

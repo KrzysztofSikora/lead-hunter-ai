@@ -59,6 +59,7 @@ const isoOrNull = (ms: number | null): string | null => (ms === null ? null : is
 function sourceFacts(row: OpportunityRow) {
   return {
     type: row.sourceType,
+    name: row.sourceName,
     url: row.sourceUrl,
     canonicalUrl: row.canonicalUrl,
     title: row.title,

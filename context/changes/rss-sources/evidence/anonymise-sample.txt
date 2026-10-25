@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><channel><title>T</title><link>https://hnrss.org/x</link>
+
+    <item><title>A</title><link>https://news.ycombinator.com/item?id=1</link><dc:creator>DEMO</dc:creator><guid>https://news.ycombinator.com/item?id=1</guid><pubDate>Mon, 05 Oct 2026 09:30:00 +0000</pubDate><description><![CDATA[<p>mail demo@example.com tel +00 000 000 000 see https://example.com/demo and 2026-10-05 ok</p>]]></description></item>
+    <item><title>B</title><link>https://news.ycombinator.com/item?id=2</link><description>&lt;a href=&quot;https://example.com/demo&quot;&gt;me&lt;/a&gt;</description></item>
+    <item><title>C</title></item>
+    <item><title>D</title></item>
+    <item><title>E</title></item>
+    
+</channel></rss>
+
