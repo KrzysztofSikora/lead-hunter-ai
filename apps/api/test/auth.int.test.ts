@@ -122,6 +122,16 @@ describe('operator session (FR-20, TR-13)', () => {
     ).toBe(401);
   });
 
+  it('re-issues the cookie with a fresh Max-Age once an hour, not on every request', async () => {
+    const clock = new FakeClock();
+    const { app } = await buildTestApp({ clock });
+    const cookie = await loginAsOperator(app);
+    const check = () => app.inject({ url: '/api/auth/session', headers: { cookie } });
+    clock.advance(2 * 60 * 60 * 1000);
+    expect((await check()).headers['set-cookie']).toContain('Max-Age=2592000');
+    expect((await check()).headers['set-cookie']).toBeUndefined();
+  });
+
   it('keeps several devices logged in at once', async () => {
     const { app } = await buildTestApp();
     const phone = await loginAsOperator(app);
