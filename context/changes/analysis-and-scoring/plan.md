@@ -377,7 +377,7 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Analysis contracts and the scoring rubric
-- [ ] Phase 2: Pre-filter, output guard and mock provider
+- [x] Phase 2: Pre-filter, output guard and mock provider
 - [ ] Phase 3: Storage, runner and configuration
 - [ ] Phase 4: Status route, DTOs and list filters
 - [ ] Phase 5: Web views, e2e and README
@@ -390,6 +390,11 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 - [minor] (Phase 1) plan-review #1: `SKIPPED` added to `AnalysisStatus` in Phase 1 (not Phase 4), with the placeholder label `analysisSkipped` in `strings.pl.ts` and the list falling through to it, so no later phase can break response serialization.
 - [REVIEW] (Phase 1) plan-review #7: profitability scores only a budget stated by the source; a model-proposed price (hypothesis) is neutral 5, because judging it against the profile's own rates is circular. The plan's Rubric row said "sourceBudget else proposedPrice"; `docs/scoring.md` states the new rule. Alternative: score the proposed price too (every budget-less mock result with rates would get 15/15).
 - [minor] (Phase 1) plan-review #9: `confidenceFor` takes only `ANALYSED` results; `INSUFFICIENT_DATA` rows get no score and no confidence (both stay null), decided in Phase 3.
+
+- [minor] (Phase 2) plan-review #5: the evidence guard's category rule is independent of the evidence level (`DIRECT_GIG`/`B2B_SUBCONTRACT` without a hiring/payment cue become `UNMET_NEED` whatever the level); tested in `output-guard.test.ts`.
+- [minor] (Phase 2) plan-review #6: `too_old` and `no_profile_match` cannot fire for manual imports (reachable from S-10 sources). Added a small rule table in `prefilter.test.ts` (TR-25 allows `none`, does not require it) covering every rule reachable now, so `prefilter.ts` has fewer mutation survivors; `no_profile_match` has no test because `SourceType` has only manual values.
+- [minor] (Phase 2) Added `mock.test.ts` and `warsaw-day.test.ts` (plan said the mock is proved end to end in Phase 3); both are cheap and pin D-15 and the DST cases early.
+- [minor] (Phase 2) `ports.ts` also defines the repository record types (`CompletedAnalysis`, `FailedAnalysis`, `PendingOpportunity`, `WaitingOpportunity`); Phase 3 may adjust their shape when the SQLite repository is written.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

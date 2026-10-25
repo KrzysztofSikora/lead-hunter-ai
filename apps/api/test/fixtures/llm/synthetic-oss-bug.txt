@@ -1,0 +1,4 @@
+DEMO: Bug report in a fictional open-source library "demo-parser".
+The parser crashes on startup when the config file contains an empty section. Steps to reproduce:
+1. create an empty [section] in demo.toml, 2. run demo-parser, 3. see the error "unexpected end of input".
+Expected: the empty section is ignored. This is an error in the library, not a job offer.
