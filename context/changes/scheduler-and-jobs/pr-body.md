@@ -92,4 +92,3 @@ Base `main`, branch `change/scheduler-and-jobs`, started 2026-10-25 16:23 UTC. N
 Total before this step: about $10.32. Every step had one attempt.
 </details>
 
-https://claude.ai/code/session_01L7xnPWXcnFkaxbXFZSCLFq
