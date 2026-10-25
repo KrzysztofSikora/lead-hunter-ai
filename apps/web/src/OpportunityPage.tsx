@@ -3,8 +3,9 @@ import { Link, useParams } from 'react-router';
 import type { ActivityEvent, OpportunityDetail } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
 import { CardActions } from './CardActions.js';
+import { CardPipeline } from './CardPipeline.js';
 import { getOpportunity } from './api/opportunities.js';
-import { buildCard, type CardItem, type CardSection } from './opportunityCard.js';
+import { buildCard, eventDetails, type CardItem, type CardSection } from './opportunityCard.js';
 import { strings } from './strings.pl.js';
 import { formatWarsaw } from './warsawTime.js';
 
@@ -141,6 +142,7 @@ function Section({
       </h3>
       {section.emptyReason && <p className={styles.emptyReason}>{section.emptyReason}</p>}
       {section.key === 'actions' && <CardActions data={data} onChange={onChange} />}
+      {section.key === 'actions' && <CardPipeline data={data} onChange={onChange} />}
       {section.items.length > 0 && (
         <dl className={styles.facts}>
           {section.items.map((item) => (
@@ -212,7 +214,12 @@ function History({ events, createdAt }: { events: ActivityEvent[]; createdAt: st
       {events.map((event) => (
         <li key={event.id}>
           <strong>{formatWarsaw(event.occurredAt)}</strong> ·{' '}
-          {event.type === 'NOTE' ? h.note : h.statusChange} ({h[event.actor]})
+          {event.type === 'NOTE'
+            ? h.note
+            : event.type === 'FOLLOW_UP'
+              ? h.followUp
+              : h.statusChange}{' '}
+          ({h[event.actor]})
           {event.type === 'STATUS_CHANGE' && event.toStatus && (
             <>
               {': '}
@@ -220,6 +227,7 @@ function History({ events, createdAt }: { events: ActivityEvent[]; createdAt: st
               {list.businessStatus[event.toStatus]}
             </>
           )}
+          {eventDetails(event).map((part) => ` — ${part}`)}
           {event.reason && ` — ${h.reason}: ${t.actions.reasons[event.reason]}`}
           {event.cause?.kind === 'prefilter' &&
             ` — ${h.prefilter(strings.prefilterRules[event.cause.rule])}`}

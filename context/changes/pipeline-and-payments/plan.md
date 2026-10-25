@@ -256,11 +256,12 @@ Observably true when done:
 - [x] Phase 1: Transition rules and the widened status API
 - [x] Phase 2: Follow-ups and payments
 - [x] Phase 3: Pipeline summary API
-- [ ] Phase 4: Card: status panel, contact, follow-up, payments
+- [x] Phase 4: Card: status panel, contact, follow-up, payments
 - [ ] Phase 5: Pipeline view, "Na dziś" and the main-path e2e
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 4) Card at 360 px and on a laptop: "Zmień status" wording, required-note hint on a back move, WON contract fields, follow-up and payment forms; typing "1234,50" PLN shows "1 234,50 PLN" — run: `docker compose up --build`, import a DEMO post, open its card at /okazje/<id>, Zapisz → Oznacz jako kontakt → Zmień status → Wygrana — evidence: none (the main-path e2e in Phase 5 adds screenshots)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -302,6 +303,10 @@ Observably true when done:
   the detail is its only history.
 - [minor] Phase 3: `contacted` counts distinct opportunities with an operator `STATUS_CHANGE` to CONTACTED, REPLIED, MEETING, WON or LOST, or with `CONTACTED` in `skipped` (the [REVIEW] note of Phase 1); `json_each` worked in the bundled SQLite, so no TypeScript fallback. `followUpsDue` uses `FOLLOW_UP_STATUSES`.
 - [minor] Phase 3: `PIPELINE_STAGES` and `PIPELINE_STAGE_LIMIT` live in `packages/contracts/src/pipeline.ts` so the web can reuse the stage order in Phase 5.
+- [minor] Phase 4: plan-review finding 2 applied: `e2e/smoke.spec.ts` now asserts "Oznacz jako kontakt" enabled; `pnpm e2e` ran as a Phase 4 check (4 passed).
+- [minor] Phase 4: plan-review finding 9 applied: `formatMinor(minor, currency)` in `strings.pl.ts` (U+00A0 groups, decimal comma), pinned in `strings.pl.test.ts`; web reuses the contracts `calendarDate` (finding 10).
+- [minor] Phase 4: labels "Notatka do zmiany statusu" and "Notatka do płatności" keep `getByLabel('Notatka', { exact: true })` in the smoke spec unambiguous. Added `warsawToday` / `formatCalendarDate` to `warsawTime.ts` and `eventDetails` to `opportunityCard.ts` (history lines for skipped stages, contract, follow-up).
+- [minor] Phase 4: the "Przygotuj ofertę, Oznacz jako kontakt: dostępne w kolejnej wersji" note now covers only the offer button (`offerLater`).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

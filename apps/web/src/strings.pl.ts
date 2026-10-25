@@ -1,3 +1,9 @@
+/** `150000` + `PLN` → `1 500,00 PLN` (U+00A0 groups); amounts are never converted between currencies. */
+export function formatMinor(minor: number, currency: string): string {
+  const units = String(Math.trunc(minor / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  return `${units},${String(minor % 100).padStart(2, '0')} ${currency}`;
+}
+
 export const strings = {
   appName: 'Lead Hunter AI',
   tagline:
@@ -209,7 +215,20 @@ export const strings = {
       note: 'Dodaj notatkę',
       offer: 'Przygotuj ofertę',
       contact: 'Oznacz jako kontakt',
-      later: 'dostępne w kolejnej wersji',
+      offerLater: 'Przygotuj ofertę: dostępne w kolejnej wersji',
+      changeStatus: 'Zmień status',
+      targetLabel: 'Nowy status',
+      targetPlaceholder: 'wybierz status',
+      confirmStatus: 'Zmień status',
+      statusNote: 'Notatka do zmiany statusu',
+      noteRequired: 'Ten ruch wymaga notatki.',
+      noteRequiredError: 'Cofnięcie wymaga notatki.',
+      contractTitle: 'Umowa (opcjonalnie)',
+      contractValue: 'Wartość umowy',
+      contractCurrency: 'Waluta',
+      contractStart: 'Planowany start',
+      contractEnd: 'Planowany koniec',
+      contractValueInvalid: 'Podaj kwotę, np. 1234,50.',
       confirmReject: 'Potwierdź odrzucenie',
       cancel: 'Anuluj',
       reasonLabel: 'Powód odrzucenia',
@@ -238,6 +257,33 @@ export const strings = {
       reason: 'powód',
       prefilter: (rule: string) => `filtr wstępny: ${rule}`,
       insufficientData: 'za mało danych do oceny',
+      skipped: (stages: string) => `pominięto: ${stages}`,
+      contract: (value: string) => `umowa: ${value}`,
+      contractDates: (start: string | null, end: string | null) =>
+        `${start ?? '?'} – ${end ?? '?'}`,
+      followUp: 'Follow-up',
+      followUpSet: (on: string) => `ustawiono na ${on}`,
+      followUpCleared: 'usunięto',
+    },
+    pipeline: {
+      followUpTitle: 'Follow-up',
+      followUpLabel: 'Data follow-upu',
+      followUpCurrent: (on: string) => `Zaplanowany: ${on}`,
+      followUpNone: 'Brak zaplanowanego follow-upu.',
+      followUpUnavailable: 'Follow-up można ustawić po oznaczeniu kontaktu.',
+      followUpSave: 'Ustaw follow-up',
+      followUpClear: 'Usuń follow-up',
+      followUpInvalid: 'Podaj poprawną datę.',
+      paymentsTitle: 'Płatności',
+      paymentsNone: 'Brak zapisanych płatności.',
+      paymentsHint: 'Płatność to osobny zapis, niezależny od statusu „Wygrana”.',
+      amountLabel: 'Kwota',
+      amountInvalid: 'Podaj kwotę większą od zera, np. 1234,50.',
+      currencyLabel: 'Waluta',
+      paidOnLabel: 'Data płatności',
+      paidOnInvalid: 'Podaj poprawną datę płatności.',
+      paymentNoteLabel: 'Notatka do płatności',
+      paymentSave: 'Zapisz płatność',
     },
     detectedEntry: 'Wykryto',
     empty: {

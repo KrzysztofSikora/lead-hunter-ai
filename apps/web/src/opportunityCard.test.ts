@@ -1,6 +1,12 @@
-import type { OpportunityDetail } from '@lead-hunter/contracts';
+import type { ActivityEvent, OpportunityDetail } from '@lead-hunter/contracts';
 import { describe, expect, it } from 'vitest';
-import { CARD_ELEMENTS, buildCard, type CardItem, type CardSection } from './opportunityCard.js';
+import {
+  CARD_ELEMENTS,
+  buildCard,
+  eventDetails,
+  type CardItem,
+  type CardSection,
+} from './opportunityCard.js';
 
 const NOW = '2026-01-01T10:00:00.000Z';
 
@@ -247,5 +253,59 @@ describe('buildCard', () => {
     const card = buildCard(states.insufficient!);
     expect(byId(card, 'reason')).toMatchObject({ value: 'DEMO reason', tag: 'inference' });
     expect(byId(card, 'missing')).toMatchObject({ value: ['DEMO u'], tag: 'inference' });
+  });
+});
+
+describe('eventDetails', () => {
+  const event: ActivityEvent = {
+    id: 1,
+    type: 'STATUS_CHANGE',
+    actor: 'operator',
+    fromStatus: 'SAVED',
+    toStatus: 'CONTACTED',
+    reason: null,
+    note: null,
+    cause: null,
+    skipped: [],
+    contract: null,
+    followUpOn: null,
+    occurredAt: NOW,
+  };
+
+  it('shows the stages a forward move skipped', () => {
+    expect(eventDetails({ ...event, skipped: ['OFFER_DRAFTED'] })).toEqual([
+      'pominięto: Szkic oferty',
+    ]);
+  });
+
+  it('shows nothing extra for a plain move', () => {
+    expect(eventDetails(event)).toEqual([]);
+  });
+
+  it('shows the contract of a win with its dates', () => {
+    expect(
+      eventDetails({
+        ...event,
+        toStatus: 'WON',
+        contract: {
+          valueMinor: 150000,
+          currency: 'PLN',
+          expectedStartOn: '2026-11-01',
+        },
+      }),
+    ).toEqual(['umowa: 1\u00a0500,00 PLN (01.11.2026 – ?)']);
+  });
+
+  it('shows a follow-up set and cleared', () => {
+    const followUp: ActivityEvent = {
+      ...event,
+      type: 'FOLLOW_UP',
+      fromStatus: null,
+      toStatus: null,
+    };
+    expect(eventDetails({ ...followUp, followUpOn: '2026-10-30' })).toEqual([
+      'ustawiono na 30.10.2026',
+    ]);
+    expect(eventDetails(followUp)).toEqual(['usunięto']);
   });
 });

@@ -1,6 +1,6 @@
 import type { ActivityEvent, OpportunityDetail } from '@lead-hunter/contracts';
-import { strings } from './strings.pl.js';
-import { formatWarsaw } from './warsawTime.js';
+import { formatMinor, strings } from './strings.pl.js';
+import { formatCalendarDate, formatWarsaw } from './warsawTime.js';
 
 const t = strings.opportunity;
 const list = strings.opportunities;
@@ -271,4 +271,30 @@ export function buildCard(data: OpportunityDetail): CardSection[] {
     ...sections[key],
     ...(reason && analysisBound.includes(key) ? { emptyReason: reason } : {}),
   }));
+}
+
+/** S-08 D-2/D-3/D-7: what a history entry adds beyond its status line, as stored on the event. */
+export function eventDetails(event: ActivityEvent): string[] {
+  const h = t.history;
+  const parts: string[] = [];
+  if (event.skipped.length) {
+    parts.push(h.skipped(event.skipped.map((stage) => list.businessStatus[stage]).join(', ')));
+  }
+  if (event.contract) {
+    const { valueMinor, currency, expectedStartOn, expectedEndOn } = event.contract;
+    const dates =
+      expectedStartOn || expectedEndOn
+        ? ` (${h.contractDates(
+            expectedStartOn ? formatCalendarDate(expectedStartOn) : null,
+            expectedEndOn ? formatCalendarDate(expectedEndOn) : null,
+          )})`
+        : '';
+    parts.push(h.contract(`${formatMinor(valueMinor, currency)}${dates}`));
+  }
+  if (event.type === 'FOLLOW_UP') {
+    parts.push(
+      event.followUpOn ? h.followUpSet(formatCalendarDate(event.followUpOn)) : h.followUpCleared,
+    );
+  }
+  return parts;
 }
