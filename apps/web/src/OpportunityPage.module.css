@@ -160,6 +160,7 @@
 }
 
 .form select,
+.form input,
 .form textarea {
   box-sizing: border-box;
   width: 100%;
@@ -171,6 +172,11 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.subheading {
+  flex-basis: 100%;
+  margin: 0.5rem 0 0;
 }
 
 .actionError {

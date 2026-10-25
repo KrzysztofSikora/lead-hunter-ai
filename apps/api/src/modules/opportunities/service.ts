@@ -1,10 +1,13 @@
 import {
   ActivityCause,
+  ActivityMetadata,
   OpportunityAnalysis,
-  operatorMoves,
+  checkMove,
   ScoreBreakdown,
   upgradeStoredAnalysis,
+  type FollowUpRequest,
   type NoteRequest,
+  type PaymentRequest,
   type OpportunityDetail,
   type OpportunityList,
   type OpportunityListQuery,
@@ -12,6 +15,7 @@ import {
   type StatusChangeRequest,
 } from '@lead-hunter/contracts';
 import type { Clock } from '../shared/clock.js';
+import { instantToWarsawDate, warsawDateToInstant } from '../shared/warsaw-day.js';
 import type {
   ActivityRepository,
   ActivityRow,
@@ -19,12 +23,15 @@ import type {
   EvidenceRow,
   OpportunityRepository,
   OpportunityRow,
+  PaymentRepository,
+  PaymentRow,
   SourceStatusReader,
 } from './ports.js';
 
 export interface OpportunityDeps {
   repository: OpportunityRepository;
   activity: ActivityRepository;
+  payments: PaymentRepository;
   sourceStatus: SourceStatusReader;
   clock: Clock;
 }
@@ -34,10 +41,15 @@ export interface OpportunityService {
   get(id: number): OpportunityDetail | undefined;
   changeStatus(id: number, request: StatusChangeRequest): ActionResult;
   addNote(id: number, request: NoteRequest): ActionResult;
+  setFollowUp(id: number, request: FollowUpRequest): ActionResult;
+  addPayment(id: number, request: PaymentRequest): ActionResult;
 }
 
 export type ActionResult =
-  { result: 'ok'; detail: OpportunityDetail } | { result: 'not_found' | 'not_allowed' };
+  | { result: 'ok'; detail: OpportunityDetail }
+  | { result: 'not_found' | 'not_allowed' | 'note_required' }
+  /** A rule that needs the clock, so the body schema cannot state it. */
+  | { result: 'invalid'; path: string; message: string };
 
 const EXCERPT_CHARS = 280;
 
@@ -126,7 +138,8 @@ function parseStored<T>(
 }
 
 function toActivity(row: ActivityRow): OpportunityDetail['activity'][number] {
-  const cause = row.metadataJson === null ? null : parseStored(ActivityCause, row.metadataJson);
+  const system = row.actor === 'system';
+  const meta = system ? null : parseStored(ActivityMetadata, row.metadataJson);
   return {
     id: row.id,
     type: row.type,
@@ -135,10 +148,23 @@ function toActivity(row: ActivityRow): OpportunityDetail['activity'][number] {
     toStatus: row.toStatus,
     reason: row.reason,
     note: row.note,
-    cause,
+    cause: system ? parseStored(ActivityCause, row.metadataJson) : null,
+    skipped: meta?.skipped ?? [],
+    contract: meta?.contract ?? null,
+    followUpOn: row.type === 'FOLLOW_UP' ? (meta?.on ?? null) : null,
+    followUpCleared: meta?.followUpCleared === true,
     occurredAt: iso(row.occurredAt),
   };
 }
+
+const toPayment = (row: PaymentRow): OpportunityDetail['payments'][number] => ({
+  id: row.id,
+  amountMinor: row.amountMinor,
+  currency: row.currency,
+  paidOn: instantToWarsawDate(new Date(row.paidAt)),
+  note: row.note,
+  createdAt: iso(row.createdAt),
+});
 
 function toLatestAnalysis(row: AnalysisAttemptRow): OpportunityDetail['latestAnalysis'] {
   return {
@@ -174,6 +200,7 @@ const DAY_MS = 86_400_000;
 export function createOpportunityService({
   repository,
   activity,
+  payments,
   sourceStatus,
   clock,
 }: OpportunityDeps): OpportunityService {
@@ -185,6 +212,9 @@ export function createOpportunityService({
       source: { ...sourceFacts(found.row), snippet: found.row.snippet },
       evidence: found.evidence.map(toEvidence),
       latestAnalysis: found.latestAnalysis ? toLatestAnalysis(found.latestAnalysis) : null,
+      followUpOn:
+        found.followUpAt === null ? null : instantToWarsawDate(new Date(found.followUpAt)),
+      payments: found.payments.map(toPayment),
       activity: found.activity.map(toActivity),
     };
   }
@@ -217,14 +247,62 @@ export function createOpportunityService({
       const outcome = activity.changeStatus(
         id,
         request.status,
-        (from) => operatorMoves(from).includes(request.status),
+        (from) => checkMove(from, request.status),
         {
           reason: request.status === 'REJECTED' ? request.reason : null,
           note: request.note ?? null,
+          metadata: (check, followUpCleared) => {
+            const metadata = ActivityMetadata.parse({
+              ...(check.skipped.length > 0 ? { skipped: check.skipped } : {}),
+              ...(request.status === 'WON' && request.contract
+                ? { contract: request.contract }
+                : {}),
+              ...(followUpCleared ? { followUpCleared: true } : {}),
+            });
+            return Object.keys(metadata).length === 0 ? null : JSON.stringify(metadata);
+          },
           at: clock.now().getTime(),
         },
       );
       return outcome === 'changed' ? withDetail(id) : { result: outcome };
+    },
+    setFollowUp(id, request) {
+      if (request.on !== null && request.on < instantToWarsawDate(clock.now())) {
+        return {
+          result: 'invalid',
+          path: 'on',
+          message: 'data follow-upu nie może być z przeszłości',
+        };
+      }
+      const outcome = activity.setFollowUp(
+        id,
+        request.on === null ? null : warsawDateToInstant(request.on).getTime(),
+        {
+          metadata: JSON.stringify(ActivityMetadata.parse({ on: request.on })),
+          at: clock.now().getTime(),
+        },
+      );
+      return outcome === 'changed' ? withDetail(id) : { result: outcome };
+    },
+    addPayment(id, request) {
+      if (request.paidOn > instantToWarsawDate(clock.now())) {
+        return {
+          result: 'invalid',
+          path: 'paidOn',
+          message: 'data wpłaty nie może być z przyszłości',
+        };
+      }
+      const added = payments.add(
+        id,
+        {
+          amountMinor: request.amountMinor,
+          currency: request.currency,
+          paidAt: warsawDateToInstant(request.paidOn).getTime(),
+          note: request.note ?? null,
+        },
+        clock.now().getTime(),
+      );
+      return added ? withDetail(id) : { result: 'not_found' };
     },
     addNote(id, request) {
       return activity.addNote(id, request.text, clock.now().getTime())

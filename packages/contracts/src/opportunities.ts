@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { OpportunityAnalysis, PrefilterRule, ScoreBreakdown } from './analysis.js';
 import { Category, Confidence, EvidenceLevel } from './classification.js';
 import { Currency } from './profile.js';
-import { RejectionReason } from './status.js';
+import { calendarDate, Contract, RejectionReason } from './status.js';
 
 export { Category, Confidence, EvidenceLevel };
 
@@ -183,20 +183,56 @@ export const ActivityCause = z.discriminatedUnion('kind', [
 ]);
 export type ActivityCause = z.infer<typeof ActivityCause>;
 
+/**
+ * S-08 D-2, D-3, D-7: what an operator event stores in `metadata_json` (system events store an
+ * `ActivityCause` instead; the reader picks by `actor`).
+ */
+export const ActivityMetadata = z
+  .object({
+    skipped: z.array(BusinessStatus).min(1).optional(),
+    contract: Contract.optional(),
+    /** `FOLLOW_UP` events: the day set, or null when cleared. */
+    on: calendarDate.nullable().optional(),
+    /** Status events: the move cleared a follow-up that was set. */
+    followUpCleared: z.literal(true).optional(),
+  })
+  .strict();
+export type ActivityMetadata = z.infer<typeof ActivityMetadata>;
+
 export const ActivityEvent = z
   .object({
     id: z.number().int(),
-    type: z.enum(['STATUS_CHANGE', 'NOTE']),
+    type: z.enum(['STATUS_CHANGE', 'NOTE', 'FOLLOW_UP']),
     actor: z.enum(['operator', 'system']),
     fromStatus: BusinessStatus.nullable(),
     toStatus: BusinessStatus.nullable(),
     reason: RejectionReason.nullable(),
     note: z.string().nullable(),
     cause: ActivityCause.nullable(),
+    /** Main-path stages this move passed over (D-2). */
+    skipped: z.array(BusinessStatus),
+    contract: Contract.nullable(),
+    /** `FOLLOW_UP` events only. */
+    followUpOn: calendarDate.nullable(),
+    /** Status events only: the move dropped the follow-up that was set (R5). */
+    followUpCleared: z.boolean(),
     occurredAt: isoInstant,
   })
   .strict();
 export type ActivityEvent = z.infer<typeof ActivityEvent>;
+
+export const Payment = z
+  .object({
+    id: z.number().int(),
+    amountMinor: z.number().int().min(1),
+    currency: Currency,
+    /** A Europe/Warsaw calendar day. */
+    paidOn: calendarDate,
+    note: z.string().nullable(),
+    createdAt: isoInstant,
+  })
+  .strict();
+export type Payment = z.infer<typeof Payment>;
 
 export const OpportunityDetail = z
   .object({
@@ -204,6 +240,10 @@ export const OpportunityDetail = z
     source: SourceFacts.extend({ snippet: z.string() }).strict(),
     evidence: z.array(Evidence),
     latestAnalysis: LatestAnalysis.nullable(),
+    /** The one current follow-up, a Europe/Warsaw calendar day (S-08 D-7). */
+    followUpOn: calendarDate.nullable(),
+    /** Newest paid first (S-08 D-10). */
+    payments: z.array(Payment),
     /** Newest first. */
     activity: z.array(ActivityEvent),
   })

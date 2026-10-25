@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { formatWarsaw, isCalendarDate, warsawDayEnd, warsawDayStart } from './warsawTime.js';
+import {
+  formatCalendarDate,
+  formatWarsaw,
+  isCalendarDate,
+  warsawDayEnd,
+  warsawDayStart,
+  warsawToday,
+} from './warsawTime.js';
 
 describe('warsawDayStart', () => {
   it.each([
@@ -41,4 +48,15 @@ it('accepts only real calendar dates', () => {
   expect(isCalendarDate('2026-02-28')).toBe(true);
   expect(isCalendarDate('2026-02-30')).toBe(false);
   expect(isCalendarDate('26-02-01')).toBe(false);
+});
+
+describe('warsawToday', () => {
+  it('reads the Warsaw calendar day, not the UTC one', () => {
+    expect(warsawToday(Date.parse('2026-10-24T22:30:00Z'))).toBe('2026-10-25');
+    expect(warsawToday(Date.parse('2026-10-25T21:30:00Z'))).toBe('2026-10-25');
+    expect(warsawToday(Date.parse('2026-10-25T23:30:00Z'))).toBe('2026-10-26');
+  });
+  it('formats a calendar date for display', () => {
+    expect(formatCalendarDate('2026-10-25')).toBe('25.10.2026');
+  });
 });

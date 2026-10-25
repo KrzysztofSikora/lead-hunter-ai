@@ -34,6 +34,7 @@ export {
 export {
   ActivityCause,
   ActivityEvent,
+  ActivityMetadata,
   AnalysisSummary,
   Availability,
   BusinessStatus,
@@ -47,6 +48,7 @@ export {
   ImportResult,
   importRequestSchema,
   OpportunityDetail,
+  Payment,
   OpportunityList,
   OpportunityListQuery,
   OpportunitySummary,
@@ -57,10 +59,23 @@ export {
 } from './opportunities.js';
 export type { ImportRequest } from './opportunities.js';
 export {
+  calendarDate,
+  checkMove,
+  Contract,
+  FOLLOW_UP_STATUSES,
+  FollowUpRequest,
   NOTE_MAX_CHARS,
   NoteRequest,
-  operatorMoves,
+  OPERATOR_TARGETS,
+  PAYMENT_MAX_MINOR,
+  PaymentRequest,
   RejectionReason,
   StatusChangeRequest,
 } from './status.js';
-export type { OperatorMove } from './status.js';
+export type { MoveCheck } from './status.js';
+export {
+  PIPELINE_STAGE_LIMIT,
+  PIPELINE_STAGES,
+  PipelineItem,
+  PipelineResponse,
+} from './pipeline.js';
