@@ -13,6 +13,7 @@ describe('loadConfig', () => {
       port: 8080,
       dataDir: './data',
       logLevel: 'info',
+      importMaxTextChars: 20_000,
     });
   });
 
@@ -24,6 +25,7 @@ describe('loadConfig', () => {
         PORT: '9000',
         DATA_DIR: '/data',
         LOG_LEVEL: 'debug',
+        IMPORT_MAX_TEXT_CHARS: '5000',
         ...HASH,
       }),
     ).toEqual({
@@ -33,6 +35,7 @@ describe('loadConfig', () => {
       dataDir: '/data',
       logLevel: 'debug',
       operatorPasswordHash: VALID_HASH,
+      importMaxTextChars: 5000,
     });
   });
 
@@ -54,6 +57,9 @@ describe('loadConfig', () => {
     ['PORT', '80.5'],
     ['NODE_ENV', 'prod'],
     ['LOG_LEVEL', 'loud'],
+    ['IMPORT_MAX_TEXT_CHARS', '999'],
+    ['IMPORT_MAX_TEXT_CHARS', '200001'],
+    ['IMPORT_MAX_TEXT_CHARS', 'dużo'],
   ])('rejects %s=%s and names the variable', (variable, value) => {
     const run = () => loadConfig({ [variable]: value });
     expect(run).toThrow(ConfigError);

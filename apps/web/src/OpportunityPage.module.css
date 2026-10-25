@@ -1,0 +1,42 @@
+.facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.25rem 1rem;
+  margin: 0 0 1rem;
+}
+
+.facts dt {
+  margin-top: 0.5rem;
+  color: #444;
+  font-size: 0.875rem;
+}
+
+.facts dd {
+  margin: 0;
+}
+
+.text {
+  margin: 0;
+  font: inherit;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.evidence {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.evidence li {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+}
+
+.error {
+  color: #b71c1c;
+}

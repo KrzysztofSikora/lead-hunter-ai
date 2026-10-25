@@ -10,6 +10,7 @@ export const ENV_VARIABLES = [
   'DATA_DIR',
   'LOG_LEVEL',
   'OPERATOR_PASSWORD_HASH',
+  'IMPORT_MAX_TEXT_CHARS',
 ] as const;
 
 /** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
@@ -39,6 +40,7 @@ export const EnvSchema = z
         message: 'nieprawidłowy format — wygeneruj hash poleceniem pnpm auth:hash',
       }),
     ),
+    IMPORT_MAX_TEXT_CHARS: optional(z.coerce.number().int().min(1_000).max(200_000)),
   })
   .superRefine((env, ctx) => {
     const host = env.HOST ?? '127.0.0.1';
@@ -58,6 +60,8 @@ export interface Config {
   dataDir: string;
   logLevel: (typeof LOG_LEVELS)[number];
   operatorPasswordHash?: string;
+  /** Longest text one manual import may carry, in UTF-16 code units (FR-02 AC4). */
+  importMaxTextChars: number;
 }
 
 export interface ConfigIssue {
@@ -80,6 +84,7 @@ export class ConfigError extends Error {
 const EXPECTED: Record<string, string> = {
   NODE_ENV: 'oczekiwano development, test lub production',
   PORT: 'oczekiwano liczby całkowitej 1–65535',
+  IMPORT_MAX_TEXT_CHARS: 'oczekiwano liczby całkowitej 1000–200000',
   LOG_LEVEL: `oczekiwano jednej z wartości: ${LOG_LEVELS.join(', ')}`,
 };
 
@@ -103,6 +108,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     port: v.PORT ?? 8080,
     dataDir: v.DATA_DIR ?? './data',
     logLevel: v.LOG_LEVEL ?? 'info',
+    importMaxTextChars: v.IMPORT_MAX_TEXT_CHARS ?? 20_000,
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };
 }

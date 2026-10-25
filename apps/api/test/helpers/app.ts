@@ -6,9 +6,12 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
+import { createOpportunityRepository } from '../../src/infrastructure/db/opportunity-repository.js';
 import { createProfileRepository } from '../../src/infrastructure/db/profile-repository.js';
+import { createSignalRepository } from '../../src/infrastructure/db/signal-repository.js';
 import { createSessionRepository } from '../../src/infrastructure/db/session-repository.js';
 import { randomTokenSource } from '../../src/infrastructure/auth/token-source.js';
+import { noSourcesYet } from '../../src/infrastructure/sources/source-status.js';
 import type { Clock } from '../../src/modules/auth/ports.js';
 import { openDb, type OpenDb } from '../../src/infrastructure/db/client.js';
 import { createHealthProbe } from '../../src/infrastructure/db/health-probe.js';
@@ -81,6 +84,11 @@ export async function buildTestApp(
       repository: createProfileRepository(db),
       clock: options.clock ?? { now: () => new Date() },
     },
+    signals: {
+      repository: createSignalRepository(db),
+      clock: options.clock ?? { now: () => new Date() },
+    },
+    opportunities: { repository: createOpportunityRepository(db), sourceStatus: noSourcesYet },
     ...options.overrides,
   });
   cleanups.push(() => app.close());

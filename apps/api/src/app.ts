@@ -12,14 +12,20 @@ import { registerAuth } from './modules/auth/routes.js';
 import type { AuthDeps } from './modules/auth/service.js';
 import { registerHealthRoutes } from './modules/health/routes.js';
 import type { HealthProbe } from './modules/health/ports.js';
+import { registerOpportunityRoutes } from './modules/opportunities/routes.js';
+import type { OpportunityDeps } from './modules/opportunities/service.js';
 import { registerProfileRoutes } from './modules/profile/routes.js';
 import type { ProfileDeps } from './modules/profile/service.js';
+import { registerSignalRoutes } from './modules/signals/routes.js';
+import type { SignalDeps } from './modules/signals/service.js';
 
 export interface AppDeps {
-  config: Pick<Config, 'nodeEnv'>;
+  config: Pick<Config, 'nodeEnv' | 'importMaxTextChars'>;
   healthProbe: HealthProbe;
   auth: AuthDeps;
   profile: ProfileDeps;
+  signals: SignalDeps;
+  opportunities: OpportunityDeps;
   version: string;
   /** Directory of the built web app; static serving and the SPA fallback are off without it. */
   webDistDir?: string;
@@ -55,6 +61,12 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
 
   registerHealthRoutes(app, { probe: deps.healthProbe, version: deps.version });
   registerProfileRoutes(app, deps.profile);
+  registerSignalRoutes(app, {
+    ...deps.signals,
+    importMaxTextChars: deps.config.importMaxTextChars,
+  });
+
+  registerOpportunityRoutes(app, deps.opportunities);
 
   if (deps.config.nodeEnv !== 'production') {
     app.get('/api/openapi.json', { schema: { hide: true } }, async () => app.swagger());

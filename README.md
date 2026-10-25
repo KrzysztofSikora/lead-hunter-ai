@@ -43,7 +43,11 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   bez aktywności, wylogowanie, limit 5 prób na 15 minut); każdy `/api/*` poza health i logowaniem
   wymaga sesji; profil operatora (`GET`/`PUT /api/profile`, widok *Profil* w UI, przykładowy profil
   z etykietą `PRZYKŁAD` przy pierwszym uruchomieniu); błędy walidacji ciała żądania mają jeden
-  kształt `{ error: "validation_failed", fields }`.
+  kształt `{ error: "validation_failed", fields }`; ręczny import ogłoszenia (widok *Import*,
+  `POST /api/signals/import`: wklejony tekst i/lub adres URL, który jest tylko zapisywany, nie
+  pobierany; powtórka rozpoznawana po adresie lub treści; limit długości w
+  `IMPORT_MAX_TEXT_CHARS`, domyślnie 20000), lista *Okazje* z filtrami, sortowaniem i stronami oraz
+  podgląd okazji; analiza i ocena dojdą ze slice'em S-04 (do tego czasu „brak analizy — w kolejce").
 - **Co wymaga kluczy:** nic w tej chwili; klucze LLM i skrzynka IMAP dojdą ze slice'ami S-04 i S-11.
 - **Co wymaga ręcznej weryfikacji:** uruchomienie `docker compose up` na Raspberry Pi
   (czas budowania better-sqlite3 na ARM64), wygląd powłoki i formularza logowania na telefonie, widok *Profil* na telefonie i komunikaty
