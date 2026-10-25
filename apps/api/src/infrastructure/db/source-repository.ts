@@ -140,10 +140,17 @@ export function createSourceRepository(db: BetterSQLite3Database): SourceReposit
     saveCursor(id, cursorJson) {
       db.update(sources).set({ cursorJson }).where(eq(sources.id, id)).run();
     },
-    startRun(sourceId, at) {
+    startRun(sourceId, at, context) {
       return db
         .insert(jobRuns)
-        .values({ jobType: 'source_run', sourceId, status: 'running', startedAt: at })
+        .values({
+          jobType: 'source_run',
+          sourceId,
+          status: 'running',
+          startedAt: at,
+          trigger: context?.trigger ?? null,
+          parentRunId: context?.parentRunId ?? null,
+        })
         .returning({ id: jobRuns.id })
         .get().id;
     },
@@ -159,7 +166,8 @@ export function createSourceRepository(db: BetterSQLite3Database): SourceReposit
           errorReason: summary.error?.reason ?? null,
           errorStatus: summary.error?.httpStatus ?? null,
         })
-        .where(eq(jobRuns.id, runId))
+        // An `interrupted` row is never rewritten by a late finish (D-3).
+        .where(and(eq(jobRuns.id, runId), eq(jobRuns.status, 'running')))
         .run();
     },
   };

@@ -24,6 +24,9 @@ import { createHttpClient } from '../../src/infrastructure/sources/http/client.j
 import { createPageFetcher } from '../../src/infrastructure/sources/manual/page-fetcher.js';
 import { createRobotsCheck } from '../../src/infrastructure/sources/manual/robots.js';
 import { createSourceRuntime } from '../../src/infrastructure/sources/compose.js';
+import type { JobLock } from '../../src/modules/jobs/ports.js';
+import type { JobsService } from '../../src/modules/jobs/service.js';
+import type { JobLockOptions } from '../../src/infrastructure/scheduler/job-lock.js';
 import type { SourceService } from '../../src/modules/sources/service.js';
 import type { Clock } from '../../src/modules/auth/ports.js';
 import { openDb, type OpenDb } from '../../src/infrastructure/db/client.js';
@@ -82,6 +85,9 @@ export async function buildTestApp(
     provider?: LlmProvider | null;
     /** Kick the runner after every created import, as the server does. Tests drain by hand otherwise. */
     autoKick?: boolean;
+    /** Another identity or staleness for the job lock (S-12). */
+    jobLock?: Partial<Omit<JobLockOptions, 'db' | 'clock'>>;
+    heartbeatMs?: number;
   } = {},
 ): Promise<{
   app: FastifyInstance;
@@ -89,6 +95,8 @@ export async function buildTestApp(
   dir: string;
   runner: AnalysisRunner;
   sources: SourceService;
+  jobs: JobsService;
+  lock: JobLock;
 }> {
   const { dir, sqlite, db } = openTestDb(options.dir);
   const config = loadConfig({ DATA_DIR: dir, ...options.env });
@@ -131,6 +139,8 @@ export async function buildTestApp(
     http,
     clock,
     sleep: async () => undefined,
+    ...(options.jobLock ? { jobLock: options.jobLock } : {}),
+    ...(options.heartbeatMs === undefined ? {} : { heartbeatMs: options.heartbeatMs }),
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),
   });
   const app = await buildApp({
@@ -159,7 +169,15 @@ export async function buildTestApp(
     ...options.overrides,
   });
   cleanups.push(() => app.close());
-  return { app, config, dir, runner, sources: sourceRuntime.service };
+  return {
+    app,
+    config,
+    dir,
+    runner,
+    sources: sourceRuntime.service,
+    jobs: sourceRuntime.jobs,
+    lock: sourceRuntime.lock,
+  };
 }
 
 /** Logs in with TEST_PASSWORD and returns the value for a `cookie` request header. */

@@ -1,5 +1,14 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  check,
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+  type AnySQLiteColumn,
+} from 'drizzle-orm/sqlite-core';
 
 export const appMeta = sqliteTable('app_meta', {
   key: text('key').primaryKey(),
@@ -68,30 +77,59 @@ export const jobRuns = sqliteTable(
     failed: integer('failed').notNull().default(0),
     errorReason: text('error_reason'),
     errorStatus: integer('error_status'),
+    /** S-12 D-11: 'schedule' | 'manual' | 'cli'; null on rows from before S-12. */
+    trigger: text('trigger'),
+    /** S-12: a source run started by a cycle points at the cycle's row. */
+    parentRunId: integer('parent_run_id').references((): AnySQLiteColumn => jobRuns.id),
+    /** S-12 D-5: the scheduled slot (UTC ms, rounded to the minute); null for manual and CLI runs. */
+    scheduledFor: integer('scheduled_for'),
+    /** S-12 D-11: sources a cycle did not attempt (`too_soon`). */
+    skipped: integer('skipped').notNull().default(0),
   },
-  (table) => [index('job_runs_source_idx').on(table.sourceId, table.startedAt)],
+  (table) => [
+    index('job_runs_source_idx').on(table.sourceId, table.startedAt),
+    uniqueIndex('job_runs_slot_uq').on(table.jobType, table.scheduledFor),
+    index('job_runs_parent_idx').on(table.parentRunId),
+    index('job_runs_started_idx').on(table.startedAt),
+  ],
 );
 
-/** D-3: the source is a text column on signals created before `sources` (S-10). */
-export const rawSignals = sqliteTable('raw_signals', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  sourceType: text('source_type').notNull(),
-  /** S-10 D-1: null for manual imports. */
-  sourceId: integer('source_id').references(() => sources.id),
-  /** S-10 D-4: the feed entry's own key (`guid`, else `link`); null for manual imports. */
-  externalId: text('external_id'),
-  /** The URL as the operator pasted it (trimmed). */
-  sourceUrl: text('source_url'),
-  /** Identity form of the URL (D-2); never shown as the source. */
-  canonicalUrl: text('canonical_url'),
-  title: text('title').notNull(),
-  snippet: text('snippet').notNull(),
-  publishedAt: integer('published_at'),
-  fetchedAt: integer('fetched_at').notNull(),
-  contentHash: text('content_hash'),
-  availability: text('availability').notNull(),
-  lastVerifiedAt: integer('last_verified_at'),
+/** S-12 D-1: one row per named lock while it is held. */
+export const jobLocks = sqliteTable('job_locks', {
+  name: text('name').primaryKey(),
+  ownerHost: text('owner_host').notNull(),
+  ownerPid: integer('owner_pid').notNull(),
+  ownerToken: text('owner_token').notNull(),
+  acquiredAt: integer('acquired_at').notNull(),
+  heartbeatAt: integer('heartbeat_at').notNull(),
 });
+
+/** D-3: the source is a text column on signals created before `sources` (S-10). */
+export const rawSignals = sqliteTable(
+  'raw_signals',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    sourceType: text('source_type').notNull(),
+    /** S-10 D-1: null for manual imports. */
+    sourceId: integer('source_id').references(() => sources.id),
+    /** S-10 D-4: the feed entry's own key (`guid`, else `link`); null for manual imports. */
+    externalId: text('external_id'),
+    /** The URL as the operator pasted it (trimmed). */
+    sourceUrl: text('source_url'),
+    /** Identity form of the URL (D-2); never shown as the source. */
+    canonicalUrl: text('canonical_url'),
+    title: text('title').notNull(),
+    snippet: text('snippet').notNull(),
+    publishedAt: integer('published_at'),
+    fetchedAt: integer('fetched_at').notNull(),
+    contentHash: text('content_hash'),
+    availability: text('availability').notNull(),
+    lastVerifiedAt: integer('last_verified_at'),
+    /** S-12 D-8: the source run that created the signal; null for imports and older rows. */
+    jobRunId: integer('job_run_id').references(() => jobRuns.id),
+  },
+  (table) => [index('raw_signals_job_run_idx').on(table.jobRunId)],
+);
 
 export const opportunities = sqliteTable(
   'opportunities',

@@ -23,7 +23,7 @@ than building on it.
 | S-09 | #10 | url-import-guard | slice | FR-03 | S-03 | M | done |
 | S-10 | #11 | rss-sources | slice | FR-04, FR-18 AC3 | S-04, S-09 | L | done |
 | S-11 | #12 | email-alerts | slice | FR-05 | S-10 | L | todo |
-| S-12 | #13 | scheduler-and-jobs | slice | FR-17, FR-18 AC1–AC2 | S-10 | M | planned |
+| S-12 | #13 | scheduler-and-jobs | slice | FR-17, FR-18 AC1–AC2 | S-10 | M | in-progress |
 | S-13 | #14 | today-brief | slice | FR-16 | S-08, S-12 | M | todo |
 | S-16 | #17 | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13 | M | todo |
 | S-14 | #15 | insights | slice | FR-19 | S-08 | M | todo |

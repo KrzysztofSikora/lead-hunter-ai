@@ -18,6 +18,8 @@ export interface IngestCandidate {
   at: number;
   /** The fact recorded as evidence: the text, or the URL when there is no text. */
   sourceFact: string;
+  /** S-12 D-8: the source run that fetched it; null for manual imports. */
+  jobRunId?: number | null;
 }
 
 export type IngestResult =
@@ -83,6 +85,7 @@ export function ingest(tx: SignalTx, candidate: IngestCandidate): IngestResult {
     contentHash: hash,
     availability: 'NOT_CHECKED',
     lastVerifiedAt: null,
+    jobRunId: candidate.jobRunId ?? null,
   });
   const opportunityId = tx.insertOpportunity(signalId, at);
   tx.insertEvidence({

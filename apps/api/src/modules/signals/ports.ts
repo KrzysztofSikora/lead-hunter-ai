@@ -17,6 +17,7 @@ export interface NewSignal {
   contentHash: string | null;
   availability: Availability;
   lastVerifiedAt: number | null;
+  jobRunId?: number | null;
 }
 
 export interface NewEvidence {

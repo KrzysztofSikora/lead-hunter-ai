@@ -13,6 +13,7 @@ import { MANUAL_ACCESS_NOTE, PRESETS } from './presets.js';
 import type {
   AdapterOutcome,
   AttemptOutcome,
+  RunContext,
   SourceAdapter,
   SourceRecord,
   SourceRepository,
@@ -54,10 +55,15 @@ export interface SourceService {
   list(): SourceList;
   create(request: CreateSourceRequest): CreateOutcome;
   setEnabled(id: number, enabled: boolean): Source | undefined;
-  run(id: number): Promise<RunOutcome>;
+  run(id: number, context?: RunContext): Promise<RunOutcome>;
   check(id: number): Promise<CheckOutcome>;
-  /** AC3: every enabled source in turn; one that fails or throws never stops the next. */
-  runEnabled(): Promise<{ id: number; name: string; outcome: RunOutcome }[]>;
+  /**
+   * AC3: every enabled source in turn; one that fails or throws never stops the next.
+   * `shouldContinue` is asked before each source; `false` ends the cycle early (lost lock, D-2).
+   */
+  runEnabled(
+    context?: RunContext & { shouldContinue?: () => boolean },
+  ): Promise<{ id: number; name: string; outcome: RunOutcome }[]>;
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString();
@@ -149,14 +155,14 @@ export function createSourceService({
     return { attempt, nextAllowedAt };
   };
 
-  async function run(id: number): Promise<RunOutcome> {
+  async function run(id: number, context?: RunContext): Promise<RunOutcome> {
     const record = repository.get(id);
     if (!record) return { kind: 'not_found' };
     const startedAt = clock.now().getTime();
     const claim = repository.claimRun(id, startedAt, minIntervalMs);
     if (!claim.ok) return refusal(claim);
 
-    const runId = repository.startRun(id, startedAt);
+    const runId = repository.startRun(id, startedAt, context);
     const counts = { fetched: 0, new: 0, duplicates: 0, failed: 0 };
     const fail = (outcome: Extract<AdapterOutcome, { ok: false }>): RunOutcome => {
       const at = clock.now().getTime();
@@ -218,6 +224,7 @@ export function createSourceService({
               contentHash: contentHash(snippet),
               at,
               sourceFact: snippet !== '' ? snippet : (item.url ?? ''),
+              jobRunId: runId,
             }),
           );
           if (result.result === 'created') counts.new += 1;
@@ -336,12 +343,16 @@ export function createSourceService({
     run,
     check,
 
-    async runEnabled() {
+    async runEnabled(context) {
       const results: { id: number; name: string; outcome: RunOutcome }[] = [];
       for (const record of repository.list().filter((candidate) => candidate.enabled)) {
+        if (context?.shouldContinue && !context.shouldContinue()) break;
         let outcome: RunOutcome;
         try {
-          outcome = await run(record.id);
+          outcome = await run(
+            record.id,
+            context && { parentRunId: context.parentRunId, trigger: context.trigger },
+          );
         } catch (error) {
           logger?.warn(
             `source ${record.id}: run threw ${error instanceof Error ? error.name : 'error'}`,
