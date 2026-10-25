@@ -133,10 +133,14 @@ function httpUrl(raw: string, base: string): string | null {
   return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null;
 }
 
+/** Dates the contract can serialise (`z.iso.datetime()`): 1970 to the end of 9999. */
+const MIN_DATE_MS = 0;
+const MAX_DATE_MS = Date.UTC(9999, 11, 31, 23, 59, 59, 999);
+
 function parseDate(raw: string): number | null {
   if (raw === '') return null;
   const at = Date.parse(raw);
-  return Number.isNaN(at) ? null : at;
+  return Number.isNaN(at) || at < MIN_DATE_MS || at > MAX_DATE_MS ? null : at;
 }
 
 function asArray(node: Node): Record<string, unknown>[] {

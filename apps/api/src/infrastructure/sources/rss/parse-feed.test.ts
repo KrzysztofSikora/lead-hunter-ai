@@ -88,6 +88,18 @@ describe('parseFeed (S-10 D-12, D-13, TR-17)', () => {
     expect(items[2]?.text).toBe('Numeric title – kept as text here.');
   });
 
+  it('treats a date the contract cannot serialise as unknown', () => {
+    const feed = (date: string) =>
+      bytes(
+        `<rss version="2.0"><channel><item><title>DEMO</title><guid>g</guid><pubDate>${date}</pubDate></item></channel></rss>`,
+      );
+    for (const date of ['Sat, 01 Jan 12026 00:00:00 GMT', 'Mon, 01 Jan 1900 00:00:00 GMT']) {
+      const parsed = parseFeed(feed(date), 'https://feeds.example.com/rss', 20_000);
+      if (parsed === 'invalid_feed') throw new Error('did not parse');
+      expect(parsed.items[0]?.publishedAt).toBeNull();
+    }
+  });
+
   it('never keeps tags, scripts as tags or non-http links', () => {
     const { items } = parse('synthetic-edge.xml', 'https://feeds.example.com/rss');
     for (const item of items) {
