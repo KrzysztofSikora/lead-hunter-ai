@@ -31,3 +31,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: pipeline-and-payments, R1
 - Scope: transition and state-machine code (`packages/contracts/src/status.ts` and its tests)
 - Status: proposed in the PR for pipeline-and-payments
+
+## Bound every CPU-bound step on untrusted input, or run it where the deadline can stop it
+- Why: Readability is superlinear in nesting depth, so a 22 KB page blocked the single Node process for two minutes; an `AbortSignal` deadline cannot interrupt synchronous code.
+- Seen in: url-import-guard, R1
+- Scope: `apps/api/src/infrastructure/sources/**` and any parser or extractor of fetched content
+- Status: proposed in the PR for url-import-guard
