@@ -12,3 +12,16 @@ export {
   ValidationError,
   WorkMode,
 } from './profile.js';
+export {
+  Availability,
+  BusinessStatus,
+  AnalysisStatus,
+  Category,
+  Confidence,
+  DEFAULT_IMPORT_MAX_TEXT_CHARS,
+  EvidenceLevel,
+  ImportResult,
+  importRequestSchema,
+  SourceType,
+} from './opportunities.js';
+export type { ImportRequest } from './opportunities.js';

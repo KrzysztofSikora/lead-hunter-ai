@@ -9,6 +9,7 @@ import { verifyPassword } from './infrastructure/auth/scrypt-password.js';
 import { createHealthProbe } from './infrastructure/db/health-probe.js';
 import { runMigrations } from './infrastructure/db/migrate.js';
 import { createProfileRepository } from './infrastructure/db/profile-repository.js';
+import { createSignalRepository } from './infrastructure/db/signal-repository.js';
 import { createSessionRepository } from './infrastructure/db/session-repository.js';
 import { createLoggerOptions } from './infrastructure/logging/logger.js';
 import { VERSION } from './version.js';
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
       tokens: randomTokenSource,
     },
     profile: { repository: createProfileRepository(db), clock: { now: () => new Date() } },
+    signals: { repository: createSignalRepository(db), clock: { now: () => new Date() } },
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });

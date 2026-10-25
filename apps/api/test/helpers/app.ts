@@ -7,6 +7,7 @@ import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
 import { createProfileRepository } from '../../src/infrastructure/db/profile-repository.js';
+import { createSignalRepository } from '../../src/infrastructure/db/signal-repository.js';
 import { createSessionRepository } from '../../src/infrastructure/db/session-repository.js';
 import { randomTokenSource } from '../../src/infrastructure/auth/token-source.js';
 import type { Clock } from '../../src/modules/auth/ports.js';
@@ -79,6 +80,10 @@ export async function buildTestApp(
     },
     profile: {
       repository: createProfileRepository(db),
+      clock: options.clock ?? { now: () => new Date() },
+    },
+    signals: {
+      repository: createSignalRepository(db),
       clock: options.clock ?? { now: () => new Date() },
     },
     ...options.overrides,

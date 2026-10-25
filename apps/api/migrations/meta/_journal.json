@@ -22,6 +22,13 @@
       "when": 1792923647746,
       "tag": "0002_lyrical_the_hood",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1792925872235,
+      "tag": "0003_cooing_nitro",
+      "breakpoints": true
     }
   ]
 }
