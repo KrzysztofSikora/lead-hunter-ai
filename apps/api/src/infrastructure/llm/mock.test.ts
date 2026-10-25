@@ -57,6 +57,18 @@ describe('MockProvider (D-15)', () => {
     expect(result.buyerOrAudience).toBeNull();
   });
 
+  it.each<[string, number, number]>([
+    ['Budżet: 1.500,00 zł', 150_000, 150_000],
+    ['Budżet 1 500 - 2 500 zł', 150_000, 250_000],
+    ['Budżet 99,50 PLN', 9_950, 9_950],
+    ['start w 2026 500 zł', 50_000, 50_000],
+  ])('reads the amount in "%s" as minor units', async (snippet, minMinor, maxMinor) => {
+    const text = `DEMO: Szukam programisty do pilnego zlecenia, płatne za wykonanie. ${snippet}. Odezwij się.`;
+    const result = await run(text);
+    if (result.verdict !== 'ANALYSED') throw new Error('expected ANALYSED');
+    expect(result.sourceBudget).toMatchObject({ minMinor, maxMinor });
+  });
+
   it('says INSUFFICIENT_DATA below 80 characters', async () => {
     const result = await run('DEMO: Szukam programisty do sterownika IoT.');
     expect(result.verdict).toBe('INSUFFICIENT_DATA');

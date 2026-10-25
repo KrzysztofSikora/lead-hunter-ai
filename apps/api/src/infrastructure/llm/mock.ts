@@ -20,23 +20,32 @@ const HOURS: Record<Category, { min: number; max: number }> = {
   PRODUCT_HYPOTHESIS: { min: 60, max: 200 },
 };
 
-const BUDGET =
-  /(\d[\d .,]*?\d|\d)(?:\s*[-–]\s*(\d[\d .,]*?\d|\d))?\s*(PLN|zł|EUR|€|USD|\$)(?![\p{L}\p{N}])/iu;
+// Space or dot only join groups of three digits; a comma or dot before 1-2 digits is the decimal part.
+const NUMBER = String.raw`(\d{1,3}(?:[ .]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?)`;
+const BUDGET = new RegExp(
+  String.raw`(?<!\d)${NUMBER}(?:\s*[-–]\s*${NUMBER})?\s*(PLN|zł|EUR|€|USD|\$)(?![\p{L}\p{N}])`,
+  'iu',
+);
 const CURRENCY = { pln: 'PLN', zł: 'PLN', eur: 'EUR', '€': 'EUR', usd: 'USD', $: 'USD' } as const;
 
-const whole = (digits: string): number => Number(digits.replace(/\D/g, ''));
+/** Minor units of a matched number: "1.500,50" → 150050. */
+function minorUnits(text: string): number {
+  const decimal = /[.,](\d{1,2})$/.exec(text);
+  const whole = Number((decimal ? text.slice(0, decimal.index) : text).replace(/\D/g, ''));
+  return whole * 100 + (decimal ? Number(decimal[1]!.padEnd(2, '0')) : 0);
+}
 
 function budgetIn(text: string) {
   const match = BUDGET.exec(text);
   if (!match) return null;
-  const low = whole(match[1]!);
-  const high = match[2] ? whole(match[2]) : low;
+  const low = minorUnits(match[1]!);
+  const high = match[2] ? minorUnits(match[2]) : low;
   const currency = CURRENCY[match[3]!.toLowerCase() as keyof typeof CURRENCY];
   const quote = match[0].trim();
   if (!Number.isFinite(low) || !Number.isFinite(high) || quote.length > 500) return null;
   return {
-    minMinor: Math.min(low, high) * 100,
-    maxMinor: Math.max(low, high) * 100,
+    minMinor: Math.min(low, high),
+    maxMinor: Math.max(low, high),
     currency,
     quote,
   };
