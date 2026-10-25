@@ -64,7 +64,7 @@ Base: `e27f4a4` (the merge base with `main`; `main` has since gained S-16 pi-dep
 - Fix: insert the draft and apply the D-4 move in one `db.transaction` (a repository method such as `insertWithMove`), or at least move `moveForward` out of the `try` so a failure there cannot add a second billed row. Same for `sent` in `act`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (d3b8b57; generate only. act `sent` still updates then moves in two steps, FOLLOW-UP in plan.md)
 
 ### R2: Dead `history()` repository method and a content parse per history row
 - Severity: minor
@@ -73,7 +73,7 @@ Base: `e27f4a4` (the merge base with `main`; `main` has since gained S-16 pi-dep
 - Fix: drop `history()` from the port and repository (or use it from the opportunity repository), and map `status: row.status as OfferDraftStatus` directly in `toOfferHistory`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (d3b8b57)
 
 ### R3: The Today brief now calls drafts "analiz"
 - Severity: minor
@@ -82,7 +82,7 @@ Base: `e27f4a4` (the merge base with `main`; `main` has since gained S-16 pi-dep
 - Fix: change the two strings to name LLM calls ("wywołań LLM", "Koszt LLM dzisiaj"), keeping the contract field.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (d3b8b57; only the parenthetical, the label "Koszt analizy dzisiaj" is fixed by PRD)
 
 ### R4: AC4 test omits the planned "no other interceptor" assertion
 - Severity: minor
@@ -91,4 +91,4 @@ Base: `e27f4a4` (the merge base with `main`; `main` has since gained S-16 pi-dep
 - Fix: add `expect(mocks.pendingInterceptors()).toEqual([])` (the LLM one is consumed) after the steps, or log a `[minor]` deviation that the recorder makes the second check redundant.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (d3b8b57)

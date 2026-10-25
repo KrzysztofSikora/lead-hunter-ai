@@ -358,6 +358,9 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [FOLLOW-UP] R1: `act` with `sent` updates the draft and then moves the business status in two
+  steps; a throw between them leaves `SENT_MANUALLY` without `CONTACTED`. Make both one
+  transaction (e.g. a repository method taking the move). `generate` no longer double-bills.
 - [FOLLOW-UP] FR-09 AC3: show the number of drafts made today, against the limit, in the Today
   brief (`GET /api/digest/today`). The card shows the limit refusal, but the brief does not
   show the count yet.
