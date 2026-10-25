@@ -21,8 +21,20 @@ const t = strings.opportunities;
 const LANGUAGES = ['pl', 'en'] as const;
 const WORK_MODES = ['REMOTE', 'HYBRID', 'ONSITE'] as const;
 
-function positiveInt(value: string | null): number | undefined {
-  return value !== null && /^\d{1,9}$/.test(value) && Number(value) > 0 ? Number(value) : undefined;
+/** The contract's upper bound for `maxAgeDays`. */
+const MAX_AGE_DAYS = 3650;
+
+function positiveInt(value: string | null, max = 999_999_999): number | undefined {
+  return value !== null && /^\d{1,9}$/.test(value) && Number(value) > 0 && Number(value) <= max
+    ? Number(value)
+    : undefined;
+}
+
+/** An amount in currency units with at most two decimals. */
+function positiveAmount(value: string | null): number | undefined {
+  return value !== null && /^\d{1,9}(\.\d{1,2})?$/.test(value) && Number(value) > 0
+    ? Number(value)
+    : undefined;
 }
 
 /** What the URL query says; unknown or malformed values are ignored, never sent. */
@@ -31,6 +43,7 @@ function readQuery(params: URLSearchParams) {
   const minScore = params.get('minScore');
   const from = params.get('from') ?? '';
   const to = params.get('to') ?? '';
+  const country = (params.get('country') ?? '').trim().toUpperCase();
   return {
     page: Number.isInteger(page) && page >= 1 ? page : 1,
     sort: params.get('sort') === 'score' ? ('score' as const) : ('date' as const),
@@ -43,12 +56,12 @@ function readQuery(params: URLSearchParams) {
     status: BusinessStatus.safeParse(params.get('status')).data,
     from: isCalendarDate(from) ? from : undefined,
     to: isCalendarDate(to) ? to : undefined,
-    maxAgeDays: positiveInt(params.get('maxAgeDays')),
-    minAmount: positiveInt(params.get('minAmount')),
+    maxAgeDays: positiveInt(params.get('maxAgeDays'), MAX_AGE_DAYS),
+    minAmount: positiveAmount(params.get('minAmount')),
     currency: Currency.safeParse(params.get('currency')).data,
     language: LANGUAGES.find((value) => value === params.get('language')),
     workMode: WORK_MODES.find((value) => value === params.get('workMode')),
-    country: /^[A-Z]{2}$/.test(params.get('country') ?? '') ? params.get('country')! : undefined,
+    country: /^[A-Z]{2}$/.test(country) ? country : undefined,
     excludeIndustries: (params.get('excludeIndustries') ?? '').trim() || undefined,
   };
 }
@@ -90,6 +103,7 @@ export function OpportunitiesPage() {
   const [params, setParams] = useSearchParams();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
   const [analysis, setAnalysis] = useState<StatusLoad>({ state: 'loading' });
+  const [formError, setFormError] = useState<string | null>(null);
   const query = readQuery(params);
   const key = params.toString();
 
@@ -124,6 +138,11 @@ export function OpportunitiesPage() {
       const value = String(form.get(name) ?? '').trim();
       if (value) next.set(name, value);
     }
+    if (next.has('minAmount') && !next.has('currency')) {
+      setFormError(t.amountNeedsCurrency);
+      return;
+    }
+    setFormError(null);
     setParams(next);
   };
 
@@ -196,6 +215,7 @@ export function OpportunitiesPage() {
             name="maxAgeDays"
             type="number"
             min={1}
+            max={MAX_AGE_DAYS}
             inputMode="numeric"
             defaultValue={query.maxAgeDays ?? ''}
           />
@@ -205,8 +225,9 @@ export function OpportunitiesPage() {
           <input
             name="minAmount"
             type="number"
-            min={1}
-            inputMode="numeric"
+            min={0.01}
+            step="0.01"
+            inputMode="decimal"
             defaultValue={query.minAmount ?? ''}
           />
         </label>
@@ -266,6 +287,7 @@ export function OpportunitiesPage() {
           <Link to={`/okazje?minScore=${DEFAULT_MIN_SCORE}`}>{t.onlyTop(DEFAULT_MIN_SCORE)}</Link>
         </div>
       </form>
+      {formError && <p role="alert">{formError}</p>}
 
       {load.state === 'loading' && <p role="status">{t.loading}</p>}
       {load.state === 'error' && (

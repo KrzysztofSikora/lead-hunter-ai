@@ -58,6 +58,7 @@ export const strings = {
     maxAgeDays: 'Maks. wiek (dni)',
     minAmount: 'Min. kwota (jednostki waluty)',
     currency: 'Waluta',
+    amountNeedsCurrency: 'Wybierz walutę dla minimalnej kwoty.',
     language: 'Język',
     workMode: 'Tryb pracy',
     country: 'Kraj (kod, np. PL)',
