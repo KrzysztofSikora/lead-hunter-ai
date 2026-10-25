@@ -171,6 +171,8 @@ test('the operator imports a pasted post, sees it in the list and the repeat is 
   await expect(page.getByText(/Zmiana statusu \(operator\): Nowa → Zapisana/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Dodaj notatkę' }).click();
+  await expect(page.getByLabel('Notatka', { exact: true })).toBeVisible();
+  await assertNoOverflow(page);
   await page.getByLabel('Notatka', { exact: true }).fill('DEMO: zadzwonić we wtorek');
   await page.getByRole('button', { name: 'Zapisz notatkę' }).click();
   await expect(page.getByText('DEMO: zadzwonić we wtorek')).toBeVisible();
