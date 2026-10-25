@@ -56,7 +56,7 @@ Gates: typecheck ok, lint ok, unit tests ok (626), image not run (no Docker daem
 - Fix: in `parseDate`, return `null` (date unknown) for anything outside a sane range: not before 1970 and not later than the fetch time plus a small margin (e.g. 1 day; pass `now` in, or bound to year 9999 at minimum). Add one parser case with a year-12026 date and one integration assertion that the list still answers 200.
 - Effort: small
 - Lesson candidate: Bound every date or time that comes from a source to the range the contract can serialise before storing it.
-- Decision: open
+- Decision: fixed (026e922) + lesson proposed
 
 ### R2: A far-future `Retry-After` date makes the Sources view and the run answer 500
 - Severity: blocker
@@ -65,7 +65,7 @@ Gates: typecheck ok, lint ok, unit tests ok (626), image not run (no Docker daem
 - Fix: cap the stored wait in one place, e.g. `nextAllowedAt = at + min(max(retryAfter, interval), MAX_SOURCE_BACKOFF_MS)` with a cap such as 7 days (or `24 h`, matching the interval's upper bound), and treat a `Retry-After` above the cap as the cap. Add a case to integration test (e) with a far-future HTTP-date.
 - Effort: small
 - Lesson candidate: Bound every date or time that comes from a source to the range the contract can serialise before storing it.
-- Decision: open
+- Decision: fixed (5170138) + lesson proposed
 
 ### R3: The fixture anonymiser is quadratic on long tokens
 - Severity: major
@@ -74,7 +74,7 @@ Gates: typecheck ok, lint ok, unit tests ok (626), image not run (no Docker daem
 - Fix: bound the quantifiers (`{1,64}@{1,255}` style, matching RFC lengths) so each start position scans a constant length, and cut the XML to the first entries before scrubbing the head. Optionally add one timing assertion with a `FETCH_MAX_BYTES` body of a single long token.
 - Effort: small
 - Lesson candidate: no (covered by the existing lesson)
-- Decision: open
+- Decision: fixed (5dea73e)
 
 ### R4: `pnpm fixtures:record` fetches a source outside the per-source interval and backoff
 - Severity: minor
@@ -83,7 +83,7 @@ Gates: typecheck ok, lint ok, unit tests ok (626), image not run (no Docker daem
 - Fix: refuse when `source.nextAllowedAt > now` (print the time), or go through `adapter.healthCheck` for the fetch and set `last_attempt_at`. Catch `HttpFetchError` and print its `reason`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (7db1bfc)
 
 ### R5: `.env.example` says the interval also applies to a check
 - Severity: minor
@@ -92,4 +92,4 @@ Gates: typecheck ok, lint ok, unit tests ok (626), image not run (no Docker daem
 - Fix: change it to "Shortest time between two runs of one source, in minutes … A check (Sprawdź) waits 60 s since the last attempt and for any wait the source asked for."
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (7db1bfc)
