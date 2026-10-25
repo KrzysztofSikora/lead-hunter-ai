@@ -345,6 +345,8 @@ export const SourceError = z
   })
   .strict();
 
+export type SourceError = z.infer<typeof SourceError>;
+
 /** D-10: counts for the empty state; `checked` counts enabled sources that were attempted. */
 export const SourcesStatus = z
   .object({ checked: z.number().int().min(0), errors: z.array(SourceError) })

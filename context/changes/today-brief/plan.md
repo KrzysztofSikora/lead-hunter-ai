@@ -87,6 +87,9 @@ Every value comes from stored rows; nothing is padded, estimated or invented.
 | D-11 | Source status counts | Enabled sources: `ok` = attempted and no current error; `error` = current error; `notChecked` = never attempted; errors list = current errors, newest first | B: count failed job runs of today (a source that failed at 08:00 and recovered at 18:00 would still show as broken) | The current state is what the operator must act on; history stays on Sources | cheap | agent |
 | D-12 | Where the follow-ups due come from on Today | In the digest response (reusing `PipelineRepository.followUpsDue` and `PipelineItem`); `DueFollowUps` leaves `PipelinePage.tsx` | B: keep a second request to `GET /api/pipeline` | One request per view; the pipeline summary is heavier | cheap | agent |
 | D-13 | Nav label and route | Route `/` stays; the link reads "Dziś"; the health line stays at the top of the view | B: new route `/dzis` with Start kept | PRD §11 names the first view Today; `/` keeps old bookmarks working | cheap | agent |
+| D-14 | Which rows are candidates (plan-review 1) | `score`, `category`, `evidenceLevel` all `IS NOT NULL` in the candidate query, in addition to D-3 | B: filter in `select.ts` (the row would still be loaded and could reach `DigestItem`) | A completed INSUFFICIENT_DATA row moved to QUALIFIED/SAVED has none of them and would make `DigestToday.parse` throw (500) | cheap | agent |
+| D-15 | Near-duplicate invariant (plan-review 6) | Every TOP item has at most one near-duplicate in TOP (a group of at most 2, also along an A~B~C chain); `pickTop` enforces it | B: at most 2 near-duplicates per item (a group of 3) | Matches the roadmap's "at most 2 near-duplicates"; not transitive Jaccard cannot sneak in a third | cheap | agent |
+| D-16 | What `newAboveThreshold` counts (plan-review 7) | Main-section (not weak) rows with a score `>= minScore`, any business status, created since Warsaw midnight | B: only open statuses (a contacted lead from this morning would vanish from the count) | The header says how many good leads arrived today, independent of what the operator did with them | cheap | agent |
 
 ## Design
 
@@ -212,7 +215,7 @@ and errors.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Digest API
+- [x] Phase 1: Digest API
 - [ ] Phase 2: Today view
 
 ## Human checks
@@ -220,6 +223,12 @@ and errors.
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] Phase 1 integration tests seed `raw_signals`, `opportunities`, `analyses` and `sources` rows directly instead of running a fake provider: scores come from the scoring rules, so chosen scores/categories are only reachable by writing the stored rows the read model reads. The digest query is what is under test.
+- [minor] `toItem` is exported from `modules/pipeline/service.ts` and reused by the digest service (plan-review 8); `type SourceError` is now exported from the contracts (it was only a value).
+- [minor] The digest service takes `PipelineRepository` and `Clock` as `DigestDeps`; `isDemo` of the opportunities module is private, so the digest compares the provider with `'mock'` itself.
+- [REVIEW] plan-review 4: Phase 1 covers FR-10 AC6 for the brief only for the minimum score (D-8); excluded industries, source age, amount, job type, language and geography are not applied to the brief. The PR must state this partial coverage. Alternative: accept the list's filter subset in `DigestQuery`.
+- [FOLLOW-UP] Persisted filters (FR-10 AC6) applied to the brief once they exist.
+- [minor] plan-review 2, 3, 5 concern Phase 2 and are answered there: the main path asserts `/Nowe sygnały: \d+/` (not a hard-coded 1), the smoke step asserts the empty-state text on `/`, and `evidence` gets an optional directory argument so the S-08 `today-360.jpg` is restored, not overwritten.
 - [FOLLOW-UP] FR-09 AC3 wants the brief to show how much work waits for the next day when a daily
   limit is reached; `AnalysisServiceStatus.waiting` exists, but limits belong to S-05. Add the count
   to `DigestToday` there.
