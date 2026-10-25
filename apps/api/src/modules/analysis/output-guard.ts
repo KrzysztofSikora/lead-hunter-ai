@@ -10,6 +10,26 @@ const squash = (value: string): string => value.replace(/\s+/g, ' ').trim().toLo
 
 const PAID_CATEGORIES = new Set(['DIRECT_GIG', 'B2B_SUBCONTRACT']);
 
+/** Amounts (minor units) a number in the text can mean: separators as thousands, or a decimal tail. */
+function amountsIn(text: string): Set<number> {
+  const amounts = new Set<number>();
+  for (const token of text.match(/\d[\d .,]*\d|\d/g) ?? []) {
+    amounts.add(Number(token.replace(/\D/g, '')) * 100);
+    const decimal = /^(.*\d)[.,](\d{1,2})$/.exec(token);
+    if (decimal) {
+      const cents = decimal[2]!.padEnd(2, '0');
+      amounts.add(Number(decimal[1]!.replace(/\D/g, '')) * 100 + Number(cents));
+    }
+  }
+  return amounts;
+}
+
+/** The quote is the evidence for the amounts: both must be readable in it. */
+function quoteStates(budget: { minMinor: number; maxMinor: number; quote: string }): boolean {
+  const amounts = amountsIn(budget.quote);
+  return amounts.has(budget.minMinor) && amounts.has(budget.maxMinor);
+}
+
 /**
  * D-14: provider-independent checks after schema validation. What the source did not say is
  * removed or downgraded, and every change is noted. Source text is only compared, never executed.
@@ -17,7 +37,10 @@ const PAID_CATEGORIES = new Set(['DIRECT_GIG', 'B2B_SUBCONTRACT']);
 export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): GuardedAnalysis {
   const notes: string[] = [];
   const haystack = squash(sourceText);
-  const inSource = (value: string): boolean => haystack.includes(squash(value));
+  const inSource = (value: string): boolean => {
+    const needle = squash(value);
+    return needle !== '' && haystack.includes(needle);
+  };
 
   const sourceFacts = result.sourceFacts.filter((fact) => {
     if (inSource(fact)) return true;
@@ -32,6 +55,9 @@ export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): 
   let sourceBudget = result.sourceBudget;
   if (sourceBudget && !inSource(sourceBudget.quote)) {
     notes.push('Usunięto budżet ze źródła: cytat nie występuje w tekście.');
+    sourceBudget = null;
+  } else if (sourceBudget && !quoteStates(sourceBudget)) {
+    notes.push('Usunięto budżet ze źródła: cytat nie zawiera podanych kwot.');
     sourceBudget = null;
   }
 

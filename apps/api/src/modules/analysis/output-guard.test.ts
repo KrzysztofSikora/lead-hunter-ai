@@ -27,6 +27,23 @@ describe('guardAnalysis: source budget (TR-01)', () => {
     expect(notes[0]).toContain('budżet');
   });
 
+  it('drops a budget when the quote occurs but does not state the amounts', () => {
+    const { result, notes } = guardAnalysis(
+      quoted('Budżet'),
+      'Szukam kogoś do zlecenia. Budżet do ustalenia.',
+    );
+    expect(result.verdict === 'ANALYSED' && result.sourceBudget).toBeNull();
+    expect(notes.join(' ')).toContain('kwot');
+  });
+
+  it('drops an empty quote and an empty source fact', () => {
+    const base = quoted('');
+    const withFact = { ...base, sourceFacts: ['  '] };
+    const { result } = guardAnalysis(withFact, text);
+    expect(result.verdict === 'ANALYSED' && result.sourceBudget).toBeNull();
+    expect(result.sourceFacts).toEqual([]);
+  });
+
   it('drops a budget whose quote was altered by one character', () => {
     const { result } = guardAnalysis(quoted('budżet 8000-12001 PLN'), text);
     expect(result.verdict === 'ANALYSED' && result.sourceBudget).toBeNull();
