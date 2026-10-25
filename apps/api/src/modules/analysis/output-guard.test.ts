@@ -174,3 +174,105 @@ describe('guardAnalysis: evidence and category (FR-10 AC3)', () => {
     expect(notes).toEqual([]);
   });
 });
+
+describe('guardAnalysis: invented links and buyer (FR-08 AC4, TR-01)', () => {
+  // DEMO text: no real company, address or person.
+  const text =
+    'DEMO: Firma Przykładowa szuka programisty. Szczegóły: https://example.test/oferta, ' +
+    'kontakt: praca@example.test. Budżet 8000-12000 PLN.';
+
+  const withFields = (overrides: Parameters<typeof analysis>[0]) => analysis(overrides);
+
+  it('keeps URLs and e-mail addresses that the source contains', () => {
+    const base = withFields({
+      problem: 'Zlecenie opisane na https://example.test/oferta.',
+      nextAction: 'Napisz na praca@example.test',
+    });
+    const { result, notes } = guardAnalysis(base, text);
+    expect(result).toMatchObject({
+      problem: 'Zlecenie opisane na https://example.test/oferta.',
+      nextAction: 'Napisz na praca@example.test',
+    });
+    expect(notes).toEqual([]);
+  });
+
+  it('removes a hallucinated URL and e-mail from any text field and notes each one', () => {
+    const base = withFields({
+      problem: 'Zobacz https://wymyslona.test/firma oraz https://example.test/oferta.',
+      rationale: 'Pisz do ceo@wymyslona.test lub na praca@example.test',
+      nextAction: 'Odwiedź www.wymyslona.test',
+    });
+    const { result, notes } = guardAnalysis(base, text);
+    if (result.verdict !== 'ANALYSED') throw new Error('expected ANALYSED');
+    expect(result.problem).toBe('Zobacz [usunięto] oraz https://example.test/oferta.');
+    expect(result.rationale).toBe('Pisz do [usunięto] lub na praca@example.test');
+    expect(result.nextAction).toBe('Odwiedź [usunięto]');
+    expect(notes).toHaveLength(3);
+    expect(notes.join(' ')).toContain('wymyslona.test');
+  });
+
+  it('ignores case and trailing punctuation when matching against the source', () => {
+    const base = withFields({ problem: 'Zobacz HTTPS://EXAMPLE.TEST/OFERTA. Potem koniec.' });
+    const { result, notes } = guardAnalysis(base, text);
+    expect(result.verdict === 'ANALYSED' && result.problem).toContain(
+      'HTTPS://EXAMPLE.TEST/OFERTA',
+    );
+    expect(notes).toEqual([]);
+  });
+
+  it('drops list entries that consisted only of an invented value', () => {
+    const base = withFields({
+      requiredClarifications: ['https://wymyslona.test/x', 'Jaki jest termin?'],
+    });
+    const { result } = guardAnalysis(base, text);
+    expect(result.verdict === 'ANALYSED' && result.requiredClarifications).toEqual([
+      'Jaki jest termin?',
+    ]);
+  });
+
+  it('cleans an INSUFFICIENT_DATA result too', () => {
+    const { result, notes } = guardAnalysis(
+      {
+        verdict: 'INSUFFICIENT_DATA',
+        reason: 'Brak danych, patrz https://wymyslona.test',
+        unknowns: [],
+        sourceFacts: [],
+      },
+      text,
+    );
+    expect(result).toMatchObject({ reason: 'Brak danych, patrz [usunięto]' });
+    expect(notes).toHaveLength(1);
+  });
+
+  it('does not confirm a buyer that the source does not name', () => {
+    const base = withFields({
+      buyerOrAudience: 'Wymyślona Spółka sp. z o.o.',
+      buyerConfirmed: true,
+    });
+    const { result, notes } = guardAnalysis(base, text);
+    expect(result).toMatchObject({
+      buyerOrAudience: 'Wymyślona Spółka sp. z o.o.',
+      buyerConfirmed: false,
+    });
+    expect(notes.join(' ')).toContain('Nabywc');
+  });
+
+  it('keeps a confirmed buyer that the source names, ignoring case and spacing', () => {
+    const base = withFields({ buyerOrAudience: 'firma   przykładowa', buyerConfirmed: true });
+    const { result, notes } = guardAnalysis(base, text);
+    expect(result).toMatchObject({ buyerConfirmed: true });
+    expect(notes).toEqual([]);
+  });
+
+  it('does not confirm a buyer that is absent while the flag says confirmed', () => {
+    const base = withFields({ buyerOrAudience: null, buyerConfirmed: true });
+    expect(guardAnalysis(base, text).result).toMatchObject({ buyerConfirmed: false });
+  });
+
+  it('leaves an unconfirmed buyer alone and silent', () => {
+    const base = withFields({ buyerOrAudience: 'Małe firmy', buyerConfirmed: false });
+    const { result, notes } = guardAnalysis(base, text);
+    expect(result).toMatchObject({ buyerOrAudience: 'Małe firmy', buyerConfirmed: false });
+    expect(notes).toEqual([]);
+  });
+});

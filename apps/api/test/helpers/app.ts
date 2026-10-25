@@ -85,7 +85,7 @@ export async function buildTestApp(
   const provider =
     options.provider !== undefined
       ? (options.provider ?? undefined)
-      : config.llmProvider === 'mock'
+      : config.llm?.provider === 'mock'
         ? new MockProvider()
         : undefined;
   const runner = createAnalysisRunner({

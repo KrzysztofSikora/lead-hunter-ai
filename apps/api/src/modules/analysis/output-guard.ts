@@ -64,7 +64,7 @@ function quoteStates(budget: { minMinor: number; maxMinor: number; quote: string
  * D-14: provider-independent checks after schema validation. What the source did not say is
  * removed or downgraded, and every change is noted. Source text is only compared, never executed.
  */
-export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): GuardedAnalysis {
+function guardAgainstSource(result: OpportunityAnalysis, sourceText: string): GuardedAnalysis {
   const notes: string[] = [];
   const haystack = squash(sourceText);
   const inSource = (value: string): boolean => {
@@ -113,4 +113,60 @@ export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): 
   }
 
   return { result: { ...result, sourceFacts, sourceBudget, evidenceLevel, category }, notes };
+}
+
+const REMOVED = '[usunięto]';
+const LINK = /\b(?:https?:\/\/|www\.)[^\s<>"'\])]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+/giu;
+
+/** Trailing punctuation is not part of a URL or address; a trailing slash does not change it. */
+const linkKey = (link: string): string =>
+  link
+    .replace(/[.,;:!?]+$/u, '')
+    .replace(/\/+$/u, '')
+    .toLowerCase();
+
+/** D-12: URLs and e-mail addresses the source does not contain are the model's invention. */
+function removeInventedLinks(value: unknown, sourceLower: string, notes: string[]): unknown {
+  if (typeof value === 'string') {
+    return value.replace(LINK, (link) => {
+      if (sourceLower.includes(linkKey(link))) return link;
+      notes.push(`Usunięto adres, którego nie ma w tekście źródła: „${link.slice(0, 80)}”.`);
+      return REMOVED;
+    });
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => removeInventedLinks(item, sourceLower, notes))
+      .filter((item) => !(typeof item === 'string' && item.trim() === REMOVED));
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, item]) => [
+        key,
+        removeInventedLinks(item, sourceLower, notes),
+      ]),
+    );
+  }
+  return value;
+}
+
+/**
+ * D-14 and D-12: the S-04 checks, then removal of invented URLs and e-mail addresses from every
+ * text field (FR-08 AC4) and the buyer rule: a buyer or company the source does not name is a
+ * model inference, never confirmed. Names in free prose are not detected.
+ */
+export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): GuardedAnalysis {
+  const base = guardAgainstSource(result, sourceText);
+  const notes = [...base.notes];
+  const sourceLower = sourceText.toLowerCase();
+  let guarded = removeInventedLinks(base.result, sourceLower, notes) as OpportunityAnalysis;
+
+  if (guarded.verdict === 'ANALYSED' && guarded.buyerConfirmed) {
+    const buyer = guarded.buyerOrAudience;
+    if (buyer === null || !squash(sourceText).includes(squash(buyer))) {
+      notes.push('Nabywcę oznaczono jako niepotwierdzonego: nie występuje w tekście źródła.');
+      guarded = { ...guarded, buyerConfirmed: false };
+    }
+  }
+  return { result: guarded, notes };
 }

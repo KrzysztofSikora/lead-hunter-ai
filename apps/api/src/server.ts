@@ -58,7 +58,7 @@ async function main(): Promise<void> {
   let logger: { error: (message: string) => void } = { error: () => undefined };
   const runner = createAnalysisRunner({
     repository: createAnalysisRepository(db),
-    provider: config.llmProvider === 'mock' ? new MockProvider() : undefined,
+    provider: config.llm?.provider === 'mock' ? new MockProvider() : undefined,
     profile: { get: () => profileService.get().profile },
     clock,
     dailyLimit: config.analysisDailyLimit,

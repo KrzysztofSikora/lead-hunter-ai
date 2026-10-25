@@ -121,6 +121,7 @@ output guard as the mock (FR-08 AC7). In detail:
 | D-11 | FR-09 AC3 in this item | The analysis part (20/day, S-04 D-9) is re-proved with a real provider adapter and covers paid and free providers; raw-signal (100) and offer-draft (5) limits are added by the items that create that work (S-10/S-12, S-07), the brief count by S-13 | B: add all three env variables and counters now (AC3 "complete" on paper, but two counters with nothing to count) | Nothing produces raw signals in bulk or drafts yet; a counter without a producer cannot be tested meaningfully | cheap | agent |
 | D-12 | FR-08 AC4 guard | In `guardAnalysis`, after the S-04 checks: (a) every URL (`https?://…` and `www.…`) and e-mail address in any string field of the result that does not occur in the source text (case-insensitive, trailing punctuation trimmed) is replaced by `[usunięto]`, list entries consisting only of it are dropped, one note per value; (b) `buyerOrAudience` not found in the source text → `buyerConfirmed = false` + note (it stays visible as a model inference, never as a fact); `sourceFacts` are already verbatim-checked (S-04). Person and company names in free prose are not detected | B: flag the whole analysis instead of removing (no partial edits, but one stray link makes the analysis useless); C: name detection by capitalised-word heuristics (more coverage, many false positives in Polish) | AC4 allows "removed or flagged"; URLs and e-mails are the values the operator could act on (contact, link); buyer is the only structured name field | cheap | agent |
 | D-13 | Status API extension | `AnalysisServiceStatus` gains (additively) `provider: 'mock' \| 'anthropic' \| 'openai-compatible' \| null`, `model: string \| null`, `paid: boolean`, `blocked: null \| 'budget_missing' \| 'price_unknown' \| 'budget_reached'`, `budget: { capMicroUsd: int \| null, spentMicroUsd: int, unknownCostCount: int, monthStart: ISO }`. `LatestAnalysis` gains `costMicroUsd: int \| null` and `reusedFromAnalysisId: int \| null` | B: a separate `GET /api/llm/budget` (keeps the status small, one more call for the list page and the brief) | S-04 D-11 planned additive budget fields here | costly (public API) | agent |
+| D-14 | Cost of a call to an unpaid provider (plan-review #4) | Unpaid provider (`LLM_PAID=false`) → `cost_micro_usd = 0`; `unknownCount` in `spentSince` = rows with `cost IS NULL AND provider <> 'mock' AND reused_from_analysis_id IS NULL`; so Ollama/Groq never count as "bez danych" and nothing carries over after switching to a paid provider. Phase 1 `costMicroUsd` stays pure (null when unknown); the runner (Phase 3) maps unpaid → 0 | B: `analyses.paid` column (explicit, but another migration column for a derived fact) | Cheapest way to keep `unknownCount` honest without a column | cheap | agent |
 
 ## Design
 
@@ -340,7 +341,7 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Config, prices, budget rules and the AC4 guard
+- [x] Phase 1: Config, prices, budget rules and the AC4 guard
 - [ ] Phase 2: Anthropic and OpenAI-compatible adapters (checkpoint)
 - [ ] Phase 3: Runner — budget, cost, reuse, failures
 - [ ] Phase 4: Retry route, UI and docs
@@ -350,6 +351,11 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [REVIEW] (Phase 1, plan-review #2) D-3, D-6 and D-8 touch paid calls, the prompt-injection boundary and retries of billed calls; per `autonomy.md` section 2 they are `costly`, not `cheap`. Reversal columns above are left as written, the PR reviewer should treat them as costly.
+- [REVIEW] (Phase 1, plan-review #3) D-3 blocks a paid model without a price (`price_unknown`), which differs from the roadmap's "unknown model → cost 'brak danych'"; "brak danych" still applies to free providers and to answers without usage. Implemented in `budgetGate` (Phase 1).
+- [REVIEW] (Phase 1, plan-review #5) FR-08 AC4 is only partly covered: URLs and e-mails are removed in every text field and the buyer is never confirmed unless named in the source (`output-guard.ts`), but person and company names in free prose are not detected; they rely on the card's "wniosek modelu" label (TR-01, S-06).
+- [minor] (Phase 1, plan-review #10) Logger `SECRET_KEYS` not extended with `llmApiKey`: nothing logs the config object, and the Phase 3 canary test is the proof. Note `*.apiKey` is one level deep, so a logged `config` (two levels) would not be redacted; nothing logs it.
+- [minor] (Phase 1) `LLM_PRICES` syntax is validated only for real providers; with `LLM_PROVIDER=mock` all other LLM variables are ignored.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, ENV_VARIABLES, loadConfig } from './env.js';
+import { DEFAULT_LLM_PRICES } from './llm-prices.js';
 
 const VALID_HASH = `scrypt:15:8:3:${'A'.repeat(22)}:${'B'.repeat(43)}`;
 const HASH = { OPERATOR_PASSWORD_HASH: VALID_HASH };
@@ -41,7 +42,7 @@ describe('loadConfig', () => {
       logLevel: 'debug',
       operatorPasswordHash: VALID_HASH,
       importMaxTextChars: 5000,
-      llmProvider: 'mock',
+      llm: { provider: 'mock' },
       analysisDailyLimit: 5,
       prefilterMaxAgeDays: 7,
     });
@@ -67,6 +68,15 @@ describe('loadConfig', () => {
     ['LOG_LEVEL', 'loud'],
     ['IMPORT_MAX_TEXT_CHARS', '999'],
     ['LLM_PROVIDER', 'openai'],
+    ['LLM_MONTHLY_BUDGET_USD', '0'],
+    ['LLM_MONTHLY_BUDGET_USD', '100001'],
+    ['LLM_MONTHLY_BUDGET_USD', 'dużo'],
+    ['LLM_PAID', 'yes'],
+    ['LLM_JSON_MODE', 'strict'],
+    ['LLM_BASE_URL', 'ftp://host'],
+    ['LLM_BASE_URL', 'nie-adres'],
+    ['LLM_PRICES', 'model=1'],
+    ['LLM_PRICES', 'model=a/b'],
     ['ANALYSIS_DAILY_LIMIT', '0'],
     ['ANALYSIS_DAILY_LIMIT', '1001'],
     ['PREFILTER_MAX_AGE_DAYS', '0'],
@@ -180,6 +190,116 @@ describe('ENV_VARIABLES', () => {
     const template = readFileSync(new URL('../../../.env.example', import.meta.url), 'utf8');
     for (const name of ENV_VARIABLES) {
       expect(template, name).toMatch(new RegExp(`^#?\\s*${name}=`, 'm'));
+    }
+  });
+});
+
+describe('loadConfig: LLM providers (D-1, D-2)', () => {
+  it('leaves llm unset without LLM_PROVIDER', () => {
+    expect(loadConfig({ LLM_API_KEY: 'k' })).not.toHaveProperty('llm');
+  });
+
+  it('configures anthropic with its defaults and the price table', () => {
+    expect(loadConfig({ LLM_PROVIDER: 'anthropic', LLM_API_KEY: 'k' }).llm).toEqual({
+      provider: 'anthropic',
+      model: 'claude-haiku-5-5',
+      offerModel: 'claude-sonnet-5-5',
+      apiKey: 'k',
+      paid: true,
+      prices: DEFAULT_LLM_PRICES,
+      jsonMode: 'json_object',
+    });
+  });
+
+  it('configures openai-compatible: key optional, free by default, offer model follows model', () => {
+    expect(
+      loadConfig({
+        LLM_PROVIDER: 'openai-compatible',
+        LLM_BASE_URL: 'http://localhost:11434/v1',
+        LLM_MODEL: 'llama3.1',
+        LLM_JSON_MODE: 'off',
+      }).llm,
+    ).toEqual({
+      provider: 'openai-compatible',
+      baseUrl: 'http://localhost:11434/v1',
+      model: 'llama3.1',
+      offerModel: 'llama3.1',
+      paid: false,
+      prices: DEFAULT_LLM_PRICES,
+      jsonMode: 'off',
+    });
+  });
+
+  it('lets LLM_PAID, models and the budget override the defaults', () => {
+    const llm = loadConfig({
+      LLM_PROVIDER: 'openai-compatible',
+      LLM_BASE_URL: 'https://api.example.test/v1',
+      LLM_MODEL: 'm1',
+      LLM_MODEL_OFFER: 'm2',
+      LLM_PAID: 'true',
+      LLM_MONTHLY_BUDGET_USD: '12.5',
+    }).llm;
+    expect(llm).toMatchObject({
+      offerModel: 'm2',
+      paid: true,
+      monthlyBudgetMicroUsd: 12_500_000,
+    });
+    expect(
+      loadConfig({ LLM_PROVIDER: 'anthropic', LLM_API_KEY: 'k', LLM_PAID: 'false' }).llm,
+    ).toMatchObject({ paid: false });
+  });
+
+  it('keeps sub-cent budgets exact as micro-USD', () => {
+    const llm = loadConfig({
+      LLM_PROVIDER: 'anthropic',
+      LLM_API_KEY: 'k',
+      LLM_MONTHLY_BUDGET_USD: '0.01',
+    }).llm;
+    expect(llm).toMatchObject({ monthlyBudgetMicroUsd: 10_000 });
+  });
+
+  it('merges LLM_PRICES (USD per million tokens) over the table', () => {
+    const llm = loadConfig({
+      LLM_PROVIDER: 'anthropic',
+      LLM_API_KEY: 'k',
+      LLM_PRICES: 'claude-haiku-5-5=0.2/1, my-model=0.059/0.079',
+    }).llm;
+    expect(llm).toMatchObject({
+      prices: {
+        'claude-haiku-5-5': { inputMicroUsdPerMTok: 200_000, outputMicroUsdPerMTok: 1_000_000 },
+        'claude-sonnet-5-5': DEFAULT_LLM_PRICES['claude-sonnet-5-5'],
+        'my-model': { inputMicroUsdPerMTok: 59_000, outputMicroUsdPerMTok: 79_000 },
+      },
+    });
+  });
+
+  it('ignores the other LLM variables for mock', () => {
+    expect(
+      loadConfig({ LLM_PROVIDER: 'mock', LLM_PRICES: 'broken', LLM_API_KEY: 'k' }).llm,
+    ).toEqual({ provider: 'mock' });
+  });
+
+  it.each([
+    [{ LLM_PROVIDER: 'anthropic' }, ['LLM_API_KEY']],
+    [{ LLM_PROVIDER: 'openai-compatible' }, ['LLM_BASE_URL', 'LLM_MODEL']],
+    [{ LLM_PROVIDER: 'openai-compatible', LLM_MODEL: 'm' }, ['LLM_BASE_URL']],
+    [{ LLM_PROVIDER: 'openai-compatible', LLM_BASE_URL: 'http://x' }, ['LLM_MODEL']],
+  ])('refuses to start with %j and names %j', (env, variables) => {
+    try {
+      loadConfig(env);
+      expect.unreachable();
+    } catch (error) {
+      expect((error as ConfigError).issues.map((i) => i.variable)).toEqual(variables);
+      expect((error as ConfigError).issues[0]?.message).toContain('wymagany');
+    }
+  });
+
+  it('never prints the API key in a configuration error', () => {
+    try {
+      loadConfig({ LLM_PROVIDER: 'anthropic', LLM_API_KEY: 'sk-SECRET', LLM_PAID: 'maybe' });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as ConfigError).message).not.toContain('sk-SECRET');
     }
   });
 });
