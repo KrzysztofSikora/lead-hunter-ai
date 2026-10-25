@@ -1,7 +1,16 @@
 # Review: pipeline-and-payments
 
 Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (36 files, 441 tests), e2e ok (5 tests), image fail (environment: corepack cannot fetch pnpm 12.15.0 inside the build, "self-signed certificate in certificate chain" from the sandbox proxy, at `RUN pnpm install --frozen-lockfile`, before any project code; the diff touches no Dockerfile, `package.json` or lockfile; same failure as in the earlier reviews), mutation not run (no S-08 module is in *Mutation targets*; no `mutation.md`) · Round: 1
+Gates: typecheck ok, lint ok, unit tests ok (36 files, 444 tests), e2e ok (5 tests), image fail (environment: corepack cannot fetch pnpm 12.15.0 inside the build, "self-signed certificate in certificate chain" from the sandbox proxy, at `RUN pnpm install --frozen-lockfile`, before any project code; the fix commits touch no Dockerfile, `package.json` or lockfile; same failure as round 1), mutation not run (no S-08 module is in *Mutation targets*; no `mutation.md`) · Round: 2
+
+## Re-review of round 1
+| Finding | Marked | Verified | Evidence |
+|---------|--------|----------|----------|
+| R1 | fixed | partly | `NEEDS_VERIFICATION` now starts from rank 0, records `skipped` and stops at `CONTACTED` (`status.ts:96-100`, tests in `status.test.ts` and `pipeline-status.int.test.ts`). The same side door is still open through `REJECTED`/`EXPIRED` (R6) |
+| R2 | fixed | yes | D-8, D-9, D-11 are `costly (public API: PipelineResponse)` in `plan.md` |
+| R3 | fixed | yes | `CardActions.tsx:128-131` refuses dates without a value with `contractValueRequired` |
+| R4 | fixed | yes | `e2e/vertical-main-path.spec.ts:88-93` asserts the `dd` exactly; e2e passes |
+| R5 | fixed | yes | `activity-repository.ts:41-44` passes `followUpCleared`; stored as `followUpCleared: true`, rendered by `eventDetails`; positive and negative integration cases |
 
 ## Plan vs diff
 | File | Status | Note |
@@ -40,15 +49,17 @@ Gates: typecheck ok, lint ok, unit tests ok (36 files, 441 tests), e2e ok (5 tes
 | `context/changes/pipeline-and-payments/{plan,plan-review}.md`, `evidence/*.jpg` | done | evidence written only with `E2E_EVIDENCE=1` (lesson); images under 300 KB |
 
 ## Areas
+Round 2 covers the fix commits `c625db4..4c343f0`; the round-1 *Plan vs diff* below still holds for the rest. The fix commits add no file outside that table except `context/lessons.md` (lesson proposal, separate commit `de3bea9`).
+
 | Area | Result (ok / concern / fail) | One-line reason |
 |------|------------------------------|-----------------|
-| Correctness | concern | ACs met, but `NEEDS_VERIFICATION` is a free pass around the user's transition rule (R1); contract dates silently dropped (R3) |
-| Design | ok | one pure `checkMove` shared by API and web; repositories behind ports; additive migration |
-| Safety | ok | bodies validated with Zod, clock rules as 400s, metadata validated before storing, no outbound calls, notes not logged |
-| Tests | ok | behaviour-level table and integration tests, failure paths covered; e2e totals are loose (R4) |
-| Simplicity | ok | small modules; the detail reads `follow_up_at` in a second query instead of the row query (not a finding) |
-| Plan fidelity | ok | every divergence is logged under *Deviations* |
-| Agent decisions | concern | the public `GET /api/pipeline` shape still has no `costly` row (R2) |
+| Correctness | concern | R1 closed the `NEEDS_VERIFICATION` door, but `REJECTED`/`EXPIRED` still lead to `MEETING → WON` with no contact recorded (R6) |
+| Design | ok | the rule stays in one pure `checkMove`; the follow-up flag is decided in the transaction that clears it |
+| Safety | ok | `followUpCleared` is a strict `z.literal(true)` in the stored metadata; nothing new crosses the boundary unvalidated |
+| Tests | ok | each fix has a behaviour test (unit, integration, e2e); the R6 path has none |
+| Simplicity | ok | small, local fixes |
+| Plan fidelity | concern | round-1 deviations sit under *Review response*, not *Deviations*; three plan/doc lines are stale (R7) |
+| Agent decisions | ok | D-8, D-9, D-11 now `costly`; D-1 updated in place for R1 |
 
 ## Findings
 ### R1: `NEEDS_VERIFICATION` bypasses "WON/LOST only after CONTACTED" and "moving back needs a note"
@@ -95,3 +106,21 @@ Gates: typecheck ok, lint ok, unit tests ok (36 files, 441 tests), e2e ok (5 tes
 - Effort: small
 - Lesson candidate: no
 - Decision: fixed (4c343f0)
+
+### R6: `REJECTED`/`EXPIRED` still lead to `WON` without a recorded contact
+- Severity: major
+- Where: `packages/contracts/src/status.ts:93` (`if (from === 'REJECTED' || from === 'EXPIRED') return back;`); claim at `context/changes/pipeline-and-payments/plan.md:317-322`
+- Problem: the R1 fix capped only `NEEDS_VERIFICATION`. Probed `checkMove` from the built contracts: `NEW → REJECTED` is `aside` (no note), `REJECTED → MEETING` is `back` with `skipped: []` (note only), `MEETING → WON` is `forward`. So a row that was never contacted is won in three moves and its history shows no `CONTACTED` and no skipped stages; `EXPIRED → REPLIED` behaves the same. Round 1's option B named all three off-path states. The plan's R1 entry says "a later stage always passes a recorded contact", which the code does not guarantee, and the new proposed lesson ("test invariants over two-step paths") is not applied to this path. The `contacted` total stays right only because `pipeline-repository.ts:8` counts any move to `REPLIED…LOST`.
+- Fix: A (matches option B and the plan's claim): in `checkMove`, from `REJECTED`/`EXPIRED` allow only main targets up to `CONTACTED` (still `back`, note required), and add the three-step case `NEW → REJECTED → MEETING` (refused) to `status.test.ts` and the integration test. B (keeps reopening to any stage with a note as a deliberate correction): leave the code, fix the plan's R1 entry and D-1 to say reopening with a note may skip the contact, and add a test pinning that.
+- Effort: small
+- Lesson candidate: no (the lesson proposed in round 1 covers it)
+- Decision: open
+
+### R7: Round-1 deviations are outside *Deviations*, and three statements are now stale
+- Severity: minor
+- Where: `context/changes/pipeline-and-payments/plan.md:315-326` (*Review response*), `plan.md:284-289`, `plan.md` D-1 ("`skipped` = ... from a main stage, else `[]`"), `packages/contracts/src/status.ts:67`
+- Problem: the R1 `[REVIEW]`, R2 `[REVIEW]` and R5 `[minor]` entries are under *Review response*, which the template reserves for plan-review findings in revise mode; `/pr-body` takes `[REVIEW]` items from *Deviations*, so the D-1 change and its stated remaining gap (`WON → NEEDS_VERIFICATION → SAVED` with no note) may not reach the reviewer. The Phase 1 `[REVIEW]` still says `skipped` "stays `[]` out of `NEEDS_VERIFICATION`", D-1 still says `skipped` is `[]` unless the move starts on a main stage, and the `MoveCheck.skipped` doc comment says the same; all three are false since `c625db4`. The R5 entry also widens D-2's `costly` stored shape and DTO (`followUpCleared`) without naming D-2.
+- Fix: move the three entries under *Deviations*; update the Phase 1 note, the D-1 `skipped` sentence and the `status.ts:67` comment to "from a main stage or from `NEEDS_VERIFICATION` (rank 0)"; name D-2 in the R5 entry (additive).
+- Effort: small
+- Lesson candidate: no
+- Decision: open
