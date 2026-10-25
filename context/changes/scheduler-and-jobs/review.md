@@ -1,7 +1,13 @@
 # Review: scheduler-and-jobs
 
-Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (47 files, 663 tests), e2e ok (5), image not run (no Docker daemon in this environment), mutation not run (not a target in `context/test-plan.md`, off by default) · Round: 1
+Verdict: APPROVE
+Gates: typecheck ok, lint ok, unit tests ok (47 files, 667 tests), e2e ok (5), image not run (no Docker daemon in this environment), mutation not run (not a target in `context/test-plan.md`, off by default) · Round: 2
+
+Round 2 re-checks the fixes 1a75730, cd01681 and 06331fa. R1 to R4 are fixed as described:
+D-16 and the *Error model* line answer R1 and `retryWhileBusy` retries the slot; `running`
+follows `JobLock.isHeld()` (R2, test added); `version` reloads **Przebiegi** after a row action
+(R3); the `stopping` flag stops the cycle before its next source (R4, test added). Round-1
+findings below keep their numbering; the new ones continue at R5.
 
 ## Plan vs diff
 | File | Status | Note |
@@ -32,16 +38,19 @@ Gates: typecheck ok, lint ok, unit tests ok (47 files, 663 tests), e2e ok (5), i
 | `apps/web/src/strings.pl.ts` | done | `Uruchom źródło`, `strings.jobs.*`, retry strings |
 | `context/changes/scheduler-and-jobs/evidence/*` | done | `jobs-sample.json` (fixture data, demo source names), `cli-busy.txt` |
 | `context/roadmap.md` | unplanned | status bookkeeping only |
+| `context/lessons.md` | unplanned | proposed lesson from R1 (review bookkeeping) |
+| `apps/api/src/infrastructure/scheduler/schedule.ts`, `schedule.test.ts`, `server.ts` (round 2) | done | D-16 `retryWhileBusy`, cancelled at shutdown; see R5 |
+| `apps/api/src/infrastructure/scheduler/job-lock.ts`, `modules/jobs/{ports,service}.ts` (round 2) | done | `isHeld()`, `stopping` (logged deviations); see R6 |
 
 ## Areas
 | Area | Result (ok / concern / fail) | One-line reason |
 |------|------------------------------|-----------------|
-| Correctness | concern | A busy lock at slot time drops the scheduled cycle with no record (R1); `running` can stay true after a foreign crash (R2) |
+| Correctness | ok | R1, R2, R4 fixed and verified; a throw inside a slot retry crashes the server (R5, rare path) |
 | Design | ok | Lock, run history and schedule each live in one place; the analysis tick moved into the scheduler as planned |
 | Safety | ok | Inputs validated by Zod at the routes; logs carry ids and counts only; no secrets; nothing sent automatically |
 | Tests | ok | Behavioural integration tests over the real DB, two-step takeover, same-process busy, DST under fake timers; all gates green |
-| Simplicity | ok | Small functions; the cycle-counter reduce in `list` is the only dense spot |
-| Plan fidelity | concern | Plan-review (round 2) #1, a `major`, has neither a *Decisions* row nor a *Deviations* line (R1) |
+| Simplicity | ok | Small functions; `JobRunRepository.isRunning` is now dead code (R6) |
+| Plan fidelity | ok | D-16 added for R1; R2 and R4 logged as deviations |
 | Agent decisions | ok | D-1, D-5, D-8, D-9, D-10 are each implemented in one module and swappable as claimed |
 
 ## Findings
@@ -80,3 +89,21 @@ Gates: typecheck ok, lint ok, unit tests ok (47 files, 663 tests), e2e ok (5), i
 - Effort: small
 - Lesson candidate: no
 - Decision: fixed (cd01681)
+
+### R5: A throw inside a scheduled-slot retry is uncaught and stops the server
+- Severity: minor
+- Where: `apps/api/src/infrastructure/scheduler/schedule.ts:30`, `apps/api/src/server.ts:143`
+- Problem: The first `startCycle` attempt runs inside croner's callback (`catch: fail`), but every retry runs in a bare `setInterval` in `retryWhileBusy`. `startCycle` can throw: `lock.acquire()` is a `BEGIN IMMEDIATE` transaction that raises `SQLITE_BUSY` after the 5 s `busy_timeout`, and a failed `runs.startCycle` insert is re-thrown. The server has no `uncaughtException` handler, so such a throw ends the process. Verified with a script that calls `retryWhileBusy` with an attempt throwing on its second call: Node prints the error and exits 1 before a 300 ms timer fires. The analysis tick next to it in `startScheduler` wraps its callback in `try/catch → onError` for exactly this reason. Also, `retries` gets one cancel function per slot and is never pruned (about 730 closures a year; harmless, but the same spot).
+- Fix: In `retryWhileBusy`, catch inside the interval callback, stop the timer and report through an `onError` option (server: `logger.error`, slot time only); add a unit case with an attempt that throws. Delete each cancel from `retries` once its retry finishes (have `retryWhileBusy` call a `onSettled` or return after clearing).
+- Effort: small
+- Lesson candidate: no
+- Decision: open
+
+### R6: `JobRunRepository.isRunning` is dead after R2
+- Severity: minor
+- Where: `apps/api/src/modules/jobs/ports.ts:70`, `apps/api/src/infrastructure/db/job-run-repository.ts:166`
+- Problem: Since `jobs.list` reads `lock.isHeld()`, nothing calls `isRunning()` (grep finds only the port and its implementation). The plan's deviation notes it as "now unused", but the port still promises it and the query stays to be maintained. Its meaning ("any `running` row") is also the one R2 showed to be wrong for the UI, so a later caller could reintroduce that bug.
+- Fix: Remove `isRunning` from the port and the repository.
+- Effort: small
+- Lesson candidate: no
+- Decision: open
