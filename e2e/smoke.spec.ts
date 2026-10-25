@@ -163,7 +163,7 @@ test('the operator imports a pasted post, sees it in the list and the repeat is 
   ].entries()) {
     await expect(page.getByRole('heading', { name: `${index + 1}. ${title}` })).toBeVisible();
   }
-  await expect(page.getByRole('button', { name: 'Przygotuj ofertę' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Przygotuj ofertę' })).toBeEnabled();
   await expect(page.getByRole('button', { name: 'Oznacz jako kontakt' })).toBeEnabled();
   await evidence(page, { path: `${CARD_EVIDENCE}/card-360.jpg`, fullPage: true, quality: 55 });
 

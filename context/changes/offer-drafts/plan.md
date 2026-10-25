@@ -348,10 +348,13 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 - [x] Phase 2: Offer prompt and adapters
 - [x] Phase 3: Generate a draft
 - [x] Phase 4: Draft actions and the no-send proof
-- [ ] Phase 5: Draft panel and the e2e draft step
+- [x] Phase 5: Draft panel and the e2e draft step
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 5) Card at 360 px and on a laptop: plan sections, estimates and the DEMO label are clearly separated from the editable message — run: `docker compose up --build`, import a DEMO post, "Przygotuj ofertę" — evidence: `context/changes/offer-drafts/evidence/draft-360.jpg`
+- [ ] (Phase 5) Over the LAN IP (plain HTTP), "Kopiuj treść" copies through the fallback or says to select the text by hand — run: open `http://<pi-ip>:8080`, press "Kopiuj treść", paste elsewhere — evidence: none
+- [ ] (Phase 5) Real provider: with `LLM_PROVIDER=anthropic` and a cap, one draft for a Polish and one for an English DEMO import; message in the source's language, no references, clients or experience beyond the profile; note the cost shown — run: "Przygotuj ofertę" on each card — evidence: save guarded JSON (no key) under `context/changes/offer-drafts/evidence/`
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -375,6 +378,9 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 - [minor] Phase 3: `AppDeps.offers` is the built `OfferService`; `server.ts` and `buildTestApp`
   build it with `createOpportunityService(...).get` as its `detail` reader (one shared
   `opportunityDeps`). An added test covers the global in-flight guard (D-20).
+- [minor] Phase 5: `e2e/smoke.spec.ts` asserted the disabled "Przygotuj ofertę" button; it now asserts
+  enabled. The panel's plan sections sit in a collapsed `<details>` labelled "szkic modelu"; the
+  editable texts are always visible.
 - [FOLLOW-UP] S-14: Pipeline/Insights "sent" should count `SENT_MANUALLY` drafts (S-08 D-9).
 
 ## Review response

@@ -30,8 +30,9 @@ async function assertNoOverflow(page: Page) {
 
 // Fifth and last login of the run: the throttle allows 5 attempts per 15 minutes, the smoke spec
 // uses 4.
-test('main path: import, analysis, card, contact with follow-up, payment, pipeline', async ({
+test('main path: import, analysis, card, offer draft, follow-up, payment, pipeline', async ({
   page,
+  context,
 }) => {
   await page.goto('/');
   await page.getByLabel('Hasło').fill(E2E_PASSWORD);
@@ -54,17 +55,42 @@ test('main path: import, analysis, card, contact with follow-up, payment, pipeli
 
   await page.getByRole('link', { name: TITLE }).click();
   await expect(page.getByText('DEMO / MOCK — wynik reguł, nie analiza AI')).toBeVisible();
-  // S-07 is not done: the draft step is not part of the path yet (D-13).
-  await expect(page.getByRole('button', { name: 'Przygotuj ofertę' })).toBeDisabled();
-
   await page.getByRole('button', { name: 'Zapisz', exact: true }).click();
   await expect(page.getByText(/Zmiana statusu \(operator\): Nowa → Zapisana/)).toBeVisible();
 
-  await page.getByRole('button', { name: 'Oznacz jako kontakt' }).click();
+  // S-07: the draft step. Nothing is sent; the operator reviews, copies and marks it by hand.
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await page.getByRole('button', { name: 'Przygotuj ofertę' }).click();
+  const panel = page.getByRole('region', { name: 'Szkic oferty' });
+  await expect(panel.getByText(/DEMO \/ MOCK — szkic z generatora testowego/)).toBeVisible();
+  await expect(panel.getByText('Status szkicu:')).toContainText('Szkic');
   await expect(
-    page.getByText(/Zmiana statusu \(operator\): Zapisana → Skontaktowano się/),
+    page.getByText(/Zmiana statusu \(operator\): Zapisana → Szkic oferty/),
   ).toBeVisible();
-  await expect(page.getByText(/pominięto: Szkic oferty/)).toBeVisible();
+  await assertNoOverflow(page);
+  await evidence(page, 'draft-360.jpg', 'context/changes/offer-drafts/evidence');
+
+  const message = panel.getByLabel('Krótka wiadomość');
+  await message.fill('DEMO: Dzień dobry, poprawiona wiadomość operatora.');
+  await panel.getByRole('button', { name: 'Zapisz i zatwierdź' }).click();
+  await expect(panel.getByText('Status szkicu:')).toContainText('Sprawdzony');
+
+  await panel.getByRole('button', { name: 'Kopiuj treść' }).click();
+  await expect(panel.getByText('Status szkicu:')).toContainText('Skopiowany lub wyeksportowany');
+  const copied = await page.evaluate(() => navigator.clipboard.readText());
+  expect(copied).toContain('DEMO: Dzień dobry, poprawiona wiadomość operatora.');
+  expect(copied).toContain(await panel.getByLabel('Temat').inputValue());
+
+  const download = page.waitForEvent('download');
+  await panel.getByRole('button', { name: 'Eksportuj Markdown' }).click();
+  expect((await download).suggestedFilename()).toMatch(/^oferta-\d+-\d{4}-\d{2}-\d{2}\.md$/);
+
+  await panel.getByRole('button', { name: 'Oznacz jako wysłane' }).click();
+  await expect(panel.getByText('Status szkicu:')).toContainText('Wysłany ręcznie');
+  await expect(
+    page.getByText(/Zmiana statusu \(operator\): Szkic oferty → Skontaktowano się/),
+  ).toBeVisible();
+  await expect(page.getByText(/Wysłano ręcznie .*Ustaw przypomnienie o follow-up/)).toBeVisible();
 
   await page.getByRole('button', { name: 'Ustaw follow-up' }).click();
   await expect(page.getByText(/Zaplanowany: \d{2}\.\d{2}\.\d{4}/)).toBeVisible();
