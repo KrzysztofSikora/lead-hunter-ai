@@ -360,7 +360,7 @@ rendered as text (React escaping), never as HTML.
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Import API, identity rules and storage
-- [ ] Phase 2: Opportunity list and detail API
+- [x] Phase 2: Opportunity list and detail API
 - [ ] Phase 3: Okazje list and opportunity view in the web app
 - [ ] Phase 4: Import view, e2e and README
 

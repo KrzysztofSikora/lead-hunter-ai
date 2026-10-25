@@ -13,15 +13,23 @@ export {
   WorkMode,
 } from './profile.js';
 export {
+  AnalysisSummary,
   Availability,
   BusinessStatus,
   AnalysisStatus,
   Category,
   Confidence,
   DEFAULT_IMPORT_MAX_TEXT_CHARS,
+  Evidence,
   EvidenceLevel,
   ImportResult,
   importRequestSchema,
+  OpportunityDetail,
+  OpportunityList,
+  OpportunityListQuery,
+  OpportunitySummary,
+  SourceFacts,
+  SourcesStatus,
   SourceType,
 } from './opportunities.js';
 export type { ImportRequest } from './opportunities.js';
