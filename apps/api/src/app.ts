@@ -7,12 +7,15 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from 'fastify-type-provider-zod';
+import { registerAuth } from './modules/auth/routes.js';
+import type { AuthDeps } from './modules/auth/service.js';
 import { registerHealthRoutes } from './modules/health/routes.js';
 import type { HealthProbe } from './modules/health/ports.js';
 
 export interface AppDeps {
   config: Pick<Config, 'nodeEnv'>;
   healthProbe: HealthProbe;
+  auth: AuthDeps;
   version: string;
   /** Directory of the built web app; static serving and the SPA fallback are off without it. */
   webDistDir?: string;
@@ -40,6 +43,9 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
     openapi: { info: { title: 'Lead Hunter AI', version: deps.version } },
     transform: jsonSchemaTransform,
   });
+
+  // The guard hook must exist before the routes it protects are registered.
+  await registerAuth(app, deps.auth);
 
   registerHealthRoutes(app, { probe: deps.healthProbe, version: deps.version });
 

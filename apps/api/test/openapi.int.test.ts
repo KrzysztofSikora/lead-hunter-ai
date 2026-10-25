@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildTestApp } from './helpers/app.js';
+import { buildTestApp, loginAsOperator } from './helpers/app.js';
 
 // `:id` in Fastify and `{id}` in OpenAPI name the same route.
 const normalise = (url: string): string => url.replace(/:(\w+)/g, '{$1}');
@@ -23,7 +23,10 @@ describe('OpenAPI document (FR-25 AC3)', () => {
 
   it('serves the document outside production', async () => {
     const { app } = await buildTestApp();
-    const res = await app.inject('/api/openapi.json');
+    const res = await app.inject({
+      url: '/api/openapi.json',
+      headers: { cookie: await loginAsOperator(app) },
+    });
     expect(res.statusCode).toBe(200);
     expect(res.json().paths['/api/health']).toBeDefined();
   });

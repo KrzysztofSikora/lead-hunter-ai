@@ -5,7 +5,10 @@ import { createLoggerOptions } from '../src/infrastructure/logging/logger.js';
 
 describe('logger redaction (FR-24 AC2)', () => {
   it('never lets a configured secret reach the log output', async () => {
-    const config = loadConfig({ HOST: '0.0.0.0', OPERATOR_PASSWORD_HASH: 'hash-LEAK-CANARY' });
+    const config = loadConfig({
+      HOST: '0.0.0.0',
+      OPERATOR_PASSWORD_HASH: `scrypt:15:8:3:LEAK-CANARY${'A'.repeat(11)}:${'B'.repeat(43)}`,
+    });
     const lines: string[] = [];
     const { stream, ...options } = createLoggerOptions(config, {
       write: (line: string) => void lines.push(line),

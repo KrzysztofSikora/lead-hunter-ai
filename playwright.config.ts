@@ -2,6 +2,7 @@ import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { defineConfig } from '@playwright/test';
+import { E2E_PASSWORD_HASH } from './e2e/env.js';
 
 const port = Number(process.env.E2E_PORT ?? 4317);
 const dataDir = mkdtempSync(join(tmpdir(), 'lh-e2e-'));
@@ -30,6 +31,7 @@ export default defineConfig({
       PORT: String(port),
       DATA_DIR: dataDir,
       LLM_PROVIDER: 'mock',
+      OPERATOR_PASSWORD_HASH: E2E_PASSWORD_HASH,
     },
   },
 });

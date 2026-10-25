@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, ENV_VARIABLES, loadConfig } from './env.js';
 
-const HASH = { OPERATOR_PASSWORD_HASH: 'placeholder' };
+const VALID_HASH = `scrypt:15:8:3:${'A'.repeat(22)}:${'B'.repeat(43)}`;
+const HASH = { OPERATOR_PASSWORD_HASH: VALID_HASH };
 
 describe('loadConfig', () => {
   it('applies the defaults', () => {
@@ -31,7 +32,7 @@ describe('loadConfig', () => {
       port: 9000,
       dataDir: '/data',
       logLevel: 'debug',
-      operatorPasswordHash: 'placeholder',
+      operatorPasswordHash: VALID_HASH,
     });
   });
 
@@ -122,6 +123,31 @@ describe('loadConfig', () => {
 
     it('accepts 0.0.0.0 with a hash', () => {
       expect(loadConfig({ HOST: '0.0.0.0', ...HASH }).host).toBe('0.0.0.0');
+    });
+
+    it.each([
+      ['the old placeholder', 'placeholder'],
+      ['a PHC string', '$scrypt$ln=15,r=8,p=1$c2FsdA$a2V5'],
+      ['a short salt', `scrypt:15:8:3:${'A'.repeat(21)}:${'B'.repeat(43)}`],
+      ['a cost above the limit', `scrypt:40:8:3:${'A'.repeat(22)}:${'B'.repeat(43)}`],
+      ['a cost below the limit', `scrypt:9:8:3:${'A'.repeat(22)}:${'B'.repeat(43)}`],
+      ['a block size above the limit', `scrypt:15:99:3:${'A'.repeat(22)}:${'B'.repeat(43)}`],
+      ['a parallelism of zero', `scrypt:15:8:0:${'A'.repeat(22)}:${'B'.repeat(43)}`],
+    ])('refuses a malformed hash: %s (FR-20 AC2)', (_name, hash) => {
+      try {
+        loadConfig({ OPERATOR_PASSWORD_HASH: hash });
+        expect.unreachable();
+      } catch (error) {
+        const [issue] = (error as ConfigError).issues;
+        expect(issue?.variable).toBe('OPERATOR_PASSWORD_HASH');
+        expect(issue?.message).toContain('pnpm auth:hash');
+      }
+    });
+
+    it('refuses 0.0.0.0 with the old placeholder', () => {
+      expect(() => loadConfig({ HOST: '0.0.0.0', OPERATOR_PASSWORD_HASH: 'placeholder' })).toThrow(
+        ConfigError,
+      );
     });
 
     it.each(['127.0.0.1', '::1', 'localhost'])('accepts %s without a hash', (host) => {

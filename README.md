@@ -15,7 +15,8 @@ the roadmap is tracked as GitHub issues.
 ```sh
 mkdir -p data
 cp .env.example .env
-# w .env ustaw OPERATOR_PASSWORD_HASH (na razie dowolna niepusta wartość zastępcza, do slice'a S-01)
+# w .env ustaw OPERATOR_PASSWORD_HASH: wynik polecenia `pnpm auth:hash` albo, tylko z Dockerem,
+# `docker compose run --rm --no-deps app node apps/api/dist/cli/auth-hash.js` (potrzebuje istniejącego .env)
 docker compose up --build
 ```
 
@@ -37,7 +38,17 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
 ## Co działa / Co wymaga kluczy / Co wymaga ręcznej weryfikacji
 
 - **Co działa:** serwer, `GET /api/health`, migracje Drizzle, OpenAPI poza produkcją, redakcja
-  sekretów w logach, pusta polska powłoka UI, `pnpm discover` (brak źródeł).
+  sekretów w logach, polska powłoka UI, `pnpm discover` (brak źródeł); logowanie operatora
+  (hasło w `OPERATOR_PASSWORD_HASH`, sesja w ciasteczku `HttpOnly` + `SameSite=Strict` ważna 30 dni
+  bez aktywności, wylogowanie, limit 5 prób na 15 minut); każdy `/api/*` poza health i logowaniem
+  wymaga sesji.
 - **Co wymaga kluczy:** nic w tej chwili; klucze LLM i skrzynka IMAP dojdą ze slice'ami S-04 i S-11.
 - **Co wymaga ręcznej weryfikacji:** uruchomienie `docker compose up` na Raspberry Pi
-  (czas budowania better-sqlite3 na ARM64), wygląd powłoki na telefonie.
+  (czas budowania better-sqlite3 na ARM64), wygląd powłoki i formularza logowania na telefonie,
+  flaga `Secure` ciasteczka za Tailscale (w Dockerze serwer widzi adres bramy, nie loopback,
+  więc flaga nie jest ustawiana; patrz decyzja D-6 w `context/changes/operator-login/plan.md`).
+
+## Dostęp zdalny
+
+Serwer domyślnie słucha tylko na `127.0.0.1`. Zdalnie: `tailscale serve` kierujące na
+`127.0.0.1:8080` (szczegóły i weryfikacja na Raspberry Pi: slice S-16).
