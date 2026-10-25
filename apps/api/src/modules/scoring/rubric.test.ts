@@ -51,6 +51,26 @@ describe('skillFit', () => {
     expect(skillFit(analysis({ relevantSkills }), p)).toMatchObject({ points, max: 25 });
   });
 
+  it('trims names and scores five distinct matches as the maximum', () => {
+    const wide = profile({ skills: ['a', 'b', 'c', 'd', 'e'], preferredTechnologies: [] });
+    expect(skillFit(analysis({ relevantSkills: [' A ', 'b', 'c', 'd', 'e'] }), wide).points).toBe(
+      25,
+    );
+  });
+
+  it('ignores surrounding whitespace in a skill name', () => {
+    expect(skillFit(analysis({ relevantSkills: [' typescript '] }), p).points).toBe(10);
+  });
+
+  it('explains the match count and names, or the absence of a match', () => {
+    const hit = skillFit(analysis({ relevantSkills: ['TypeScript', 'react'] }), p);
+    expect(hit.justification).toContain('(2): typescript, react');
+    expect(hit.justification).toContain('16 pkt');
+    expect(skillFit(analysis({ relevantSkills: ['Rust'] }), p).justification).toContain(
+      'Żadna umiejętność',
+    );
+  });
+
   it('is 0 when an excluded technology is named, whatever else matches', () => {
     const result = skillFit(
       analysis({ relevantSkills: ['TypeScript', 'Node.js', 'React', ' php '] }),
@@ -87,6 +107,13 @@ describe('speed', () => {
     );
   });
 
+  it('explains the base and the hours band', () => {
+    expect(speed(analysis({ category: 'DIRECT_GIG' })).justification).toContain('nieznany');
+    expect(
+      speed(analysis({ category: 'DIRECT_GIG', estimatedHours: hours(40) })).justification,
+    ).toContain('do 40 h (8 pkt)');
+  });
+
   it('never exceeds its maximum', () => {
     expect(speed(analysis({ category: 'DIRECT_GIG', estimatedHours: hours(10) })).points).toBe(20);
   });
@@ -98,7 +125,7 @@ describe('profitability', () => {
     analysis({ sourceBudget: b, estimatedHours: { min: 10, max: 10 } });
 
   it.each<[string, number, number]>([
-    ['above the minimum rate', 100_000, 15],
+    ['above the minimum rate', 150_000, 15],
     ['exactly the minimum rate', 100_000, 15],
     ['just below the minimum rate', 99_998, 10],
     ['exactly 75 %', 75_000, 10],
@@ -148,6 +175,47 @@ describe('profitability', () => {
     expect(outcome.justification).toContain('Brak danych');
   });
 
+  it('names the reason for a neutral score', () => {
+    const reason = (result: AnalysedResult) => profitability(result, rate).justification;
+    expect(reason(analysis({ estimatedHours: hours(10) }))).toContain('brak budżetu');
+    expect(
+      reason(
+        analysis({
+          proposedPrice: { minMinor: 1, maxMinor: 1, currency: 'PLN' },
+        }),
+      ),
+    ).toContain('hipoteza');
+    expect(reason(analysis({ sourceBudget: budget(1, 1) }))).toContain('nieznany czas');
+    expect(
+      profitability(withHours(budget(1, 1)), profile({ rateRanges: [] })).justification,
+    ).toContain('brak stawki');
+  });
+
+  it('uses only an hourly rate, not a daily or project one', () => {
+    const daily = profile({
+      rateRanges: [{ unit: 'DAY', currency: 'PLN', minMinor: 1, maxMinor: 2 }],
+    });
+    const outcome = profitability(withHours(budget(100_000, 100_000)), daily);
+    expect(outcome.points).toBe(5);
+    expect(outcome.justification).toContain('brak stawki');
+  });
+
+  it('states the share of the minimum rate that decided the points', () => {
+    const outcome = profitability(withHours(budget(60_000, 60_000)), rate);
+    expect(outcome.points).toBe(5);
+    expect(outcome.justification).toContain('ok. 60%');
+    expect(outcome.justification).toContain('5 pkt');
+  });
+
+  it('does not divide by zero when the hours are zero', () => {
+    const outcome = profitability(
+      analysis({ sourceBudget: budget(1, 1), estimatedHours: { min: 0, max: 0 } }),
+      rate,
+    );
+    expect(outcome.points).toBe(15);
+    expect(outcome.justification).toContain('100%');
+  });
+
   it('is neutral without an hourly rate in the budget currency', () => {
     expect(profitability(withHours(budget(1, 1, 'EUR')), rate).points).toBe(5);
     expect(profitability(withHours(budget(1, 1)), profile({ rateRanges: [] })).points).toBe(5);
@@ -155,6 +223,18 @@ describe('profitability', () => {
 });
 
 describe('repeatability', () => {
+  it('mentions the recurring model only when it adds points', () => {
+    const recurring = repeatability(
+      analysis({ category: 'UNMET_NEED', monetizationModel: 'SUBSCRIPTION' }),
+    );
+    expect(recurring.justification).toContain('+ model SUBSCRIPTION (2 pkt)');
+    expect(recurring.justification).toContain('9 pkt');
+    const plain = repeatability(
+      analysis({ category: 'UNMET_NEED', monetizationModel: 'HOURLY_B2B' }),
+    );
+    expect(plain.justification).toBe('Kategoria UNMET_NEED (7 pkt): 7 pkt.');
+  });
+
   it.each<[Category, number]>([
     ['PRODUCT_HYPOTHESIS', 8],
     ['UNMET_NEED', 7],
