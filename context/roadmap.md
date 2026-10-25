@@ -15,7 +15,7 @@ than building on it.
 | S-01 | #2 | operator-login | slice | FR-20 | F-01 | M | done |
 | S-02 | #3 | operator-profile | slice | FR-01 | S-01 | S | done |
 | S-03 | #4 | manual-text-import | slice | FR-02, FR-06, FR-11 AC1, FR-12 | S-02 | M | done |
-| S-04 | #5 | analysis-and-scoring | slice | FR-07, FR-08 (mock), FR-10 | S-03 | L | in-progress |
+| S-04 | #5 | analysis-and-scoring | slice | FR-07, FR-08 (mock), FR-10 | S-03 | L | review |
 | S-05 | #6 | llm-providers | slice | FR-08 AC1–AC4, AC7, FR-09, FR-24 AC3 | S-04 | M | todo |
 | S-06 | #7 | opportunity-card | slice | FR-11 AC2–AC4 | S-04 | M | todo |
 | S-07 | #8 | offer-drafts | slice | FR-13 | S-05, S-06 | M | todo |
