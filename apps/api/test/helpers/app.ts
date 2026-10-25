@@ -8,7 +8,7 @@ import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
 import { createActivityRepository } from '../../src/infrastructure/db/activity-repository.js';
 import { createAnalysisRepository } from '../../src/infrastructure/db/analysis-repository.js';
-import { MockProvider } from '../../src/infrastructure/llm/mock.js';
+import { createLlmProvider, llmRunnerDeps } from '../../src/infrastructure/llm/create-provider.js';
 import { createAnalysisRunner, type AnalysisRunner } from '../../src/modules/analysis/service.js';
 import type { LlmProvider } from '../../src/modules/analysis/ports.js';
 import { createProfileService } from '../../src/modules/profile/service.js';
@@ -108,9 +108,7 @@ export async function buildTestApp(
   const provider =
     options.provider !== undefined
       ? (options.provider ?? undefined)
-      : config.llmProvider === 'mock'
-        ? new MockProvider()
-        : undefined;
+      : createLlmProvider(config.llm, { maxRetries: 0 });
   const runner = createAnalysisRunner({
     repository: createAnalysisRepository(db),
     provider,
@@ -118,6 +116,7 @@ export async function buildTestApp(
     clock,
     dailyLimit: config.analysisDailyLimit,
     maxAgeDays: config.prefilterMaxAgeDays,
+    ...llmRunnerDeps(config.llm),
     onError: () => undefined,
   });
   // Pages go through the real fetcher; the global MockAgent answers (nothing leaves the machine).

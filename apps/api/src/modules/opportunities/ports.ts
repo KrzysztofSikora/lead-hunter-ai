@@ -57,6 +57,8 @@ export interface AnalysisAttemptRow {
   error: string | null;
   inputTokens: number | null;
   outputTokens: number | null;
+  costMicroUsd: number | null;
+  reusedFromAnalysisId: number | null;
   createdAt: number;
 }
 

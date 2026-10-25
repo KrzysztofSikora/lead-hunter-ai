@@ -173,6 +173,10 @@ export const LatestAnalysis = z
     createdAt: isoInstant,
     inputTokens: z.number().int().nullable(),
     outputTokens: z.number().int().nullable(),
+    /** Micro-USD; null reads "brak danych" (FR-09 AC4). */
+    costMicroUsd: z.number().int().nullable(),
+    /** Set when the result was copied from an earlier analysis (FR-09 AC5). */
+    reusedFromAnalysisId: z.number().int().nullable(),
     result: OpportunityAnalysis.nullable(),
     breakdown: ScoreBreakdown.nullable(),
     guardNotes: z.array(z.string()),

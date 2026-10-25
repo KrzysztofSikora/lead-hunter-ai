@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { DEFAULT_LLM_PRICES, parseLlmPrices, type ModelPrice } from './llm-prices.js';
 
 const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 const LOOPBACK_HOSTS = ['127.0.0.1', '::1', 'localhost'];
@@ -12,6 +13,14 @@ export const ENV_VARIABLES = [
   'OPERATOR_PASSWORD_HASH',
   'IMPORT_MAX_TEXT_CHARS',
   'LLM_PROVIDER',
+  'LLM_BASE_URL',
+  'LLM_MODEL',
+  'LLM_MODEL_OFFER',
+  'LLM_API_KEY',
+  'LLM_MONTHLY_BUDGET_USD',
+  'LLM_PAID',
+  'LLM_PRICES',
+  'LLM_JSON_MODE',
   'ANALYSIS_DAILY_LIMIT',
   'PREFILTER_MAX_AGE_DAYS',
   'FETCH_TIMEOUT_MS',
@@ -30,6 +39,15 @@ function isValidPasswordHash(value: string): boolean {
   if (!match) return false;
   const [ln, r, p] = [Number(match[1]), Number(match[2]), Number(match[3])];
   return ln >= 10 && ln <= 20 && r >= 1 && r <= 32 && p >= 1 && p <= 16;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
 }
 
 const DISCOVERY_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -63,7 +81,17 @@ export const EnvSchema = z
       }),
     ),
     IMPORT_MAX_TEXT_CHARS: optional(z.coerce.number().int().min(1_000).max(200_000)),
-    LLM_PROVIDER: optional(z.enum(['mock'])),
+    LLM_PROVIDER: optional(z.enum(['mock', 'anthropic', 'openai-compatible'])),
+    LLM_BASE_URL: optional(
+      z.string().refine(isHttpUrl, { message: 'oczekiwano adresu http:// lub https://' }),
+    ),
+    LLM_MODEL: optional(z.string().trim().min(1)),
+    LLM_MODEL_OFFER: optional(z.string().trim().min(1)),
+    LLM_API_KEY: optional(z.string().trim().min(1)),
+    LLM_MONTHLY_BUDGET_USD: optional(z.coerce.number().min(0.01).max(100_000)),
+    LLM_PAID: optional(z.enum(['true', 'false'])),
+    LLM_PRICES: optional(z.string()),
+    LLM_JSON_MODE: optional(z.enum(['json_object', 'off'])),
     ANALYSIS_DAILY_LIMIT: optional(z.coerce.number().int().min(1).max(1_000)),
     PREFILTER_MAX_AGE_DAYS: optional(z.coerce.number().int().min(1).max(365)),
     FETCH_TIMEOUT_MS: optional(z.coerce.number().int().min(1_000).max(60_000)),
@@ -78,6 +106,24 @@ export const EnvSchema = z
     ),
   })
   .superRefine((env, ctx) => {
+    const missing = (path: string, message: string) =>
+      ctx.addIssue({ code: 'custom', path: [path], message });
+    if (env.LLM_PROVIDER === 'anthropic' && !env.LLM_API_KEY) {
+      missing('LLM_API_KEY', 'wymagany, gdy LLM_PROVIDER=anthropic');
+    }
+    if (env.LLM_PROVIDER === 'openai-compatible') {
+      if (!env.LLM_BASE_URL) {
+        missing('LLM_BASE_URL', 'wymagany, gdy LLM_PROVIDER=openai-compatible');
+      }
+      if (!env.LLM_MODEL) missing('LLM_MODEL', 'wymagany, gdy LLM_PROVIDER=openai-compatible');
+    }
+    if (env.LLM_PRICES && env.LLM_PROVIDER !== 'mock') {
+      try {
+        parseLlmPrices(env.LLM_PRICES);
+      } catch (error) {
+        missing('LLM_PRICES', (error as Error).message);
+      }
+    }
     const host = env.HOST ?? '127.0.0.1';
     if (!LOOPBACK_HOSTS.includes(host) && !env.OPERATOR_PASSWORD_HASH) {
       ctx.addIssue({
@@ -87,6 +133,23 @@ export const EnvSchema = z
       });
     }
   });
+
+export type LlmConfig =
+  | { provider: 'mock' }
+  | {
+      provider: 'anthropic' | 'openai-compatible';
+      baseUrl?: string;
+      model: string;
+      offerModel: string;
+      /** Secret. Required for anthropic, optional for local servers. */
+      apiKey?: string;
+      /** A paid provider needs a monthly cap and a price before it may run (FR-09). */
+      paid: boolean;
+      /** Cap in integer micro-USD; absent means none was set. */
+      monthlyBudgetMicroUsd?: number;
+      prices: Record<string, ModelPrice>;
+      jsonMode: 'json_object' | 'off';
+    };
 
 export interface Config {
   nodeEnv: 'development' | 'test' | 'production';
@@ -98,7 +161,7 @@ export interface Config {
   /** Longest text one manual import may carry, in UTF-16 code units (FR-02 AC4). */
   importMaxTextChars: number;
   /** Absent means analysis is not configured (FR-08 AC5). */
-  llmProvider?: 'mock';
+  llm?: LlmConfig;
   /** Analyses per Europe/Warsaw day (FR-07 AC3). */
   analysisDailyLimit: number;
   /** Sources older than this many days are pre-filtered out (D-6). */
@@ -142,9 +205,32 @@ const EXPECTED: Record<string, string> = {
   FETCH_MAX_BYTES: 'oczekiwano liczby całkowitej 65536–5242880',
   SOURCE_MIN_INTERVAL_MINUTES: 'oczekiwano liczby całkowitej 60–1440',
   SOURCE_MAX_ATTEMPTS: 'oczekiwano liczby całkowitej 1–5',
-  LLM_PROVIDER: 'oczekiwano: mock',
+  LLM_PROVIDER: 'oczekiwano: mock, anthropic lub openai-compatible',
+  LLM_MONTHLY_BUDGET_USD: 'oczekiwano liczby 0.01–100000 (USD)',
+  LLM_PAID: 'oczekiwano true lub false',
+  LLM_JSON_MODE: 'oczekiwano json_object lub off',
   LOG_LEVEL: `oczekiwano jednej z wartości: ${LOG_LEVELS.join(', ')}`,
 };
+
+function buildLlm(v: z.infer<typeof EnvSchema>): LlmConfig | undefined {
+  if (!v.LLM_PROVIDER) return undefined;
+  if (v.LLM_PROVIDER === 'mock') return { provider: 'mock' };
+  const anthropic = v.LLM_PROVIDER === 'anthropic';
+  const model = v.LLM_MODEL ?? (anthropic ? 'claude-haiku-5-5' : '');
+  return {
+    provider: v.LLM_PROVIDER,
+    ...(v.LLM_BASE_URL ? { baseUrl: v.LLM_BASE_URL } : {}),
+    model,
+    offerModel: v.LLM_MODEL_OFFER ?? (anthropic ? 'claude-sonnet-5-5' : model),
+    ...(v.LLM_API_KEY ? { apiKey: v.LLM_API_KEY } : {}),
+    paid: v.LLM_PAID ? v.LLM_PAID === 'true' : anthropic,
+    ...(v.LLM_MONTHLY_BUDGET_USD !== undefined
+      ? { monthlyBudgetMicroUsd: Math.round(v.LLM_MONTHLY_BUDGET_USD * 1e6) }
+      : {}),
+    prices: { ...DEFAULT_LLM_PRICES, ...(v.LLM_PRICES ? parseLlmPrices(v.LLM_PRICES) : {}) },
+    jsonMode: v.LLM_JSON_MODE ?? 'json_object',
+  };
+}
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const parsed = EnvSchema.safeParse(env);
@@ -160,6 +246,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     );
   }
   const v = parsed.data;
+  const llm = buildLlm(v);
   return {
     nodeEnv: v.NODE_ENV ?? 'development',
     host: v.HOST ?? '127.0.0.1',
@@ -178,7 +265,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
           .map((t) => t.trim())
           .sort()
       : DEFAULT_DISCOVERY_TIMES,
-    ...(v.LLM_PROVIDER ? { llmProvider: v.LLM_PROVIDER } : {}),
+    ...(llm ? { llm } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };
 }

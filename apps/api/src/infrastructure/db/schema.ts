@@ -128,7 +128,10 @@ export const rawSignals = sqliteTable(
     /** S-12 D-8: the source run that created the signal; null for imports and older rows. */
     jobRunId: integer('job_run_id').references(() => jobRuns.id),
   },
-  (table) => [index('raw_signals_job_run_idx').on(table.jobRunId)],
+  (table) => [
+    index('raw_signals_job_run_idx').on(table.jobRunId),
+    index('raw_signals_content_hash_idx').on(table.contentHash),
+  ],
 );
 
 export const opportunities = sqliteTable(
@@ -161,6 +164,8 @@ export const opportunities = sqliteTable(
     /** The budget the source stated, never a model's price (plan-review #8). */
     amountMaxMinor: integer('amount_max_minor'),
     amountCurrency: text('amount_currency'),
+    /** D-10: the next analysis must call the provider instead of reusing a stored result. */
+    analysisForce: integer('analysis_force').notNull().default(0),
     /** S-08 D-5, D-7: Warsaw midnight (UTC epoch ms) of the one current follow-up day. */
     followUpAt: integer('follow_up_at'),
   },
@@ -193,6 +198,13 @@ export const analyses = sqliteTable(
     error: text('error'),
     inputTokens: integer('input_tokens'),
     outputTokens: integer('output_tokens'),
+    /** D-2: micro-USD, 0 for an unpaid provider, null when usage or price is unknown. */
+    costMicroUsd: integer('cost_micro_usd'),
+    /** D-4: set when the result was copied from an earlier analysis instead of a provider call. */
+    reusedFromAnalysisId: integer('reused_from_analysis_id').references(
+      (): AnySQLiteColumn => analyses.id,
+      { onDelete: 'set null' },
+    ),
     createdAt: integer('created_at').notNull(),
   },
   (table) => [

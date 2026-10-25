@@ -1,5 +1,8 @@
 export {
   ANALYSIS_SCHEMA_VERSION,
+  AnalysisRequestBody,
+  AnalysisRequestRefused,
+  AnalysisRequestResult,
   AnalysisServiceStatus,
   AnalysisWorkMode,
   DEFAULT_MIN_SCORE,

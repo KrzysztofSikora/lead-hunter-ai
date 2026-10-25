@@ -8,7 +8,7 @@ import { randomTokenSource } from './infrastructure/auth/token-source.js';
 import { verifyPassword } from './infrastructure/auth/scrypt-password.js';
 import { createActivityRepository } from './infrastructure/db/activity-repository.js';
 import { createAnalysisRepository } from './infrastructure/db/analysis-repository.js';
-import { MockProvider } from './infrastructure/llm/mock.js';
+import { createLlmProvider, llmRunnerDeps } from './infrastructure/llm/create-provider.js';
 import { createAnalysisRunner } from './modules/analysis/service.js';
 import { createProfileService } from './modules/profile/service.js';
 import { createHealthProbe } from './infrastructure/db/health-probe.js';
@@ -72,11 +72,12 @@ async function main(): Promise<void> {
   let logWarn: (message: string) => void = () => undefined;
   const runner = createAnalysisRunner({
     repository: createAnalysisRepository(db),
-    provider: config.llmProvider === 'mock' ? new MockProvider() : undefined,
+    provider: createLlmProvider(config.llm),
     profile: { get: () => profileService.get().profile },
     clock,
     dailyLimit: config.analysisDailyLimit,
     maxAgeDays: config.prefilterMaxAgeDays,
+    ...llmRunnerDeps(config.llm),
     onError: (error) =>
       logger.error(`analysis drain failed: ${error instanceof Error ? error.message : 'error'}`),
   });

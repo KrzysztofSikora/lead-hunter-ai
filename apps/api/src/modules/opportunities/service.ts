@@ -176,6 +176,8 @@ function toLatestAnalysis(row: AnalysisAttemptRow): OpportunityDetail['latestAna
     createdAt: iso(row.createdAt),
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
+    costMicroUsd: row.costMicroUsd,
+    reusedFromAnalysisId: row.reusedFromAnalysisId,
     result: parseStored(OpportunityAnalysis, row.resultJson, (value) =>
       upgradeStoredAnalysis(value, row.schemaVersion),
     ),

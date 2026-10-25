@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { ActivityCause } from '@lead-hunter/contracts';
 import type {
@@ -15,6 +15,7 @@ const selection = {
   url: rawSignals.sourceUrl,
   sourceType: rawSignals.sourceType,
   businessStatus: opportunities.businessStatus,
+  force: sql<number>`${opportunities.analysisForce} <> 0`.mapWith(Boolean),
   publishedAt: rawSignals.publishedAt,
 };
 
@@ -108,8 +109,92 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
     },
     countSince(at) {
       return (
-        db.select({ value: count() }).from(analyses).where(gte(analyses.createdAt, at)).get()
-          ?.value ?? 0
+        db
+          .select({ value: count() })
+          .from(analyses)
+          .where(and(gte(analyses.createdAt, at), isNull(analyses.reusedFromAnalysisId)))
+          .get()?.value ?? 0
+      );
+    },
+    spentSince(at) {
+      const row = db
+        .select({
+          microUsd: sql<number>`COALESCE(SUM(${analyses.costMicroUsd}), 0)`,
+          unknownCount: sql<number>`COALESCE(SUM(CASE WHEN ${analyses.status} = 'COMPLETE' AND ${analyses.costMicroUsd} IS NULL AND ${analyses.provider} <> 'mock' AND ${analyses.reusedFromAnalysisId} IS NULL THEN 1 ELSE 0 END), 0)`,
+        })
+        .from(analyses)
+        .where(gte(analyses.createdAt, at))
+        .get();
+      return { microUsd: row?.microUsd ?? 0, unknownCount: row?.unknownCount ?? 0 };
+    },
+    findReusable(opportunityId, promptVersion, schemaVersion) {
+      const own = db
+        .select({ hash: rawSignals.contentHash })
+        .from(opportunities)
+        .innerJoin(rawSignals, eq(opportunities.primarySignalId, rawSignals.id))
+        .where(eq(opportunities.id, opportunityId))
+        .get();
+      if (!own?.hash) return undefined;
+      const hit = db
+        .select({
+          id: analyses.id,
+          provider: analyses.provider,
+          model: analyses.model,
+          promptVersion: analyses.promptVersion,
+          schemaVersion: analyses.schemaVersion,
+          resultJson: analyses.resultJson,
+          inputTokens: analyses.inputTokens,
+          outputTokens: analyses.outputTokens,
+        })
+        .from(analyses)
+        .innerJoin(opportunities, eq(analyses.opportunityId, opportunities.id))
+        .innerJoin(rawSignals, eq(opportunities.primarySignalId, rawSignals.id))
+        .where(
+          and(
+            eq(rawSignals.contentHash, own.hash),
+            eq(analyses.status, 'COMPLETE'),
+            isNull(analyses.reusedFromAnalysisId),
+            isNotNull(analyses.resultJson),
+            eq(analyses.promptVersion, promptVersion),
+            eq(analyses.schemaVersion, schemaVersion),
+          ),
+        )
+        .orderBy(desc(analyses.id))
+        .limit(1)
+        .get();
+      if (!hit || hit.resultJson === null) return undefined;
+      return {
+        id: hit.id,
+        provider: hit.provider,
+        model: hit.model,
+        promptVersion: hit.promptVersion,
+        schemaVersion: hit.schemaVersion,
+        resultJson: hit.resultJson,
+        usage: { inputTokens: hit.inputTokens, outputTokens: hit.outputTokens },
+      };
+    },
+    requeue(id, force, at) {
+      return (
+        db
+          .update(opportunities)
+          .set({ analysisStatus: 'PENDING', analysisForce: force ? 1 : 0, updatedAt: at })
+          .where(
+            and(
+              eq(opportunities.id, id),
+              inArray(opportunities.analysisStatus, ['PENDING', 'FAILED', 'COMPLETE']),
+              isNull(opportunities.prefilterRule),
+            ),
+          )
+          .run().changes > 0
+      );
+    },
+    exists(id) {
+      return (
+        db
+          .select({ id: opportunities.id })
+          .from(opportunities)
+          .where(eq(opportunities.id, id))
+          .get() !== undefined
       );
     },
     waitingCount() {
@@ -131,6 +216,8 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
             guardNotesJson: JSON.stringify(analysis.guardNotes),
             inputTokens: analysis.usage.inputTokens,
             outputTokens: analysis.usage.outputTokens,
+            costMicroUsd: analysis.costMicroUsd,
+            reusedFromAnalysisId: analysis.reusedFromAnalysisId,
             createdAt: analysis.at,
           })
           .run();
@@ -138,6 +225,7 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
         tx.update(opportunities)
           .set({
             analysisStatus: 'COMPLETE',
+            analysisForce: 0,
             analysisProvider: analysis.provider,
             category: columns.category,
             evidenceLevel: columns.evidenceLevel,
@@ -188,12 +276,16 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
             promptVersion: analysis.promptVersion,
             schemaVersion: analysis.schemaVersion,
             error: analysis.error,
+            inputTokens: analysis.usage?.inputTokens ?? null,
+            outputTokens: analysis.usage?.outputTokens ?? null,
+            costMicroUsd: analysis.costMicroUsd ?? null,
             createdAt: analysis.at,
           })
           .run();
         tx.update(opportunities)
           .set({
             analysisStatus: 'FAILED',
+            analysisForce: 0,
             analysisProvider: analysis.provider,
             updatedAt: analysis.at,
           })

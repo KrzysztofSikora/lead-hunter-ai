@@ -4,8 +4,8 @@ Self-hosted service for a solo software/AI/IoT studio: it finds real demand sign
 permitted sources, scores them with explicit rules and prepares offer drafts that the operator
 reviews and sends by hand. Target: Raspberry Pi 4B (Linux ARM64), running 24/7.
 
-Status: MVP bez prawdziwego dostawcy LLM. Działa import ręczny, źródła RSS/Atom, analiza dostawcą
-`mock`, ocena, lejek z płatnościami, widok *Dziś* i harmonogram; instalacja na Raspberry Pi opisana
+Status: MVP. Działa import ręczny, źródła RSS/Atom, analiza przez Anthropic, dowolny serwer
+OpenAI-compatible (np. Ollama, Groq) albo `mock`, ocena, lejek z płatnościami, widok *Dziś* i harmonogram; instalacja na Raspberry Pi opisana
 niżej.
 Product brief: [`lead-hunter-ai-PRD.md`](lead-hunter-ai-PRD.md).
 Development follows the spec-driven workflow in [`docs/workflow.md`](docs/workflow.md);
@@ -120,9 +120,10 @@ docker compose --profile ollama up -d
 docker compose exec ollama ollama pull <mały model>
 ```
 
-Na Pi 4B nadają się tylko małe modele (patrz D-08 w `context/prd.md`). **Aplikacja jeszcze
-z niej nie korzysta**: dostawcy LLM dojdą ze slice'em S-05, wtedy będzie ona dostępna pod
-`http://ollama:11434/v1`. Usługa nie publikuje portu na hoście.
+Na Pi 4B nadają się tylko małe modele (patrz D-08 w `context/prd.md`); szybciej działa Ollama na
+laptopie w sieci domowej. Konfiguracja w `.env`: `LLM_PROVIDER=openai-compatible`,
+`LLM_BASE_URL=http://ollama:11434/v1` (usługa z profilu) albo `http://<IP laptopa>:11434/v1`,
+`LLM_MODEL=<model>`, `LLM_PAID=false`. Usługa nie publikuje portu na hoście.
 
 ### Pomiary na Raspberry Pi
 
@@ -143,9 +144,9 @@ nieudany, a `integrity` wypisuje `ok`.
 
 ## Konfiguracja
 
-- **Co trafia do LLM:** dziś nic. Jedyny dostawca to `mock` (reguły lokalne, bez żadnego
-  wywołania sieciowego). Lista elementów wysyłanych do prawdziwego dostawcy (FR-24 AC3) powstanie
-  ze slice'em S-05.
+- **Co trafia do LLM:** fragment treści źródła i wycinek profilu potrzebny do analizy; adres
+  źródła, dane operatora i konfiguracja nie są wysyłane. Szczegóły (FR-24 AC3):
+  [`docs/llm.md`](docs/llm.md). Dostawca `mock` niczego nie wysyła.
 - **Źródła:** sposób dostępu, regulamin i limity każdego adaptera: [`docs/source-policy.md`](docs/source-policy.md).
 
 | Adapter | Dostęp | Limity |
@@ -190,8 +191,13 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   modelu`, `szacunek (hipoteza)`, `wyliczone regułami`, `brak danych`); akcje `Zapisz`, `Odrzuć`
   (z powodem) i `Dodaj notatkę` (`POST /api/opportunities/:id/status` i `/notes`) oraz historia
   zmian statusu i notatek; `Przygotuj ofertę` i `Oznacz jako kontakt` są wyłączone do kolejnych
-  wersji. Bez `LLM_PROVIDER` UI mówi, że analiza nie jest
-  skonfigurowana, a okazje czekają jako „Analiza: oczekuje".
+  wersji. Prawdziwi dostawcy: `anthropic` i
+  `openai-compatible` (ten sam runner, schemat i kontrola wyniku co `mock`), koszt każdej analizy,
+  miesięczny limit `LLM_MONTHLY_BUDGET_USD` (płatny dostawca bez limitu nic nie analizuje),
+  ponowne użycie wyniku dla tej samej treści, przyciski „Ponów analizę" / „Analizuj ponownie"
+  (`POST /api/opportunities/:id/analysis`); co dokładnie wysyłamy i jak liczymy koszt:
+  [`docs/llm.md`](docs/llm.md). Bez `LLM_PROVIDER` UI mówi, że analiza nie jest skonfigurowana, a
+  okazje czekają jako „Analiza: oczekuje".
 - **Dziś, harmonogram, lejek:** widok *Dziś* (`/`): podsumowanie dnia z listą okazji i
   zadań do wykonania; harmonogram przebiegów (`DISCOVERY_TIMES`, domyślnie 08:00 i 18:00) z
   historią przebiegów, przebieg przerwany awarią oznaczany jako nieudany; lejek (`/lejek`):
@@ -205,10 +211,13 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   regulaminy i limity: [`docs/source-policy.md`](docs/source-policy.md). Automatyczne przebiegi:
   codziennie o 08:00 i 18:00 (Europe/Warsaw), zmiana przez `DISCOVERY_TIMES`; przebieg pominięty,
   gdy aplikacja była wyłączona, nie jest nadrabiany.
-- **Co wymaga kluczy:** prawdziwy dostawca LLM (Anthropic, OpenAI-compatible) dojdzie ze slice'em
-  S-05; skrzynka IMAP ze slice'em S-11. Zmienne analizy: `LLM_PROVIDER`, `ANALYSIS_DAILY_LIMIT`,
-  `PREFILTER_MAX_AGE_DAYS` (patrz `.env.example`).
-- **Co wymaga ręcznej weryfikacji:** prawdziwe kanały hnrss.org i We Work Remotely (adresy
+- **Co wymaga kluczy:** Anthropic (`LLM_PROVIDER=anthropic`, `LLM_API_KEY`, `LLM_MONTHLY_BUDGET_USD`);
+  serwer OpenAI-compatible (`LLM_BASE_URL`, `LLM_MODEL`, klucz opcjonalny); skrzynka IMAP ze
+  slice'em S-11. Zmienne analizy: `LLM_*`, `ANALYSIS_DAILY_LIMIT`, `PREFILTER_MAX_AGE_DAYS`
+  (patrz `.env.example`).
+- **Co wymaga ręcznej weryfikacji:** prawdziwe analizy Anthropic i OpenAI-compatible (czy schemat
+  jest przyjęty, czy `json_object` i zużycie tokenów działają u danego dostawcy), wygląd
+  komunikatów o limicie kosztów na telefonie, prawdziwe kanały hnrss.org i We Work Remotely (adresy
   presetów w `apps/api/src/modules/sources/presets.ts`, format wpisów, regulaminy; agent nie miał
   do nich dostępu), widok *Źródła* na telefonie, nagranie fixture'ów poleceniem
   `pnpm fixtures:record <id źródła>` (zapisuje do `apps/api/test/fixtures/feeds/` pierwsze 5
