@@ -16,6 +16,8 @@ export const analysis = (overrides: Partial<AnalysedResult> = {}): AnalysedResul
   relevantSkills: [],
   solutionApproach: 'DEMO',
   suggestedDeliverable: 'DEMO',
+  mvpScope: [],
+  exclusions: [],
   monetizationModel: 'FIXED_PRICE',
   estimatedHours: null,
   proposedPrice: null,

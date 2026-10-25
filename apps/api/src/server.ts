@@ -6,6 +6,7 @@ import { loadConfigOrExit } from './cli/config.js';
 import { openDb } from './infrastructure/db/client.js';
 import { randomTokenSource } from './infrastructure/auth/token-source.js';
 import { verifyPassword } from './infrastructure/auth/scrypt-password.js';
+import { createActivityRepository } from './infrastructure/db/activity-repository.js';
 import { createAnalysisRepository } from './infrastructure/db/analysis-repository.js';
 import { createLlmProvider, llmRunnerDeps } from './infrastructure/llm/create-provider.js';
 import { createAnalysisRunner } from './modules/analysis/service.js';
@@ -82,6 +83,7 @@ async function main(): Promise<void> {
     onSignalCreated: () => runner.kick(),
     opportunities: {
       repository: createOpportunityRepository(db),
+      activity: createActivityRepository(db),
       sourceStatus: noSourcesYet,
       clock,
     },

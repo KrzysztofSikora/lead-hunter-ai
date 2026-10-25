@@ -8,6 +8,8 @@
   "relevantSkills": ["TypeScript"],
   "solutionApproach": "DEMO approach",
   "suggestedDeliverable": "DEMO dashboard",
+  "mvpScope": ["DEMO: zakres MVP"],
+  "exclusions": ["DEMO: poza zakresem"],
   "monetizationModel": "FIXED_PRICE",
   "estimatedHours": {
     "min": 20,

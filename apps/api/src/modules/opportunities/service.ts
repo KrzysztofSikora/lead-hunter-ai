@@ -1,13 +1,20 @@
 import {
+  ActivityCause,
   OpportunityAnalysis,
+  operatorMoves,
   ScoreBreakdown,
+  upgradeStoredAnalysis,
+  type NoteRequest,
   type OpportunityDetail,
   type OpportunityList,
   type OpportunityListQuery,
   type OpportunitySummary,
+  type StatusChangeRequest,
 } from '@lead-hunter/contracts';
 import type { Clock } from '../shared/clock.js';
 import type {
+  ActivityRepository,
+  ActivityRow,
   AnalysisAttemptRow,
   EvidenceRow,
   OpportunityRepository,
@@ -17,6 +24,7 @@ import type {
 
 export interface OpportunityDeps {
   repository: OpportunityRepository;
+  activity: ActivityRepository;
   sourceStatus: SourceStatusReader;
   clock: Clock;
 }
@@ -24,7 +32,12 @@ export interface OpportunityDeps {
 export interface OpportunityService {
   list(query: OpportunityListQuery): OpportunityList;
   get(id: number): OpportunityDetail | undefined;
+  changeStatus(id: number, request: StatusChangeRequest): ActionResult;
+  addNote(id: number, request: NoteRequest): ActionResult;
 }
+
+export type ActionResult =
+  { result: 'ok'; detail: OpportunityDetail } | { result: 'not_found' | 'not_allowed' };
 
 const EXCERPT_CHARS = 280;
 
@@ -101,14 +114,30 @@ const toEvidence = (row: EvidenceRow): OpportunityDetail['evidence'][number] => 
 function parseStored<T>(
   schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } },
   json: string | null,
+  upgrade: (value: unknown) => unknown = (value) => value,
 ): T | null {
   if (json === null) return null;
   try {
-    const parsed = schema.safeParse(JSON.parse(json));
+    const parsed = schema.safeParse(upgrade(JSON.parse(json)));
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
+}
+
+function toActivity(row: ActivityRow): OpportunityDetail['activity'][number] {
+  const cause = row.metadataJson === null ? null : parseStored(ActivityCause, row.metadataJson);
+  return {
+    id: row.id,
+    type: row.type,
+    actor: row.actor,
+    fromStatus: row.fromStatus,
+    toStatus: row.toStatus,
+    reason: row.reason,
+    note: row.note,
+    cause,
+    occurredAt: iso(row.occurredAt),
+  };
 }
 
 function toLatestAnalysis(row: AnalysisAttemptRow): OpportunityDetail['latestAnalysis'] {
@@ -124,7 +153,9 @@ function toLatestAnalysis(row: AnalysisAttemptRow): OpportunityDetail['latestAna
     outputTokens: row.outputTokens,
     costMicroUsd: row.costMicroUsd,
     reusedFromAnalysisId: row.reusedFromAnalysisId,
-    result: parseStored(OpportunityAnalysis, row.resultJson),
+    result: parseStored(OpportunityAnalysis, row.resultJson, (value) =>
+      upgradeStoredAnalysis(value, row.schemaVersion),
+    ),
     breakdown: parseStored(ScoreBreakdown, row.breakdownJson),
     guardNotes: row.guardNotesJson === null ? [] : parseNotes(row.guardNotesJson),
     error: row.error,
@@ -144,9 +175,27 @@ const DAY_MS = 86_400_000;
 
 export function createOpportunityService({
   repository,
+  activity,
   sourceStatus,
   clock,
 }: OpportunityDeps): OpportunityService {
+  function detailOf(id: number): OpportunityDetail | undefined {
+    const found = repository.get(id);
+    if (!found) return undefined;
+    return {
+      ...base(found.row),
+      source: { ...sourceFacts(found.row), snippet: found.row.snippet },
+      evidence: found.evidence.map(toEvidence),
+      latestAnalysis: found.latestAnalysis ? toLatestAnalysis(found.latestAnalysis) : null,
+      activity: found.activity.map(toActivity),
+    };
+  }
+
+  function withDetail(id: number): ActionResult {
+    const detail = detailOf(id);
+    return detail ? { result: 'ok', detail } : { result: 'not_found' };
+  }
+
   return {
     list({ from, to, maxAgeDays, ...rest }) {
       const { rows, total } = repository.list({
@@ -165,15 +214,24 @@ export function createOpportunityService({
         sources: sourceStatus.summary(),
       };
     },
-    get(id) {
-      const found = repository.get(id);
-      if (!found) return undefined;
-      return {
-        ...base(found.row),
-        source: { ...sourceFacts(found.row), snippet: found.row.snippet },
-        evidence: found.evidence.map(toEvidence),
-        latestAnalysis: found.latestAnalysis ? toLatestAnalysis(found.latestAnalysis) : null,
-      };
+    get: detailOf,
+    changeStatus(id, request) {
+      const outcome = activity.changeStatus(
+        id,
+        request.status,
+        (from) => operatorMoves(from).includes(request.status),
+        {
+          reason: request.status === 'REJECTED' ? request.reason : null,
+          note: request.note ?? null,
+          at: clock.now().getTime(),
+        },
+      );
+      return outcome === 'changed' ? withDetail(id) : { result: outcome };
+    },
+    addNote(id, request) {
+      return activity.addNote(id, request.text, clock.now().getTime())
+        ? withDetail(id)
+        : { result: 'not_found' };
     },
   };
 }

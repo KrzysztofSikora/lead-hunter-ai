@@ -53,7 +53,12 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   osobną pewnością (reguły w [`docs/scoring.md`](docs/scoring.md)), dzienny limit analiz
   (`ANALYSIS_DAILY_LIMIT`, domyślnie 20; reszta czeka do następnego dnia czasu Europe/Warsaw),
   `GET /api/analysis/status`, filtry listy (min. ocena z linkiem „Tylko ≥ 65", wiek, kwota,
-  język, tryb pracy, kraj, wykluczone branże). Prawdziwi dostawcy: `anthropic` i
+  język, tryb pracy, kraj, wykluczone branże). Karta okazji (`/okazje/:id`) ma dwanaście
+  elementów z briefu §8, a przy każdej wartości etykietę pochodzenia (`ze źródła`, `wniosek
+  modelu`, `szacunek (hipoteza)`, `wyliczone regułami`, `brak danych`); akcje `Zapisz`, `Odrzuć`
+  (z powodem) i `Dodaj notatkę` (`POST /api/opportunities/:id/status` i `/notes`) oraz historia
+  zmian statusu i notatek; `Przygotuj ofertę` i `Oznacz jako kontakt` są wyłączone do kolejnych
+  wersji. Prawdziwi dostawcy: `anthropic` i
   `openai-compatible` (ten sam runner, schemat i kontrola wyniku co `mock`), koszt każdej analizy,
   miesięczny limit `LLM_MONTHLY_BUDGET_USD` (płatny dostawca bez limitu nic nie analizuje),
   ponowne użycie wyniku dla tej samej treści, przyciski „Ponów analizę" / „Analizuj ponownie"

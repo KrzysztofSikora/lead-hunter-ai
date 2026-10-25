@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { Category, Confidence, EvidenceLevel } from './classification.js';
 import { Currency } from './profile.js';
 
-export const ANALYSIS_SCHEMA_VERSION = 1;
+export const ANALYSIS_SCHEMA_VERSION = 2;
 export const SCORING_VERSION = 1;
 /** FR-10 AC6: the one-click minimum score. The API itself applies no minimum by default. */
 export const DEFAULT_MIN_SCORE = 65;
@@ -68,7 +68,7 @@ export const HoursRange = z
   });
 export type HoursRange = z.infer<typeof HoursRange>;
 
-/** Brief §6.1 plus the fields the FR-10 AC6 filters need (D-7). */
+/** Brief §6.1 plus the fields the FR-10 AC6 filters need (D-7); schema v2 adds `mvpScope` and `exclusions` (§8 item 6). */
 const AnalysedResult = z
   .object({
     verdict: z.literal('ANALYSED'),
@@ -80,6 +80,8 @@ const AnalysedResult = z
     relevantSkills: shortList,
     solutionApproach: long,
     suggestedDeliverable: long,
+    mvpScope: shortList,
+    exclusions: shortList,
     monetizationModel: MonetizationModel,
     estimatedHours: HoursRange.nullable(),
     proposedPrice: MoneyRange.nullable(),
@@ -114,6 +116,19 @@ export const OpportunityAnalysis = z.discriminatedUnion('verdict', [
 export type OpportunityAnalysis = z.infer<typeof OpportunityAnalysis>;
 export type AnalysedResult = z.infer<typeof AnalysedResult>;
 export type InsufficientDataResult = z.infer<typeof InsufficientData>;
+
+/** Reads a result stored under an older schema version as the current one; v1 had no MVP scope or exclusions. */
+export function upgradeStoredAnalysis(value: unknown, schemaVersion: number): unknown {
+  if (
+    schemaVersion < 2 &&
+    typeof value === 'object' &&
+    value !== null &&
+    (value as { verdict?: unknown }).verdict === 'ANALYSED'
+  ) {
+    return { ...value, mvpScope: [], exclusions: [] };
+  }
+  return value;
+}
 
 export const ScoreComponentKey = z.enum([
   'demand',

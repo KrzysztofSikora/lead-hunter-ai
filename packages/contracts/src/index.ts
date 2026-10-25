@@ -10,6 +10,7 @@ export {
   MonetizationModel,
   MoneyRange,
   OpportunityAnalysis,
+  upgradeStoredAnalysis,
   PrefilterRule,
   SCORE_COMPONENT_MAX,
   SCORING_VERSION,
@@ -34,6 +35,8 @@ export {
   WorkMode,
 } from './profile.js';
 export {
+  ActivityCause,
+  ActivityEvent,
   AnalysisSummary,
   Availability,
   BusinessStatus,
@@ -56,3 +59,11 @@ export {
   SourceType,
 } from './opportunities.js';
 export type { ImportRequest } from './opportunities.js';
+export {
+  NOTE_MAX_CHARS,
+  NoteRequest,
+  operatorMoves,
+  RejectionReason,
+  StatusChangeRequest,
+} from './status.js';
+export type { OperatorMove } from './status.js';

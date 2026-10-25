@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OpportunityAnalysis, ScoreBreakdown } from './analysis.js';
+import { OpportunityAnalysis, ScoreBreakdown, upgradeStoredAnalysis } from './analysis.js';
 
 const analysed = {
   verdict: 'ANALYSED',
@@ -11,6 +11,8 @@ const analysed = {
   relevantSkills: ['IoT'],
   solutionApproach: 'DEMO',
   suggestedDeliverable: 'DEMO',
+  mvpScope: ['DEMO'],
+  exclusions: [],
   monetizationModel: 'FIXED_PRICE',
   estimatedHours: { min: 10, max: 20 },
   proposedPrice: { minMinor: 100_000, maxMinor: 200_000, currency: 'PLN' },
@@ -37,7 +39,7 @@ const insufficient = {
 
 const parses = (value: unknown) => OpportunityAnalysis.safeParse(value).success;
 
-describe('OpportunityAnalysis (schema v1)', () => {
+describe('OpportunityAnalysis (schema v2)', () => {
   it('accepts a full ANALYSED result and an INSUFFICIENT_DATA result', () => {
     expect(parses(analysed)).toBe(true);
     expect(parses(insufficient)).toBe(true);
@@ -46,6 +48,9 @@ describe('OpportunityAnalysis (schema v1)', () => {
   it.each<[string, unknown]>([
     ['unknown field', { ...analysed, phone: '123' }],
     ['unknown field on INSUFFICIENT_DATA', { ...insufficient, category: 'DIRECT_GIG' }],
+    ['no mvpScope', { ...analysed, mvpScope: undefined }],
+    ['no exclusions', { ...analysed, exclusions: undefined }],
+    ['mvpScope item over 500 characters', { ...analysed, mvpScope: ['x'.repeat(501)] }],
     ['unknown verdict', { ...analysed, verdict: 'MAYBE' }],
     ['no verdict', { ...analysed, verdict: undefined }],
     ['problem over 2000 characters', { ...analysed, problem: 'x'.repeat(2001) }],
@@ -87,6 +92,24 @@ describe('OpportunityAnalysis (schema v1)', () => {
     });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(['estimatedHours', 'max']);
+  });
+});
+
+describe('upgradeStoredAnalysis', () => {
+  const v1: Record<string, unknown> = { ...analysed };
+  delete v1.mvpScope;
+  delete v1.exclusions;
+
+  it('reads a v1 ANALYSED result with empty lists', () => {
+    expect(parses(v1)).toBe(false);
+    const upgraded = upgradeStoredAnalysis(v1, 1);
+    expect(parses(upgraded)).toBe(true);
+    expect(upgraded).toMatchObject({ mvpScope: [], exclusions: [] });
+  });
+
+  it('leaves v2 and INSUFFICIENT_DATA results unchanged', () => {
+    expect(upgradeStoredAnalysis(analysed, 2)).toBe(analysed);
+    expect(upgradeStoredAnalysis(insufficient, 1)).toBe(insufficient);
   });
 });
 

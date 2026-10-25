@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { opportunities, rawSignals } from '../src/infrastructure/db/schema.js';
+import { analyses, opportunities, rawSignals } from '../src/infrastructure/db/schema.js';
 import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/app.js';
 
 const HOUR = 3_600_000;
@@ -213,7 +213,7 @@ describe('analysis in the DTOs (D-12)', () => {
       status: 'COMPLETE',
       provider: 'mock',
       demo: true,
-      schemaVersion: 1,
+      schemaVersion: 2,
       result: { verdict: 'ANALYSED' },
     });
     expect(detail.latestAnalysis.breakdown.components).toHaveLength(5);
@@ -242,6 +242,47 @@ describe('analysis in the DTOs (D-12)', () => {
     expect(list.items.find((i: { id: number }) => i.id === opportunityId)).toMatchObject({
       analysisStatus: 'COMPLETE',
       analysis: { score: null, demo: true },
+    });
+  });
+});
+
+describe('stored analysis under schema v1 (S-06 D-2)', () => {
+  it('still reads as an analysis, with empty MVP scope and exclusions', async () => {
+    const built = await buildTestApp({ env: { LLM_PROVIDER: 'mock' } });
+    const cookie = await loginAsOperator(built.app);
+    const { opportunityId } = (
+      await built.app.inject({
+        method: 'POST',
+        url: '/api/signals/import',
+        headers: { cookie },
+        payload: {
+          text: 'DEMO: Szukamy programisty TypeScript do narzędzia wewnętrznego, budżet 5000 PLN, zapłacimy za wykonanie.',
+        },
+      })
+    ).json<{ opportunityId: number }>();
+    await built.runner.drain();
+
+    // Rewrite the stored row into what schema v1 wrote: no `mvpScope`, no `exclusions`.
+    const { db } = openTestDb(built.dir);
+    const row = db.select().from(analyses).all()[0]!;
+    const v1 = JSON.parse(row.resultJson!);
+    delete v1.mvpScope;
+    delete v1.exclusions;
+    db.update(analyses)
+      .set({ schemaVersion: 1, resultJson: JSON.stringify(v1) })
+      .where(eq(analyses.id, row.id))
+      .run();
+
+    const detail = (
+      await built.app.inject({
+        method: 'GET',
+        url: `/api/opportunities/${opportunityId}`,
+        headers: { cookie },
+      })
+    ).json();
+    expect(detail.latestAnalysis).toMatchObject({
+      schemaVersion: 1,
+      result: { verdict: 'ANALYSED', mvpScope: [], exclusions: [] },
     });
   });
 });

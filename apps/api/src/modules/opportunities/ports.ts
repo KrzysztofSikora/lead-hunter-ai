@@ -6,6 +6,7 @@ import type {
   Confidence,
   EvidenceLevel,
   OpportunityListQuery,
+  RejectionReason,
   PrefilterRule,
   SourceType,
   SourcesStatus,
@@ -65,6 +66,19 @@ export interface EvidenceRow {
   extractedAt: number;
 }
 
+/** One `activity_events` row; `metadataJson` is still text here. */
+export interface ActivityRow {
+  id: number;
+  type: 'STATUS_CHANGE' | 'NOTE';
+  actor: 'operator' | 'system';
+  fromStatus: BusinessStatus | null;
+  toStatus: BusinessStatus | null;
+  reason: RejectionReason | null;
+  note: string | null;
+  metadataJson: string | null;
+  occurredAt: number;
+}
+
 export interface OpportunityFilter extends Omit<
   OpportunityListQuery,
   'from' | 'to' | 'maxAgeDays'
@@ -84,6 +98,8 @@ export interface OpportunityRepository {
         row: OpportunityRow;
         evidence: EvidenceRow[];
         latestAnalysis: AnalysisAttemptRow | undefined;
+        /** Newest first. */
+        activity: ActivityRow[];
       }
     | undefined;
 }
@@ -91,4 +107,21 @@ export interface OpportunityRepository {
 /** D-10: replaced by job-run data in S-10/S-12. */
 export interface SourceStatusReader {
   summary(): SourcesStatus;
+}
+
+export type StatusChangeOutcome = 'changed' | 'not_found' | 'not_allowed';
+
+export interface ActivityRepository {
+  /**
+   * One transaction: reads the current status, asks `allowed` about it, then updates the status
+   * (conditional on the status read) and inserts the event.
+   */
+  changeStatus(
+    id: number,
+    to: 'SAVED' | 'REJECTED',
+    allowed: (from: BusinessStatus) => boolean,
+    event: { reason: RejectionReason | null; note: string | null; at: number },
+  ): StatusChangeOutcome;
+  /** False when the opportunity does not exist. */
+  addNote(id: number, text: string, at: number): boolean;
 }

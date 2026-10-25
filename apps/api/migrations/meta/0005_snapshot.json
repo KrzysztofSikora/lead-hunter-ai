@@ -1,9 +1,112 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "27e1965d-1666-4a9e-a4d3-f4376cce3aee",
+  "id": "c58206c2-4ca6-41d3-8a4a-9b256c2e6313",
   "prevId": "8a222ec0-5a74-44d8-b62a-ec8e5ef2a8e1",
   "tables": {
+    "activity_events": {
+      "name": "activity_events",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": true
+        },
+        "opportunity_id": {
+          "name": "opportunity_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "actor": {
+          "name": "actor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "from_status": {
+          "name": "from_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "to_status": {
+          "name": "to_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "metadata_json": {
+          "name": "metadata_json",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "occurred_at": {
+          "name": "occurred_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "activity_events_opportunity_idx": {
+          "name": "activity_events_opportunity_idx",
+          "columns": [
+            "opportunity_id",
+            "occurred_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "activity_events_opportunity_id_opportunities_id_fk": {
+          "name": "activity_events_opportunity_id_opportunities_id_fk",
+          "tableFrom": "activity_events",
+          "tableTo": "opportunities",
+          "columnsFrom": [
+            "opportunity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {}
+    },
     "analyses": {
       "name": "analyses",
       "columns": {
@@ -98,20 +201,6 @@
           "notNull": false,
           "autoincrement": false
         },
-        "cost_micro_usd": {
-          "name": "cost_micro_usd",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "reused_from_analysis_id": {
-          "name": "reused_from_analysis_id",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "integer",
@@ -149,19 +238,6 @@
             "id"
           ],
           "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "analyses_reused_from_analysis_id_analyses_id_fk": {
-          "name": "analyses_reused_from_analysis_id_analyses_id_fk",
-          "tableFrom": "analyses",
-          "tableTo": "analyses",
-          "columnsFrom": [
-            "reused_from_analysis_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "set null",
           "onUpdate": "no action"
         }
       },
@@ -394,14 +470,6 @@
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
-        },
-        "analysis_force": {
-          "name": "analysis_force",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false,
-          "default": 0
         }
       },
       "indexes": {
@@ -647,15 +715,7 @@
           "autoincrement": false
         }
       },
-      "indexes": {
-        "raw_signals_content_hash_idx": {
-          "name": "raw_signals_content_hash_idx",
-          "columns": [
-            "content_hash"
-          ],
-          "isUnique": false
-        }
-      },
+      "indexes": {},
       "foreignKeys": {},
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
