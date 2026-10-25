@@ -11,7 +11,7 @@ Test levels in this repo:
 | **unit** | Vitest | `apps/api/src/**/*.test.ts`, `packages/*/src/**/*.test.ts`, `apps/web/src/**/*.test.ts(x)` | pure rules named by a `test` risk (scoring, guards, transitions); no React component tests |
 | **integration** | Vitest | `apps/api/test/**/*.int.test.ts` | Fastify app via `inject` → services → real SQLite (temp file, all migrations); outbound HTTP through undici `MockAgent`; fake clock; fake IMAP server port |
 | **e2e** | Playwright (Chromium headless) | `e2e/*.spec.ts` | built app (`pnpm build && pnpm start`) on a temp data dir, `LLM_PROVIDER=mock`, no outbound network |
-| **image** | `docker build` | `Dockerfile` | the image builds; container healthcheck in the e2e-in-container check of S-16 |
+| **image** | `docker build` | `Dockerfile` | the image builds; `pnpm docker:smoke` (S-16) runs it: non-root, migrations, health, refusal without a hash, data kept when the container is replaced |
 | **human** | PR checklist with evidence | `context/changes/<id>/evidence/` | real feeds, real LLM providers, real IMAP mailbox, the Raspberry Pi; never a gate |
 
 ## Test budget (user decision, 2026-10-25)
@@ -58,8 +58,8 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 | TR-23 (none) | Layer boundary violated (domain imports infrastructure/SDKs; web imports api internals) | M | M | lint | ESLint `no-restricted-imports` + a fixture asserting lint fails | planned (F-01) |
 | TR-24 (human) | Facts and estimates indistinguishable in the UI; status by colour only; unusable at 360 px | M | M | unit + e2e | component tests assert the "ze źródła" / "wniosek modelu" / "szacunek (hipoteza)" labels; e2e at 360 px viewport asserts no horizontal scroll on the main views | planned (S-06, S-13) |
 | TR-25 (none) | Pre-filter lets "SEEKING WORK" posts or excluded categories reach the LLM; daily limits ignored | M | M | unit | pre-filter rule table; limit counters with fake clock | planned (S-04, S-05) |
-| TR-26 (human) | Image does not build or the container cannot start (native better-sqlite3, non-root permissions, volume) | M | M | image + human | CI `docker build` on every PR; S-16 human check on the Pi with evidence | planned (F-01, S-16) |
-| TR-27 (human) | Footprint too large for the Pi 4 (NFR-01, NFR-02) | M | L | human | S-16 measurements with seeded 10 000 signals | planned (S-16) |
+| TR-26 (human) | Image does not build or the container cannot start (native better-sqlite3, non-root permissions, volume) | M | M | image + human | CI `docker build` and `docker:smoke` on every PR; S-16 human check on the Pi with evidence | covered (S-16: container-smoke; Pi build human) |
+| TR-27 (human) | Footprint too large for the Pi 4 (NFR-01, NFR-02) | M | L | human | S-16 measurements with seeded 10 000 signals | planned (S-16 human checks, evidence in changes/pi-deployment/evidence/) |
 
 ## Not tested (and why)
 - **Real third-party services in automated tests** (hnrss.org, WWR, Useme mail, Anthropic,
@@ -80,13 +80,14 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 | unit + integration `pnpm test` | `/implement` each phase; `/review`; CI | yes |
 | e2e `pnpm e2e` | `/review`; CI on every PR and push | yes (F-01: one smoke spec; S-08 on: main path) |
 | image `pnpm docker:build` | `/review`; CI on every PR and push | yes |
+| image smoke `pnpm docker:smoke` | `/review` (needs Docker); CI `image` job after the build | yes |
 | mutation `pnpm mutation --mutate <file>` | only S-04 and S-09 (`ship <id> --mutation`); CI job `mutation-report` report-only | no (report only, target 80 %) |
 
 - No pre-commit hook: autonomous runs are gated by the skills; human commits rely on CI.
 - CI (`.github/workflows/ci.yml`, created in F-01): Node 24 + pnpm, `pnpm install
   --frozen-lockfile`, then typecheck, lint, test; job `e2e` (`pnpm exec playwright install
   --with-deps chromium`, `pnpm e2e`, report uploaded as an artifact on failure); job `image`
-  (`pnpm docker:build`); job `repo-hygiene` (fails if `.env`, `*.db`, backups or logs are
+  (`pnpm docker:build`, then `pnpm docker:smoke`); job `repo-hygiene` (fails if `.env`, `*.db`, backups or logs are
   tracked); job `mutation-report` (Stryker on changed target files, score in the job summary,
   never fails).
 - `pnpm e2e` builds the app, starts it on a free port with a temp `DATA_DIR`,
