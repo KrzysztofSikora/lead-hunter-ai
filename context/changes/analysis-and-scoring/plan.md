@@ -398,7 +398,7 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 - [minor] (Phase 3) plan-review #2: the e2e import test now waits (reload until `Analiza: gotowa`) and no longer asserts "brak analizy — w kolejce" on the detail: the 44-character DEMO post is `INSUFFICIENT_DATA` with the mock, so the detail has no analysis summary until Phase 5 renders `latestAnalysis`. Phase 5 replaces these assertions.
 - [minor] (Phase 3) plan-review #3/#4: `drain()` and `kick()` share one in-flight promise (a call during a drain makes it run once more); any error after the provider answered is stored as `FAILED` with `internal_error: …`, and if that also throws the drain stops and `onError` logs it. `buildTestApp` kicks only with `autoKick: true`; tests call `runner.drain()`.
 - [minor] (Phase 3) `AnalysisRepository.savePrefilter` takes a fourth argument `moveTo` (business status applied only while `NEW`), so the status mapping (D-5) stays in the service, not in SQL. Amount columns hold `sourceBudget` only (plan-review #8); `workMode UNKNOWN` is stored as null so the filters treat it as unknown.
-- [minor] (Phase 3) `pnpm docker:build` not run (no Docker in this environment); `/review` runs it.
+- [minor] (Phase 3) `pnpm docker:build` fails in this sandbox before reaching the code: corepack cannot download pnpm inside the build ("self-signed certificate in certificate chain", the agent proxy's CA is not trusted in the container). Not caused by this phase; `/review` runs it again.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
