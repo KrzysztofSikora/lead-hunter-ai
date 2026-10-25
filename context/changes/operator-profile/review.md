@@ -48,7 +48,7 @@ Gates: typecheck ok, lint ok, unit tests ok (19 files, 135 tests), e2e ok (3 tes
 - Fix: add `{errorLine('rateRanges', 'rateRanges')}` under the rates list (with an exact-path match so per-row errors are not shown twice) and disable *Dodaj przedział* at 10 rows; optionally show any error that matches no rendered field next to the status line.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (b2c83e5)
 
 ### R2: README *Co wymaga ręcznej weryfikacji* does not list the new human checks
 - Severity: minor
@@ -57,4 +57,4 @@ Gates: typecheck ok, lint ok, unit tests ok (19 files, 135 tests), e2e ok (3 tes
 - Fix: add "widok *Profil* na telefonie i komunikaty błędów przy polach" to *Co wymaga ręcznej weryfikacji*.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (fc17acc)
