@@ -114,6 +114,13 @@ export function createJobLock({
         return { ok: true, handle: handleFor(token) };
       }, immediate);
     },
+    isHeld() {
+      const row = db.select().from(jobLocks).where(eq(jobLocks.name, name)).get();
+      return (
+        row !== undefined &&
+        (minted.has(row.ownerToken) || !stale(row, clock.now().getTime(), false))
+      );
+    },
     releaseStale() {
       return db.transaction((tx) => {
         const now = clock.now().getTime();

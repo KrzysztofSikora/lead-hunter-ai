@@ -23,6 +23,8 @@ export interface JobLock {
    * `interrupted`. Returns whether a lock was freed.
    */
   releaseStale(): boolean;
+  /** Whether a live holder has the lock: a stale row (D-2) does not count. */
+  isHeld(): boolean;
 }
 
 export interface CycleSummary {

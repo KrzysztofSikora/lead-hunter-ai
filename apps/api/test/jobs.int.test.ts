@@ -271,6 +271,45 @@ describe('shutdown and a lost lock (D-3)', () => {
     expect(h.lockRows()).toEqual([]);
   });
 
+  it('stops a running cycle from starting its next source after shutdown (R4)', async () => {
+    const h = harness();
+    let continued: boolean | undefined;
+    const sources = {
+      async runEnabled(context?: { shouldContinue?: () => boolean }) {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        continued = context?.shouldContinue?.();
+        return [];
+      },
+    } as unknown as SourceService;
+    const jobs = createJobsService({
+      lock: h.lockFor({ pid: process.pid }),
+      runs: h.runs,
+      sources,
+      clock: h.clock,
+    });
+    const started = jobs.startCycle('manual');
+    if (started.kind !== 'started') throw new Error('cycle did not start');
+    jobs.shutdown(h.clock.now().getTime());
+    await started.done;
+    expect(continued).toBe(false);
+  });
+
+  it('reports running only while a live holder has the lock (R2)', () => {
+    const h = harness();
+    const jobs = createJobsService({
+      lock: h.lockFor({ pid: process.pid }),
+      runs: h.runs,
+      sources: gatedSources().sources,
+      clock: h.clock,
+    });
+    const foreign = h.lockFor({ pid: process.pid + 1, host: 'other-host' });
+    expect(foreign.acquire().ok).toBe(true);
+    h.runs.startCycle('cli', h.clock.now().getTime(), null);
+    expect(jobs.list({ page: 1, pageSize: 20 }).running).toBe(true);
+    h.clock.advance(3 * 60_000);
+    expect(jobs.list({ page: 1, pageSize: 20 }).running).toBe(false);
+  });
+
   it('leaves a lock held by another process and its runs alone', () => {
     const h = harness();
     const cli = h.lockFor({ pid: process.pid + 1 });

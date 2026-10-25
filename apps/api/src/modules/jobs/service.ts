@@ -60,6 +60,7 @@ export function createJobsService({
   logger,
 }: JobsDeps): JobsService {
   let held: LockHandle | null = null;
+  let stopping = false;
   const inflight = new Set<Promise<unknown>>();
 
   /** Keeps the lock alive while it is held; `lost()` turns true when another process took it. */
@@ -146,7 +147,7 @@ export function createJobsService({
           results = await sources.runEnabled({
             parentRunId: id,
             trigger,
-            shouldContinue: () => !heart.lost(),
+            shouldContinue: () => !heart.lost() && !stopping,
           });
           summary = summarise(results, clock.now().getTime());
         } catch (error) {
@@ -212,7 +213,7 @@ export function createJobsService({
         total,
         page: query.page,
         pageSize: query.pageSize,
-        running: runs.isRunning(),
+        running: lock.isHeld(),
       };
     },
 
@@ -221,6 +222,7 @@ export function createJobsService({
     },
 
     shutdown(at) {
+      stopping = true;
       if (!held) return;
       const handle = held;
       held = null;
