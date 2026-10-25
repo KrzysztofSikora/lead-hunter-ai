@@ -16,6 +16,8 @@ describe('loadConfig', () => {
       importMaxTextChars: 20_000,
       analysisDailyLimit: 20,
       prefilterMaxAgeDays: 30,
+      fetchTimeoutMs: 20_000,
+      fetchMaxBytes: 1_048_576,
     });
   });
 
@@ -31,6 +33,8 @@ describe('loadConfig', () => {
         LLM_PROVIDER: 'mock',
         ANALYSIS_DAILY_LIMIT: '5',
         PREFILTER_MAX_AGE_DAYS: '7',
+        FETCH_TIMEOUT_MS: '5000',
+        FETCH_MAX_BYTES: '200000',
         ...HASH,
       }),
     ).toEqual({
@@ -44,6 +48,8 @@ describe('loadConfig', () => {
       llmProvider: 'mock',
       analysisDailyLimit: 5,
       prefilterMaxAgeDays: 7,
+      fetchTimeoutMs: 5000,
+      fetchMaxBytes: 200_000,
     });
   });
 
@@ -73,6 +79,11 @@ describe('loadConfig', () => {
     ['PREFILTER_MAX_AGE_DAYS', '366'],
     ['IMPORT_MAX_TEXT_CHARS', '200001'],
     ['IMPORT_MAX_TEXT_CHARS', 'dużo'],
+    ['FETCH_TIMEOUT_MS', '999'],
+    ['FETCH_TIMEOUT_MS', '60001'],
+    ['FETCH_MAX_BYTES', '65535'],
+    ['FETCH_MAX_BYTES', '5242881'],
+    ['FETCH_MAX_BYTES', 'dużo'],
   ])('rejects %s=%s and names the variable', (variable, value) => {
     const run = () => loadConfig({ [variable]: value });
     expect(run).toThrow(ConfigError);

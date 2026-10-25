@@ -1,4 +1,5 @@
 import { count } from 'drizzle-orm';
+import { getGlobalDispatcher, type MockAgent } from 'undici';
 import { describe, expect, it } from 'vitest';
 import {
   opportunities,
@@ -150,16 +151,24 @@ describe('manual import (FR-02, FR-06)', () => {
     expect(rows().opps).toHaveLength(2);
   });
 
-  it('never merges URL imports with blank text (D-2)', async () => {
+  it('fetches each URL given with blank text and never merges them (S-09 retires the empty-snippet rule)', async () => {
+    const pools = [
+      ['https://example.com', '/job/1', 'Pierwsze ogłoszenie z portalu'],
+      ['https://example.org', '/oferta/2', 'Drugie ogłoszenie z innego portalu'],
+    ] as const;
+    for (const [origin, path, body] of pools) {
+      const pool = (getGlobalDispatcher() as unknown as MockAgent).get(origin);
+      pool.intercept({ path: '/robots.txt' }).reply(404, '');
+      pool.intercept({ path }).reply(200, body, { headers: { 'content-type': 'text/plain' } });
+    }
     const { post, rows } = await setup();
     expect((await post({ text: '  ', url: URL_A })).statusCode).toBe(201);
     expect((await post({ text: '  ', url: URL_B })).statusCode).toBe(201);
     const { signals, opps } = rows();
     expect(opps).toHaveLength(2);
-    expect(signals.map((s) => s.contentHash)).toEqual([null, null]);
-    expect(signals.map((s) => [s.snippet, s.title])).toEqual([
-      ['', URL_A],
-      ['', URL_B],
+    expect(signals.map((s) => [s.sourceType, s.snippet, s.title])).toEqual([
+      ['manual_fetch', 'Pierwsze ogłoszenie z portalu', 'Pierwsze ogłoszenie z portalu'],
+      ['manual_fetch', 'Drugie ogłoszenie z innego portalu', 'Drugie ogłoszenie z innego portalu'],
     ]);
   });
 
@@ -212,7 +221,7 @@ describe('manual import (FR-02, FR-06)', () => {
 
   it('recognises a duplicate after a restart', async () => {
     const { app, post, dir } = await setup();
-    await post({ url: URL_A });
+    await post({ text: POST, url: URL_A });
     await app.close();
 
     const restarted = await buildTestApp({ dir });

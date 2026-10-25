@@ -5,6 +5,13 @@ import { opportunities, opportunityEvidence, rawSignals, signalIdentities } from
 
 export function createSignalRepository(db: BetterSQLite3Database): SignalRepository {
   return {
+    findOwner(kind, value) {
+      return db
+        .select({ id: signalIdentities.opportunityId })
+        .from(signalIdentities)
+        .where(and(eq(signalIdentities.kind, kind), eq(signalIdentities.value, value)))
+        .get()?.id;
+    },
     transaction(fn) {
       return db.transaction((tx) =>
         fn({

@@ -1,3 +1,5 @@
+import type { FetchFailureReason } from '@lead-hunter/contracts';
+
 /** `150000` + `PLN` → `1 500,00 PLN` (U+00A0 groups); amounts are never converted between currencies. */
 export function formatMinor(minor: number, currency: string): string {
   const units = String(Math.trunc(minor / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
@@ -125,6 +127,7 @@ export const strings = {
     sourceTypes: {
       manual_text: 'Wklejony tekst',
       manual_url: 'Wklejony adres URL',
+      manual_fetch: 'Pobrana strona (jednorazowo)',
     },
   },
   prefilterRules: {
@@ -142,7 +145,22 @@ export const strings = {
     textLabel: 'Treść ogłoszenia',
     urlLabel: 'Adres URL (opcjonalnie)',
     urlHint:
-      'Adres zostanie zapisany jako źródło; pobieranie strony dojdzie później — wklej treść.',
+      'Jeśli nie wkleisz treści, strona zostanie pobrana jednorazowo (z poszanowaniem robots.txt).',
+    pastePrompt:
+      'Wklej treść ogłoszenia w polu powyżej i zaimportuj ponownie — adres zostanie zapisany jako źródło.',
+    fetchFailed: {
+      blocked_address: 'Nie pobrano strony: adres prywatny lub lokalny jest zablokowany.',
+      blocked_url: 'Nie pobrano strony: adres lub przekierowanie jest niedozwolone.',
+      robots_disallowed: 'Nie pobrano strony: robots.txt serwisu zabrania pobierania.',
+      robots_unavailable: 'Nie pobrano strony: nie udało się odczytać robots.txt serwisu.',
+      timeout: 'Nie pobrano strony: serwis odpowiadał zbyt długo.',
+      too_large: 'Nie pobrano strony: odpowiedź jest zbyt duża.',
+      http_status: 'Nie pobrano strony: serwis zwrócił błąd.',
+      unsupported_content: 'Nie pobrano strony: to nie jest strona z tekstem.',
+      no_text: 'Nie pobrano strony: nie znaleziono na niej treści.',
+      too_many_redirects: 'Nie pobrano strony: zbyt wiele przekierowań.',
+      network: 'Nie pobrano strony: błąd połączenia z serwisem.',
+    } satisfies Record<FetchFailureReason, string>,
     submit: 'Importuj',
     submitting: 'Importowanie…',
     failed: 'Nie udało się zaimportować. Spróbuj ponownie.',

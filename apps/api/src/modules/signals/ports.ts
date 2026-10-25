@@ -1,4 +1,4 @@
-import type { Availability, SourceType } from '@lead-hunter/contracts';
+import type { Availability, FetchFailureReason, SourceType } from '@lead-hunter/contracts';
 
 export type IdentityKind = 'canonical_url' | 'content_hash';
 
@@ -42,7 +42,18 @@ export interface SignalTx {
   insertEvidence(evidence: NewEvidence): void;
 }
 
+export type PageFetchResult =
+  | { ok: true; title: string; text: string; fetchedAt: number }
+  | { ok: false; reason: FetchFailureReason; httpStatus?: number };
+
+/** S-09: one guarded, robots-respecting fetch of a page the operator pasted. */
+export interface PageFetcher {
+  fetch(url: string): Promise<PageFetchResult>;
+}
+
 export interface SignalRepository {
+  /** A plain read outside a transaction: the pre-fetch duplicate check (D-1). */
+  findOwner(kind: IdentityKind, value: string): number | undefined;
   /** Synchronous: better-sqlite3 rejects a callback that returns a promise. */
   transaction<T>(fn: (tx: SignalTx) => T): T;
 }

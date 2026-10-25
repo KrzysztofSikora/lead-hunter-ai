@@ -43,6 +43,7 @@ export {
   Confidence,
   DEFAULT_IMPORT_MAX_TEXT_CHARS,
   Evidence,
+  FetchFailureReason,
   LatestAnalysis,
   EvidenceLevel,
   ImportResult,

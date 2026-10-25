@@ -14,6 +14,8 @@ export const ENV_VARIABLES = [
   'LLM_PROVIDER',
   'ANALYSIS_DAILY_LIMIT',
   'PREFILTER_MAX_AGE_DAYS',
+  'FETCH_TIMEOUT_MS',
+  'FETCH_MAX_BYTES',
 ] as const;
 
 /** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
@@ -47,6 +49,8 @@ export const EnvSchema = z
     LLM_PROVIDER: optional(z.enum(['mock'])),
     ANALYSIS_DAILY_LIMIT: optional(z.coerce.number().int().min(1).max(1_000)),
     PREFILTER_MAX_AGE_DAYS: optional(z.coerce.number().int().min(1).max(365)),
+    FETCH_TIMEOUT_MS: optional(z.coerce.number().int().min(1_000).max(60_000)),
+    FETCH_MAX_BYTES: optional(z.coerce.number().int().min(65_536).max(5_242_880)),
   })
   .superRefine((env, ctx) => {
     const host = env.HOST ?? '127.0.0.1';
@@ -74,6 +78,10 @@ export interface Config {
   analysisDailyLimit: number;
   /** Sources older than this many days are pre-filtered out (D-6). */
   prefilterMaxAgeDays: number;
+  /** One deadline for everything a URL import fetches: robots.txt, redirects, headers, body (D-8). */
+  fetchTimeoutMs: number;
+  /** Largest single HTTP response body the shared client reads, in bytes (D-8). */
+  fetchMaxBytes: number;
 }
 
 export interface ConfigIssue {
@@ -99,6 +107,8 @@ const EXPECTED: Record<string, string> = {
   IMPORT_MAX_TEXT_CHARS: 'oczekiwano liczby całkowitej 1000–200000',
   ANALYSIS_DAILY_LIMIT: 'oczekiwano liczby całkowitej 1–1000',
   PREFILTER_MAX_AGE_DAYS: 'oczekiwano liczby całkowitej 1–365',
+  FETCH_TIMEOUT_MS: 'oczekiwano liczby całkowitej 1000–60000',
+  FETCH_MAX_BYTES: 'oczekiwano liczby całkowitej 65536–5242880',
   LLM_PROVIDER: 'oczekiwano: mock',
   LOG_LEVEL: `oczekiwano jednej z wartości: ${LOG_LEVELS.join(', ')}`,
 };
@@ -126,6 +136,8 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     importMaxTextChars: v.IMPORT_MAX_TEXT_CHARS ?? 20_000,
     analysisDailyLimit: v.ANALYSIS_DAILY_LIMIT ?? 20,
     prefilterMaxAgeDays: v.PREFILTER_MAX_AGE_DAYS ?? 30,
+    fetchTimeoutMs: v.FETCH_TIMEOUT_MS ?? 20_000,
+    fetchMaxBytes: v.FETCH_MAX_BYTES ?? 1_048_576,
     ...(v.LLM_PROVIDER ? { llmProvider: v.LLM_PROVIDER } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };

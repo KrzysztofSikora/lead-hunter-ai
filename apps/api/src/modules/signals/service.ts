@@ -7,26 +7,52 @@ import {
   isNewEvidence,
   normaliseSnippet,
 } from './identity.js';
-import type { IdentityKind, SignalRepository, SignalTx } from './ports.js';
+import type { IdentityKind, PageFetcher, SignalRepository, SignalTx } from './ports.js';
 
 export interface SignalDeps {
   repository: SignalRepository;
   clock: Clock;
+  pageFetcher: PageFetcher;
 }
 
 export interface SignalService {
-  /** Synchronous on purpose: the transaction callback must not await (D-14). */
-  importSignal(request: ImportRequest): ImportResult;
+  /** Only the fetch awaits; the transaction callback stays synchronous (D-14). */
+  importSignal(request: ImportRequest): Promise<ImportResult>;
 }
 
-export function createSignalService({ repository, clock }: SignalDeps): SignalService {
+export function createSignalService({ repository, clock, pageFetcher }: SignalDeps): SignalService {
   return {
-    importSignal({ text, url }) {
+    async importSignal({ text, url }) {
       const sourceUrl = url ?? null;
       const canonicalUrl = sourceUrl === null ? null : canonicalizeUrl(sourceUrl);
-      const snippet = normaliseSnippet(text ?? '');
+      let snippet = normaliseSnippet(text ?? '');
+      let fetched: { title: string } | null = null;
+      let at = clock.now().getTime();
+
+      // D-1: a URL without text is fetched once, unless the URL is already known.
+      if (sourceUrl !== null && canonicalUrl !== null && snippet === '') {
+        const known = repository.findOwner('canonical_url', canonicalUrl);
+        if (known !== undefined) {
+          return {
+            result: 'duplicate',
+            opportunityId: known,
+            matchedBy: 'canonical_url',
+            evidenceAdded: false,
+          };
+        }
+        const page = await pageFetcher.fetch(sourceUrl);
+        if (!page.ok) {
+          return {
+            result: 'fetch_failed',
+            reason: page.reason,
+            ...(page.httpStatus === undefined ? {} : { httpStatus: page.httpStatus }),
+          };
+        }
+        snippet = normaliseSnippet(page.text);
+        fetched = { title: page.title };
+        at = page.fetchedAt;
+      }
       const hash = contentHash(snippet);
-      const at = clock.now().getTime();
       // For an import without text the only fact the operator gave is the URL.
       const sourceFact = snippet !== '' ? snippet : (sourceUrl ?? '');
 
@@ -64,10 +90,10 @@ export function createSignalService({ repository, clock }: SignalDeps): SignalSe
         }
 
         const signalId = tx.insertSignal({
-          sourceType: sourceUrl === null ? 'manual_text' : 'manual_url',
+          sourceType: fetched ? 'manual_fetch' : sourceUrl === null ? 'manual_text' : 'manual_url',
           sourceUrl,
           canonicalUrl,
-          title: deriveTitle(snippet, sourceUrl),
+          title: fetched?.title ?? deriveTitle(snippet, sourceUrl),
           snippet,
           publishedAt: null,
           fetchedAt: at,

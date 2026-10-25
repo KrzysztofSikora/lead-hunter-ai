@@ -19,6 +19,10 @@ import { createProfileRepository } from '../../src/infrastructure/db/profile-rep
 import { createSignalRepository } from '../../src/infrastructure/db/signal-repository.js';
 import { createSessionRepository } from '../../src/infrastructure/db/session-repository.js';
 import { randomTokenSource } from '../../src/infrastructure/auth/token-source.js';
+import { getGlobalDispatcher } from 'undici';
+import { createHttpClient } from '../../src/infrastructure/sources/http/client.js';
+import { createPageFetcher } from '../../src/infrastructure/sources/manual/page-fetcher.js';
+import { createRobotsCheck } from '../../src/infrastructure/sources/manual/robots.js';
 import { noSourcesYet } from '../../src/infrastructure/sources/source-status.js';
 import type { Clock } from '../../src/modules/auth/ports.js';
 import { openDb, type OpenDb } from '../../src/infrastructure/db/client.js';
@@ -100,6 +104,19 @@ export async function buildTestApp(
     maxAgeDays: config.prefilterMaxAgeDays,
     onError: () => undefined,
   });
+  // Pages go through the real fetcher; the global MockAgent answers (nothing leaves the machine).
+  const http = createHttpClient({
+    userAgent: 'LeadHunterAI/test (+https://example.invalid)',
+    maxBytes: config.fetchMaxBytes,
+    dispatcher: getGlobalDispatcher(),
+  });
+  const pageFetcher = createPageFetcher({
+    http,
+    robots: createRobotsCheck({ http, userAgentToken: 'LeadHunterAI', clock }),
+    timeoutMs: config.fetchTimeoutMs,
+    maxTextChars: config.importMaxTextChars,
+    clock,
+  });
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
@@ -111,7 +128,7 @@ export async function buildTestApp(
       tokens: randomTokenSource,
     },
     profile: profileDeps,
-    signals: { repository: createSignalRepository(db), clock },
+    signals: { repository: createSignalRepository(db), clock, pageFetcher },
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),
     opportunities: {
       repository: createOpportunityRepository(db),
