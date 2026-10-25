@@ -5,7 +5,7 @@ import type {
   PendingOpportunity,
   WaitingOpportunity,
 } from '../../modules/analysis/ports.js';
-import { analyses, opportunities, rawSignals } from './schema.js';
+import { activityEvents, analyses, opportunities, rawSignals } from './schema.js';
 
 const selection = {
   id: opportunities.id,
@@ -28,6 +28,38 @@ const waiting = and(
 const moveFromNew = (status: string | null) =>
   sql`CASE WHEN ${opportunities.businessStatus} = 'NEW' AND ${status} IS NOT NULL THEN ${status} ELSE ${opportunities.businessStatus} END`;
 
+type Tx = Parameters<Parameters<BetterSQLite3Database['transaction']>[0]>[0];
+
+/** The status before an update; the system event is written only when it was `NEW` (D-8). */
+const statusOf = (tx: Tx, id: number): string | undefined =>
+  tx
+    .select({ status: opportunities.businessStatus })
+    .from(opportunities)
+    .where(eq(opportunities.id, id))
+    .get()?.status;
+
+function recordSystemMove(
+  tx: Tx,
+  id: number,
+  before: string | undefined,
+  to: string | null,
+  cause: object,
+  at: number,
+): void {
+  if (before !== 'NEW' || to === null) return;
+  tx.insert(activityEvents)
+    .values({
+      opportunityId: id,
+      type: 'STATUS_CHANGE',
+      actor: 'system',
+      fromStatus: before,
+      toStatus: to,
+      metadataJson: JSON.stringify(cause),
+      occurredAt: at,
+    })
+    .run();
+}
+
 export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRepository {
   const joined = () =>
     db
@@ -43,18 +75,24 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
         .all() as PendingOpportunity[];
     },
     savePrefilter(id, result, at, moveTo) {
-      db.update(opportunities)
-        .set({
-          prefilterRule: result.rule,
-          prefilterMatches: result.matches,
-          prefilterAt: at,
-          language: result.language,
-          ...(result.rule !== null
-            ? { analysisStatus: 'SKIPPED', businessStatus: moveFromNew(moveTo), updatedAt: at }
-            : {}),
-        })
-        .where(eq(opportunities.id, id))
-        .run();
+      db.transaction((tx) => {
+        const before = statusOf(tx, id);
+        tx.update(opportunities)
+          .set({
+            prefilterRule: result.rule,
+            prefilterMatches: result.matches,
+            prefilterAt: at,
+            language: result.language,
+            ...(result.rule !== null
+              ? { analysisStatus: 'SKIPPED', businessStatus: moveFromNew(moveTo), updatedAt: at }
+              : {}),
+          })
+          .where(eq(opportunities.id, id))
+          .run();
+        if (result.rule !== null) {
+          recordSystemMove(tx, id, before, moveTo, { kind: 'prefilter', rule: result.rule }, at);
+        }
+      });
     },
     nextWaiting(limit) {
       return joined()
@@ -78,6 +116,7 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
     },
     saveComplete(analysis) {
       db.transaction((tx) => {
+        const before = statusOf(tx, analysis.opportunityId);
         tx.insert(analyses)
           .values({
             opportunityId: analysis.opportunityId,
@@ -113,6 +152,14 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
           })
           .where(eq(opportunities.id, analysis.opportunityId))
           .run();
+        recordSystemMove(
+          tx,
+          analysis.opportunityId,
+          before,
+          columns.businessStatus,
+          { kind: 'insufficient_data' },
+          analysis.at,
+        );
       });
     },
     saveFailed(analysis) {

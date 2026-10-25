@@ -17,12 +17,19 @@ import {
 } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type {
+  ActivityRow,
   AnalysisAttemptRow,
   EvidenceRow,
   OpportunityRepository,
   OpportunityRow,
 } from '../../modules/opportunities/ports.js';
-import { analyses, opportunities, opportunityEvidence, rawSignals } from './schema.js';
+import {
+  activityEvents,
+  analyses,
+  opportunities,
+  opportunityEvidence,
+  rawSignals,
+} from './schema.js';
 
 const columns = {
   id: opportunities.id,
@@ -170,7 +177,23 @@ export function createOpportunityRepository(db: BetterSQLite3Database): Opportun
         .orderBy(desc(analyses.id))
         .limit(1)
         .get() as AnalysisAttemptRow | undefined;
-      return { row, evidence, latestAnalysis };
+      const activity = db
+        .select({
+          id: activityEvents.id,
+          type: activityEvents.type,
+          actor: activityEvents.actor,
+          fromStatus: activityEvents.fromStatus,
+          toStatus: activityEvents.toStatus,
+          reason: activityEvents.reason,
+          note: activityEvents.note,
+          metadataJson: activityEvents.metadataJson,
+          occurredAt: activityEvents.occurredAt,
+        })
+        .from(activityEvents)
+        .where(eq(activityEvents.opportunityId, id))
+        .orderBy(desc(activityEvents.occurredAt), desc(activityEvents.id))
+        .all() as ActivityRow[];
+      return { row, evidence, latestAnalysis, activity };
     },
   };
 }

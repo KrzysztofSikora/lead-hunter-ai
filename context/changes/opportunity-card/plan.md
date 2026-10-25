@@ -236,7 +236,7 @@ storing (lesson). Notes and reasons are operator text, never logged.
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Analysis schema v2 with MVP scope and exclusions
-- [ ] Phase 2: Activity events and the actions API
+- [x] Phase 2: Activity events and the actions API
 - [ ] Phase 3: The twelve-element card with provenance tags
 - [ ] Phase 4: Card actions, history and e2e
 
@@ -246,6 +246,7 @@ storing (lesson). Notes and reasons are operator text, never logged.
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
 - [minor] Phase 1: `apps/api/test/analysis.int.test.ts` pinned `schemaVersion: 1`; now 2. `docs/scoring.md` does not describe the analysis schema, so no doc line was added.
+- [minor] Phase 2: `ActivityRepository` has no `list`; `OpportunityRepository.get` returns the activity rows (one read path for the detail). System events follow plan-review #3 (status read in the same transaction; no event when the operator moved the row first, covered by an integration case). `refine` for `OTHER` sits on the `REJECTED` member with `path: ['note']` (plan-review #6).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
