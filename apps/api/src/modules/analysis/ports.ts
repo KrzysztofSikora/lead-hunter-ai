@@ -119,6 +119,8 @@ export interface AnalysisRepository {
   waitingCount(): number;
   saveComplete(analysis: CompletedAnalysis): void;
   saveFailed(analysis: FailedAnalysis): void;
+  /** D-12: `FAILED` back to `PENDING`; the failed attempt stays as history. One UPDATE. */
+  retryFailed(id: number, at: number): 'reset' | 'not_failed' | 'not_found';
 }
 
 export type { AnalysisStatus };

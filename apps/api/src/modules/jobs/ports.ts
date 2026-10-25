@@ -1,3 +1,5 @@
+import type { JobCost, JobCounters, JobErrorReason } from '@lead-hunter/contracts';
+
 /** Who started a run (D-14, D-10). */
 export type JobTrigger = 'schedule' | 'manual' | 'cli';
 
@@ -34,10 +36,36 @@ export interface CycleSummary {
   error?: { reason: 'internal' };
 }
 
+/** One run as the list shows it: times in UTC ms, counters already joined at read time (D-8). */
+export interface JobRunRow {
+  id: number;
+  type: 'discovery' | 'source_run';
+  trigger: JobTrigger | null;
+  parentId: number | null;
+  source: { id: number; name: string } | null;
+  status: 'running' | 'ok' | 'partial' | 'failed';
+  startedAt: number;
+  finishedAt: number | null;
+  scheduledFor: number | null;
+  counters: JobCounters;
+  error: { reason: JobErrorReason; httpStatus?: number } | null;
+  cost: JobCost | null;
+}
+
+export interface JobRunQuery {
+  page: number;
+  pageSize: number;
+  sourceId?: number | undefined;
+  /** One run by id (the answer to a started cycle). */
+  id?: number | undefined;
+}
+
 export interface JobRunRepository {
   /** D-5: `'slot_taken'` when this scheduled slot already has a cycle row. */
   startCycle(trigger: JobTrigger, at: number, scheduledFor: number | null): number | 'slot_taken';
   /** Writes only a row still `running`, so an `interrupted` row is never rewritten (D-3). */
   finishCycle(id: number, summary: CycleSummary): void;
   isRunning(): boolean;
+  /** Newest first. A cycle's counters are the sums over its child runs (D-8, D-11). */
+  list(query: JobRunQuery): { items: JobRunRow[]; total: number };
 }

@@ -1,6 +1,14 @@
+import type { JobList } from '@lead-hunter/contracts';
 import type { Clock } from '../shared/clock.js';
 import type { RunOutcome, SourceService } from '../sources/service.js';
-import type { CycleSummary, JobLock, JobRunRepository, JobTrigger, LockHandle } from './ports.js';
+import type {
+  CycleSummary,
+  JobLock,
+  JobRunQuery,
+  JobRunRepository,
+  JobTrigger,
+  LockHandle,
+} from './ports.js';
 
 /** D-2: how often a held lock proves its owner is alive. */
 export const HEARTBEAT_MS = 20_000;
@@ -25,6 +33,8 @@ export interface JobsService {
   startCycle(trigger: JobTrigger, scheduledFor?: number): CycleStart;
   /** D-4: one source through the same lock. */
   runSource(id: number): Promise<SourceRunStart>;
+  /** D-10: newest first; the schedule is added by the route. */
+  list(query: JobRunQuery): Omit<JobList, 'schedule'>;
   /** Resolves when no cycle or source run started by this process is in flight. */
   idle(): Promise<void>;
   /** D-3: graceful stop; touches the lock and the rows only when this process holds the lock. */
@@ -187,6 +197,23 @@ export function createJobsService({
         }
       })();
       return track(work);
+    },
+
+    list(query) {
+      const { items, total } = runs.list(query);
+      const iso = (ms: number): string => new Date(ms).toISOString();
+      return {
+        items: items.map((row) => ({
+          ...row,
+          startedAt: iso(row.startedAt),
+          finishedAt: row.finishedAt === null ? null : iso(row.finishedAt),
+          scheduledFor: row.scheduledFor === null ? null : iso(row.scheduledFor),
+        })),
+        total,
+        page: query.page,
+        pageSize: query.pageSize,
+        running: runs.isRunning(),
+      };
     },
 
     async idle() {

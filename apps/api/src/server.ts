@@ -23,7 +23,7 @@ import { createHttpClient } from './infrastructure/sources/http/client.js';
 import { createPageFetcher } from './infrastructure/sources/manual/page-fetcher.js';
 import { createRobotsCheck } from './infrastructure/sources/manual/robots.js';
 import { createSourceRuntime } from './infrastructure/sources/compose.js';
-import { startScheduler } from './infrastructure/scheduler/schedule.js';
+import { startScheduler, type Scheduler } from './infrastructure/scheduler/schedule.js';
 import { createLoggerOptions } from './infrastructure/logging/logger.js';
 import { VERSION } from './version.js';
 
@@ -96,6 +96,8 @@ async function main(): Promise<void> {
     onSignalCreated: () => runner.kick(),
     logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
   });
+  // The list shows the next slot; the scheduler starts after the app, so it is read lazily.
+  const running: { scheduler?: Scheduler } = {};
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
@@ -119,6 +121,11 @@ async function main(): Promise<void> {
     pipeline: { repository: createPipelineRepository(db), clock },
     analysis: runner,
     sources: sourceRuntime.service,
+    jobs: sourceRuntime.jobs,
+    schedule: {
+      times: config.discoveryTimes,
+      nextRunAt: () => running.scheduler?.nextRunAt() ?? null,
+    },
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });
@@ -148,6 +155,8 @@ async function main(): Promise<void> {
     onError: (error) =>
       logger.error(`scheduler error: ${error instanceof Error ? error.message : 'error'}`),
   });
+
+  running.scheduler = scheduler;
 
   const shutdown = async (): Promise<void> => {
     scheduler.stop();

@@ -336,7 +336,7 @@ per time, plus the 10-minute analysis interval (D-7). It returns `{ nextRunAt(),
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Job lock, run history columns and a locked CLI
 - [x] Phase 2: Schedule (croner) and server wiring
-- [ ] Phase 3: Jobs API, locked source runs and analysis retry
+- [x] Phase 3: Jobs API, locked source runs and analysis retry
 - [ ] Phase 4: Sources view runs and card retry
 
 ## Human checks
@@ -350,6 +350,8 @@ per time, plus the 10-minute analysis interval (D-7). It returns `{ nextRunAt(),
 - [minor] (Phase 1) Plan-review #3 applied: `runSource` holds the lock with the same 20 s heartbeat as a cycle (shared `beat` helper in the jobs service).
 - [minor] (Phase 1) `/api/sources/:id/run` still calls `SourceService.run` unlocked until Phase 3 switches it to `jobs.runSource`; `runSource` and its busy refusal are implemented and tested at service level now.
 - [minor] (Phase 2) `DISCOVERY_TIMES` is stored sorted; the DST tests cover one 24 h window around each change day (Sunday slots) because a multi-day fake-timer run with croner's re-arming is slow; Saturday/Monday are not asserted.
+- [minor] (Phase 3) Plan puts the `ScheduleInfo` into the jobs service; it lives in the route deps (`registerJobRoutes({ jobs, schedule })`) because the scheduler starts after the app and the service is built earlier in `compose.ts`. `JobRunQuery` gained an optional `id` so `POST /api/jobs/discover` answers with exactly the new cycle (a child run can share its `started_at`).
+- [minor] (Phase 3) `AnalysisRunner.retry(id)` (repository + kick) is the route's dependency; `kick` stays the same function.
 - [FOLLOW-UP] S-05: add the money value of cost to `JobRun.cost` once the price table exists
   (D-9).
 - [FOLLOW-UP] S-15: register the 03:30 backup in `startScheduler` and decide its lock name.

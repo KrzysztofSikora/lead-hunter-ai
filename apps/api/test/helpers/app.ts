@@ -166,6 +166,8 @@ export async function buildTestApp(
     pipeline: { repository: createPipelineRepository(db), clock },
     analysis: runner,
     sources: sourceRuntime.service,
+    jobs: sourceRuntime.jobs,
+    schedule: { times: config.discoveryTimes, nextRunAt: () => null },
     ...options.overrides,
   });
   cleanups.push(() => app.close());
