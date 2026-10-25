@@ -64,7 +64,7 @@ export type MoveCheck =
   | {
       allowed: true;
       kind: 'forward' | 'back' | 'aside';
-      /** Main-path stages a forward move from a main stage passed over. */
+      /** Main-path stages a forward move from a main stage or from `NEEDS_VERIFICATION` (rank 0) passed over. */
       skipped: BusinessStatus[];
       /** A back move or a reopen needs a note. */
       noteRequired: boolean;
@@ -90,11 +90,15 @@ export function checkMove(from: BusinessStatus, to: BusinessStatus): MoveCheck {
     if (AFTER_CONTACT.includes(from)) return forward();
     return from === 'WON' || from === 'LOST' ? back : { allowed: false };
   }
-  if (from === 'REJECTED' || from === 'EXPIRED') return back;
-  // R1: leaving NEEDS_VERIFICATION counts as a forward move from the start of the main path, and
-  // never past CONTACTED, so a later stage always passes through a recorded contact.
-  const fromRank = from === 'NEEDS_VERIFICATION' ? 0 : MAIN_RANK[from];
+  const offPath = from === 'REJECTED' || from === 'EXPIRED';
+  // R1, R6: leaving an off-path state never goes past CONTACTED, so a later stage always passes
+  // through a recorded contact. NEEDS_VERIFICATION counts as a forward move from the start of the
+  // main path; a reopen from REJECTED/EXPIRED is a back move and needs a note.
   const toRank = MAIN_RANK[to];
+  if (offPath) {
+    return toRank !== undefined && toRank <= (MAIN_RANK.CONTACTED ?? 0) ? back : { allowed: false };
+  }
+  const fromRank = from === 'NEEDS_VERIFICATION' ? 0 : MAIN_RANK[from];
   if (fromRank === undefined || toRank === undefined) return { allowed: false };
   if (from === 'NEEDS_VERIFICATION' && toRank > (MAIN_RANK.CONTACTED ?? 0))
     return { allowed: false };

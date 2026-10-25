@@ -104,6 +104,17 @@ describe('pipeline status moves (FR-14 AC1–AC3)', () => {
     expect((await move({ status: 'SAVED' })).json()).toEqual({ error: 'note_required' });
     expect((await move({ status: 'SAVED', note: 'jednak wraca' })).statusCode).toBe(200);
   });
+
+  it('R6: NEW -> REJECTED -> MEETING is refused, so a reopened row passes a recorded contact', async () => {
+    const t = await setup();
+    const id = await t.importText(POST);
+    const move = (payload: object) => t.call('POST', `/api/opportunities/${id}/status`, payload);
+    await move({ status: 'REJECTED', reason: 'NO_BUDGET' });
+    const jump = await move({ status: 'MEETING', note: 'wraca' });
+    expect(jump.statusCode).toBe(409);
+    expect(jump.json()).toEqual({ error: 'transition_not_allowed' });
+    expect((await move({ status: 'CONTACTED', note: 'wraca' })).statusCode).toBe(200);
+  });
 });
 
 describe('follow-up (FR-14 AC4, storage and API)', () => {

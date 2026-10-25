@@ -65,6 +65,14 @@ describe('checkMove (TR-14, S-08 D-1)', () => {
     expect(checkMove('WON', 'NEEDS_VERIFICATION').allowed).toBe(true);
   });
 
+  it('R6: a reopened REJECTED/EXPIRED row cannot jump past CONTACTED, so WON needs a recorded contact', () => {
+    for (const closed of ['REJECTED', 'EXPIRED'] as const) {
+      for (const to of ['REPLIED', 'MEETING', 'WON', 'LOST'] as const) {
+        expect(checkMove(closed, to).allowed).toBe(false);
+      }
+    }
+  });
+
   it('allows REJECTED, EXPIRED and NEEDS_VERIFICATION from every other status', () => {
     for (const target of ['REJECTED', 'EXPIRED', 'NEEDS_VERIFICATION'] as const) {
       for (const from of ALL.filter((status) => status !== target)) {
