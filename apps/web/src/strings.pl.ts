@@ -57,7 +57,6 @@ export const strings = {
     next: 'Następna',
     page: (page: number, pages: number) => `Strona ${page} z ${pages}`,
     total: (n: number) => `Razem: ${n}`,
-    open: 'Zobacz',
     businessStatus: {
       NEW: 'Nowa',
       QUALIFIED: 'Zakwalifikowana',
@@ -115,8 +114,6 @@ export const strings = {
     sourceType: 'Rodzaj źródła',
     sourceUrl: 'Adres URL (jak wklejono)',
     pastedText: 'wklejony tekst',
-    noUrl: 'brak adresu',
-    title: 'Tytuł',
     text: 'Treść',
     noText: 'brak treści',
     publishedAt: 'Data publikacji',
