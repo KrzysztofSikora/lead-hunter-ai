@@ -40,12 +40,15 @@ export type ProviderErrorKind =
   | 'bad_request'
   | 'refusal'
   | 'truncated'
-  | 'empty';
+  | 'empty'
+  | 'not_json';
 
 export class ProviderError extends Error {
   constructor(
     readonly kind: ProviderErrorKind,
     readonly status?: number,
+    /** Set when the provider answered and billed the call before the answer was rejected. */
+    readonly usage?: ProviderOutput['usage'],
   ) {
     super(status === undefined ? kind : `${kind} ${status}`);
     this.name = 'ProviderError';

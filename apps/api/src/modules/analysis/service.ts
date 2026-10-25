@@ -98,10 +98,13 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     row: WaitingOpportunity,
     meta: Omit<CompletedAnalysis, 'resultJson' | 'breakdown' | 'guardNotes' | 'columns'>,
     answer: OpportunityAnalysis,
-  ): void {
+  ): string | null {
     const profile = deps.profile.get();
     const guarded = guardAnalysis(answer, row.text);
-    const result = guarded.result;
+    // The guard edits text; what is stored must still satisfy the contract (read side parses it).
+    const checked = OpportunityAnalysis.safeParse(guarded.result);
+    if (!checked.success) return 'invalid_output: guard';
+    const result = checked.data;
     const columns: CompletedAnalysis['columns'] = {
       category: null,
       evidenceLevel: null,
@@ -137,6 +140,7 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       guardNotes: guarded.notes,
       columns,
     });
+    return null;
   }
 
   /** D-3, D-5: whether a provider call may start now; also what `status()` reports. */
@@ -163,22 +167,23 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     }
     const parsed = OpportunityAnalysis.safeParse(stored);
     if (!parsed.success) return false;
-    complete(
-      row,
-      {
-        opportunityId: row.id,
-        provider: earlier.provider,
-        model: earlier.model,
-        promptVersion: earlier.promptVersion,
-        schemaVersion: earlier.schemaVersion,
-        usage: earlier.usage,
-        costMicroUsd: null,
-        reusedFromAnalysisId: earlier.id,
-        at,
-      },
-      parsed.data,
+    return (
+      complete(
+        row,
+        {
+          opportunityId: row.id,
+          provider: earlier.provider,
+          model: earlier.model,
+          promptVersion: earlier.promptVersion,
+          schemaVersion: earlier.schemaVersion,
+          usage: earlier.usage,
+          costMicroUsd: null,
+          reusedFromAnalysisId: earlier.id,
+          at,
+        },
+        parsed.data,
+      ) === null
     );
-    return true;
   }
 
   async function analyseOne(row: WaitingOpportunity, active: LlmProvider): Promise<Outcome> {
@@ -218,10 +223,17 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
         provided = await active.analyzeOpportunity(input);
       } catch (error) {
         // A JSON.parse SyntaxError quotes the model's text, so it is stored as a code, not a message.
+        const notJson =
+          error instanceof SyntaxError ||
+          (error instanceof ProviderError && error.kind === 'not_json');
+        // A refusal, truncation or non-JSON answer was billed: its usage counts against the cap (R2).
+        const usage = error instanceof ProviderError ? error.usage : undefined;
         fail(
-          error instanceof SyntaxError
-            ? 'invalid_output: not_json'
-            : `provider_error: ${reasonOf(error)}`,
+          notJson ? 'invalid_output: not_json' : `provider_error: ${reasonOf(error)}`,
+          usage && {
+            usage,
+            costMicroUsd: active.paid ? costMicroUsd(usage, deps.budget?.price ?? null) : 0,
+          },
         );
         return error instanceof ProviderError && PROVIDER_WIDE.has(error.kind)
           ? 'stop'
@@ -245,11 +257,12 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
         return 'continue';
       }
 
-      complete(
+      const rejected = complete(
         row,
         { ...meta, usage: provided.usage, costMicroUsd: cost, reusedFromAnalysisId: null },
         parsed.data,
       );
+      if (rejected) fail(rejected, billed);
       return 'continue';
     } catch (error) {
       // After the provider answered: a failed save must not leave the row at the head of the queue.

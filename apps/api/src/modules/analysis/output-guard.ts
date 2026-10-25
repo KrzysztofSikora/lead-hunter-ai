@@ -116,6 +116,9 @@ function guardAgainstSource(result: OpportunityAnalysis, sourceText: string): Gu
 }
 
 const REMOVED = '[usunięto]';
+/** For an address shorter than `REMOVED`: a replacement must never make a field longer. */
+const REMOVED_SHORT = '[…]';
+const MAX_LINK_NOTES = 5;
 const LINK = /\b(?:https?:\/\/|www\.)[^\s<>"'\])]+|[\w.+-]+@[\w-]+(?:\.[\w-]+)+/giu;
 
 /** Trailing punctuation is not part of a URL or address; a trailing slash does not change it. */
@@ -126,24 +129,26 @@ const linkKey = (link: string): string =>
     .toLowerCase();
 
 /** D-12: URLs and e-mail addresses the source does not contain are the model's invention. */
-function removeInventedLinks(value: unknown, sourceLower: string, notes: string[]): unknown {
+function removeInventedLinks(value: unknown, sourceLower: string, removed: string[]): unknown {
   if (typeof value === 'string') {
     return value.replace(LINK, (link) => {
       if (sourceLower.includes(linkKey(link))) return link;
-      notes.push(`Usunięto adres, którego nie ma w tekście źródła: „${link.slice(0, 80)}”.`);
-      return REMOVED;
+      removed.push(link.slice(0, 80));
+      return link.length >= REMOVED.length ? REMOVED : REMOVED_SHORT;
     });
   }
   if (Array.isArray(value)) {
     return value
-      .map((item) => removeInventedLinks(item, sourceLower, notes))
-      .filter((item) => !(typeof item === 'string' && item.trim() === REMOVED));
+      .map((item) => removeInventedLinks(item, sourceLower, removed))
+      .filter(
+        (item) => !(typeof item === 'string' && [REMOVED, REMOVED_SHORT].includes(item.trim())),
+      );
   }
   if (value && typeof value === 'object') {
     return Object.fromEntries(
       Object.entries(value).map(([key, item]) => [
         key,
-        removeInventedLinks(item, sourceLower, notes),
+        removeInventedLinks(item, sourceLower, removed),
       ]),
     );
   }
@@ -159,7 +164,14 @@ export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): 
   const base = guardAgainstSource(result, sourceText);
   const notes = [...base.notes];
   const sourceLower = sourceText.toLowerCase();
-  let guarded = removeInventedLinks(base.result, sourceLower, notes) as OpportunityAnalysis;
+  const removed: string[] = [];
+  let guarded = removeInventedLinks(base.result, sourceLower, removed) as OpportunityAnalysis;
+  for (const link of removed.slice(0, MAX_LINK_NOTES)) {
+    notes.push(`Usunięto adres, którego nie ma w tekście źródła: „${link}”.`);
+  }
+  if (removed.length > MAX_LINK_NOTES) {
+    notes.push(`Usunięto jeszcze ${removed.length - MAX_LINK_NOTES} adresów spoza tekstu źródła.`);
+  }
 
   if (guarded.verdict === 'ANALYSED' && guarded.buyerConfirmed) {
     const buyer = guarded.buyerOrAudience;

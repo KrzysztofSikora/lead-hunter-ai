@@ -6,7 +6,7 @@ import {
   type ProviderOutput,
 } from '../../modules/analysis/ports.js';
 import { toProviderError } from './errors.js';
-import { parseModelJson } from './parse-json.js';
+import { parseBilledJson } from './parse-json.js';
 import { buildUserMessage, PROMPT_VERSION, systemPrompt } from './prompt.js';
 
 export interface OpenAiCompatibleOptions {
@@ -59,15 +59,15 @@ export class OpenAiCompatibleProvider implements LlmProvider {
       throw toProviderError(error);
     }
 
-    const choice = response.choices?.[0];
-    if (choice?.finish_reason === 'length') throw new ProviderError('truncated');
-    if (choice?.finish_reason === 'content_filter' || choice?.message?.refusal) {
-      throw new ProviderError('refusal');
-    }
     const usage = {
       inputTokens: response.usage?.prompt_tokens ?? null,
       outputTokens: response.usage?.completion_tokens ?? null,
     };
-    return { output: parseModelJson(choice?.message?.content ?? ''), usage };
+    const choice = response.choices?.[0];
+    if (choice?.finish_reason === 'length') throw new ProviderError('truncated', undefined, usage);
+    if (choice?.finish_reason === 'content_filter' || choice?.message?.refusal) {
+      throw new ProviderError('refusal', undefined, usage);
+    }
+    return { output: parseBilledJson(choice?.message?.content ?? '', usage), usage };
   }
 }

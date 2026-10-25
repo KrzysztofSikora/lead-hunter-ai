@@ -6,7 +6,7 @@ import {
   type ProviderOutput,
 } from '../../modules/analysis/ports.js';
 import { toProviderError } from './errors.js';
-import { parseModelJson } from './parse-json.js';
+import { parseBilledJson } from './parse-json.js';
 import { buildUserMessage, outputJsonSchema, PROMPT_VERSION, systemPrompt } from './prompt.js';
 
 export interface AnthropicOptions {
@@ -56,13 +56,14 @@ export class AnthropicProvider implements LlmProvider {
       throw toProviderError(error);
     }
 
-    if (response.stop_reason === 'refusal') throw new ProviderError('refusal');
-    if (response.stop_reason === 'max_tokens') throw new ProviderError('truncated');
-    const block = response.content.find((part) => part.type === 'text');
     const usage = {
       inputTokens: response.usage?.input_tokens ?? null,
       outputTokens: response.usage?.output_tokens ?? null,
     };
-    return { output: parseModelJson(block?.type === 'text' ? block.text : ''), usage };
+    if (response.stop_reason === 'refusal') throw new ProviderError('refusal', undefined, usage);
+    if (response.stop_reason === 'max_tokens')
+      throw new ProviderError('truncated', undefined, usage);
+    const block = response.content.find((part) => part.type === 'text');
+    return { output: parseBilledJson(block?.type === 'text' ? block.text : '', usage), usage };
   }
 }

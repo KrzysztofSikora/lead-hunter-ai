@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { analysis } from '../../../test/helpers/analysis.js';
+import { OpportunityAnalysis } from '@lead-hunter/contracts';
 import { guardAnalysis } from './output-guard.js';
 
 const fixture = (name: string): string =>
@@ -194,6 +195,17 @@ describe('guardAnalysis: invented links and buyer (FR-08 AC4, TR-01)', () => {
       nextAction: 'Napisz na praca@example.test',
     });
     expect(notes).toEqual([]);
+  });
+
+  it('never makes a field longer than its limit by replacing a short invented address (R1)', () => {
+    const nextAction = `${'x'.repeat(493)} a@b.pl`;
+    const problem = 'see www.a.pl '.repeat(150);
+    const { result, notes } = guardAnalysis(withFields({ nextAction, problem }), text);
+    expect(OpportunityAnalysis.safeParse(result).success).toBe(true);
+    if (result.verdict !== 'ANALYSED') throw new Error('expected ANALYSED');
+    expect(result.nextAction.length).toBeLessThanOrEqual(nextAction.length);
+    expect(result.problem.length).toBeLessThanOrEqual(problem.length);
+    expect(notes.length).toBeLessThanOrEqual(7);
   });
 
   it('removes a hallucinated URL and e-mail from any text field and notes each one', () => {

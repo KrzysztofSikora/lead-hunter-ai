@@ -182,7 +182,7 @@ describe('Anthropic adapter', () => {
   });
 
   it.each([
-    ['anthropic-not-json.json', 200, 'SyntaxError'],
+    ['anthropic-not-json.json', 200, 'not_json'],
     ['anthropic-refusal.json', 200, 'refusal'],
     ['anthropic-truncated.json', 200, 'truncated'],
   ])('maps %s', async (file, status, expected) => {

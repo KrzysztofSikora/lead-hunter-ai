@@ -211,6 +211,19 @@ describe('rejected answers (FR-08 AC2)', () => {
     expect((await t.status()).budget.spentMicroUsd).toBe(407);
   });
 
+  it.each([
+    ['refusal', 'anthropic-refusal.json', 1],
+    ['truncated', 'anthropic-truncated.json', 4001],
+    ['not JSON', 'anthropic-not-json.json', 4],
+  ])('costs a billed %s and counts it against the cap (R2)', async (_name, file, micro) => {
+    answer(ANTHROPIC, MESSAGES, 200, json(file));
+    const t = await setup({ env: anthropicEnv() });
+    const id = await t.importText(read('synthetic-direct-pl.txt'));
+    await t.runner.drain();
+    expect(t.runs(id)[0]).toMatchObject({ status: 'FAILED', costMicroUsd: micro });
+    expect((await t.status()).budget.spentMicroUsd).toBe(micro);
+  });
+
   it('stops the drain after a provider-wide error and leaks no secret (TR-12)', async () => {
     answer(ANTHROPIC, MESSAGES, 401, {
       type: 'error',
