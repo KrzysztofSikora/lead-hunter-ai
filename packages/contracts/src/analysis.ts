@@ -206,6 +206,8 @@ export const PrefilterRule = z.enum([
   'excluded_technology',
   'excluded_category',
   'no_profile_match',
+  /** S-17 D-5: rejected at discovery by the source's own filter. */
+  'source_filter',
 ]);
 export type PrefilterRule = z.infer<typeof PrefilterRule>;
 

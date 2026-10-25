@@ -69,7 +69,7 @@ beforeEach(() => {
 
 async function setup() {
   const clock = new FakeClock();
-  const built = await buildTestApp({ clock });
+  const built = await buildTestApp({ clock, env: { LLM_PROVIDER: 'mock' } });
   const cookie = await loginAsOperator(built.app);
   const call = (method: 'GET' | 'POST' | 'PATCH', url: string, payload?: object) =>
     built.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
@@ -381,7 +381,7 @@ describe('sources (FR-04, FR-18 AC3)', () => {
     expect(hn.statusCode).toBe(201);
     expect(hn.json()).toMatchObject({
       presetWithdrawn: false,
-      filter: { enabled: true, include: ['SEEKING FREELANCER'], exclude: [] },
+      filter: { enabled: true, include: [], exclude: ['SEEKING WORK'] },
     });
     const forum = await call('POST', '/api/sources', { preset: 'arduino-jobs' });
     expect(forum.json().filter).toEqual({
@@ -396,6 +396,106 @@ describe('sources (FR-04, FR-18 AC3)', () => {
       url: 'https://feeds.example/jobs.xml',
     });
     expect(manual.json().filter).toEqual({ enabled: false, include: [], exclude: [] });
+  });
+
+  it('stores items the source filter drops as rejected and counts them (FR-31 AC1-AC3, D-4, D-5)', async () => {
+    const item = (n: number, title: string, text: string) =>
+      `<item><title>${title}</title><link>https://freelancer.example/p/${n}</link><guid>p${n}</guid><description>${text}</description></item>`;
+    const rss = `<?xml version="1.0"?><rss version="2.0"><channel><title>DEMO</title>${[
+      item(1, 'DEMO [FOR HIRE] Arduino dev', 'I am available'),
+      item(2, 'DEMO Web shop', 'Need a shop built'),
+      item(3, 'DEMO Arduino sensor hub', 'Need firmware for Arduino sensors'),
+    ].join('')}</channel></rss>`;
+    serve(FL, FL_ARDUINO, { status: 200, body: rss });
+    serve(FL, FL_REACT, { status: 200, body: rss });
+    const { call, add, clock, db, runner } = await setup();
+    const id = await add('freelancer-arduino');
+    expect(
+      (
+        await call('PATCH', `/api/sources/${id}`, {
+          filter: { enabled: true, include: ['arduino'], exclude: ['[for hire]'] },
+        })
+      ).statusCode,
+    ).toBe(200);
+
+    const run = await call('POST', `/api/sources/${id}/run`);
+    expect(run.json()).toMatchObject({ status: 'ok', fetched: 3, new: 3, filtered: 2 });
+
+    const items = (await call('GET', '/api/opportunities')).json().items as {
+      id: number;
+      businessStatus: string;
+      analysisStatus: string;
+      prefilter: { rule: string; phrase: string | null } | null;
+      source: { title: string };
+    }[];
+    const byTitle = (needle: string) => items.find((i) => i.source.title.includes(needle));
+    expect(byTitle('[FOR HIRE]')).toMatchObject({
+      businessStatus: 'REJECTED',
+      analysisStatus: 'SKIPPED',
+      prefilter: { rule: 'source_filter', phrase: '[for hire]' },
+    });
+    expect(byTitle('Web shop')).toMatchObject({
+      businessStatus: 'REJECTED',
+      prefilter: { rule: 'source_filter', phrase: null },
+    });
+    expect(byTitle('sensor hub')).toMatchObject({
+      businessStatus: 'NEW',
+      analysisStatus: 'PENDING',
+    });
+
+    const card = (await call('GET', `/api/opportunities/${byTitle('[FOR HIRE]')?.id}`)).json();
+    expect(card.activity[0]).toMatchObject({
+      actor: 'system',
+      fromStatus: 'NEW',
+      toStatus: 'REJECTED',
+      cause: { kind: 'source_filter', phrase: '[for hire]' },
+    });
+    // The runner's own pre-filter runs on the item that passed; it never touches the other two.
+    await runner.drain();
+    const after = (await call('GET', '/api/opportunities')).json().items as typeof items;
+    const rules = (needle: string) =>
+      after.find((i) => i.source.title.includes(needle))?.prefilter?.rule;
+    expect(rules('[FOR HIRE]')).toBe('source_filter');
+    expect(rules('Web shop')).toBe('source_filter');
+    expect(rules('sensor hub')).not.toBe('source_filter');
+    expect(
+      (await call('POST', `/api/opportunities/${byTitle('Web shop')?.id}/analysis`)).json(),
+    ).toMatchObject({ error: 'prefiltered' });
+
+    // A re-read finds everything in the cursor: nothing new, nothing filtered.
+    clock.advance(2 * HOUR);
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+      new: 0,
+      filtered: 0,
+      duplicates: 3,
+    });
+
+    // The same feed on a source with the filter off passes every new item on; the ones that
+    // belong to an earlier opportunity stay duplicates and keep their status (D-4).
+    const other = await add('freelancer-react');
+    const second = await call('POST', `/api/sources/${other}/run`);
+    expect(second.json()).toMatchObject({ new: 0, filtered: 0, duplicates: 3 });
+    expect(db().select().from(rawSignals).all()).toHaveLength(3);
+  });
+
+  it('applies the HN default: a SEEKING WORK comment is stored as rejected by the source filter (plan-review #1)', async () => {
+    serve(HN, HN_FREELANCE, { status: 200, body: HN_FEED });
+    const { call, add } = await setup();
+    const id = await add('hn-freelance');
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+      new: 2,
+      filtered: 1,
+    });
+    const items = (await call('GET', '/api/opportunities')).json().items as {
+      businessStatus: string;
+      prefilter: { rule: string; phrase: string | null } | null;
+    }[];
+    expect(items.filter((i) => i.prefilter?.rule === 'source_filter')).toEqual([
+      expect.objectContaining({
+        businessStatus: 'REJECTED',
+        prefilter: expect.objectContaining({ phrase: 'SEEKING WORK' }),
+      }),
+    ]);
   });
 
   it('edits the filter by PATCH: round-trips, off keeps the phrases, bad input is 400 (D-2, D-13, D-16)', async () => {

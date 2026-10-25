@@ -157,6 +157,8 @@ export const opportunities = sqliteTable(
     prefilterRule: text('prefilter_rule'),
     prefilterMatches: integer('prefilter_matches'),
     prefilterAt: integer('prefilter_at'),
+    /** S-17 D-5: the exclude phrase of a source-filter rejection; null for any other rule. */
+    prefilterPhrase: text('prefilter_phrase'),
     language: text('language'),
     analysisProvider: text('analysis_provider'),
     industry: text('industry'),

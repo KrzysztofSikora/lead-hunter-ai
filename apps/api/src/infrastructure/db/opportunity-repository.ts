@@ -56,6 +56,7 @@ const columns = {
   lastVerifiedAt: rawSignals.lastVerifiedAt,
   prefilterRule: opportunities.prefilterRule,
   prefilterMatches: opportunities.prefilterMatches,
+  prefilterPhrase: opportunities.prefilterPhrase,
   prefilterAt: opportunities.prefilterAt,
   language: opportunities.language,
   analysisProvider: opportunities.analysisProvider,

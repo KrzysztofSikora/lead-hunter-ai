@@ -29,7 +29,7 @@ export const PRESETS: readonly SourcePreset[] = [
     url: 'https://hnrss.org/whoishiring/freelance',
     accessNote: `Kanał RSS serwisu hnrss.org (nieoficjalne lustro Hacker News): komentarze z miesięcznego wątku „Freelancer? Seeking freelancer?”. ${POLL_NOTE}`,
     termsUrl: 'https://github.com/hnrss/hnrss',
-    filter: { enabled: true, include: ['SEEKING FREELANCER'], exclude: [] },
+    filter: { enabled: true, include: [], exclude: ['SEEKING WORK'] },
   },
   ...FREELANCER_SKILLS.map(([slug, label, keyword]): SourcePreset => ({
     id: `freelancer-${slug}`,

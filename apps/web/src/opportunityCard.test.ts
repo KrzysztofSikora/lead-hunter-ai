@@ -130,7 +130,7 @@ const states: Record<string, OpportunityDetail> = {
   skipped: detail({
     analysisStatus: 'SKIPPED',
     businessStatus: 'NEEDS_VERIFICATION',
-    prefilter: { rule: 'spam', matches: 1, language: null },
+    prefilter: { rule: 'spam', matches: 1, language: null, phrase: null },
   }),
 };
 

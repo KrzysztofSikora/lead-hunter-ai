@@ -115,6 +115,7 @@ export const strings = {
       analysed: 'przeanalizowane',
       failed: 'błędy',
       skipped: 'pominięte',
+      sourceFiltered: 'odrzucone przez filtr źródła',
     },
   },
   pipeline: {
@@ -269,6 +270,7 @@ export const strings = {
     excluded_technology: 'wykluczona technologia',
     excluded_category: 'wykluczona kategoria',
     no_profile_match: 'brak dopasowania do profilu',
+    source_filter: 'filtr źródła',
   },
   import: {
     title: 'Import ogłoszenia',
@@ -429,6 +431,7 @@ export const strings = {
       reason: 'powód',
       prefilter: (rule: string) => `filtr wstępny: ${rule}`,
       insufficientData: 'za mało danych do oceny',
+      sourceFilter: (phrase: string | null) => `filtr źródła: ${phrase ?? 'brak frazy'}`,
       skipped: (stages: string) => `pominięto: ${stages}`,
       contract: (value: string) => `umowa: ${value}`,
       contractDates: (start: string | null, end: string | null) =>

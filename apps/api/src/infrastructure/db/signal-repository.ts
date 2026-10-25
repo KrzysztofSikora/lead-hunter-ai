@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { SignalRepository } from '../../modules/signals/ports.js';
+import { moveFromNew, recordSystemMove, statusOf } from './system-move.js';
 import { opportunities, opportunityEvidence, rawSignals, signalIdentities } from './schema.js';
 
 export function createSignalRepository(db: BetterSQLite3Database): SignalRepository {
@@ -65,6 +66,29 @@ export function createSignalRepository(db: BetterSQLite3Database): SignalReposit
           },
           insertEvidence(evidence) {
             tx.insert(opportunityEvidence).values(evidence).run();
+          },
+          rejectBySourceFilter(opportunityId, phrase, at) {
+            const before = statusOf(tx, opportunityId);
+            tx.update(opportunities)
+              .set({
+                prefilterRule: 'source_filter',
+                prefilterMatches: 0,
+                prefilterPhrase: phrase,
+                prefilterAt: at,
+                analysisStatus: 'SKIPPED',
+                businessStatus: moveFromNew('REJECTED'),
+                updatedAt: at,
+              })
+              .where(eq(opportunities.id, opportunityId))
+              .run();
+            recordSystemMove(
+              tx,
+              opportunityId,
+              before,
+              'REJECTED',
+              { kind: 'source_filter', phrase },
+              at,
+            );
           },
         }),
       );

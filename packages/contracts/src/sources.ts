@@ -120,6 +120,8 @@ export const SourceRunResult = z
     new: z.number().int().min(0),
     duplicates: z.number().int().min(0),
     failed: z.number().int().min(0),
+    /** S-17 D-6: new signals stored as rejected by the source filter (also counted in `new`). */
+    filtered: z.number().int().min(0),
     error: z
       .object({
         reason: SourceFailureReason,

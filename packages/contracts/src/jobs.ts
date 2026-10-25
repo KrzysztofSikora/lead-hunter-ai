@@ -23,6 +23,8 @@ export const JobCounters = z
     analysed: count,
     failed: count,
     skipped: count,
+    /** S-17 D-6: rejected by a source filter; also part of `rejected`. */
+    sourceFiltered: count,
   })
   .strict();
 export type JobCounters = z.infer<typeof JobCounters>;

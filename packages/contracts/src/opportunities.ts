@@ -157,6 +157,8 @@ export const PrefilterOutcome = z
     rule: PrefilterRule.nullable(),
     matches: z.number().int().min(0),
     language: z.enum(['pl', 'en']).nullable(),
+    /** S-17 D-5: the exclude phrase that matched; null for "no include phrase" and other rules. */
+    phrase: z.string().nullable(),
   })
   .strict();
 export type PrefilterOutcome = z.infer<typeof PrefilterOutcome>;
@@ -219,6 +221,7 @@ export type Evidence = z.infer<typeof Evidence>;
 export const ActivityCause = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('prefilter'), rule: PrefilterRule }).strict(),
   z.object({ kind: z.literal('insufficient_data') }).strict(),
+  z.object({ kind: z.literal('source_filter'), phrase: z.string().nullable() }).strict(),
 ]);
 export type ActivityCause = z.infer<typeof ActivityCause>;
 

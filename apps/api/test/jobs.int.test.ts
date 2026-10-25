@@ -16,6 +16,7 @@ import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/
 const feed = (name: string): string =>
   readFileSync(fileURLToPath(new URL(`./fixtures/feeds/${name}`, import.meta.url)), 'utf8');
 const WWR_FEED = feed('synthetic-wwr-programming.xml');
+const HN_FEED = feed('synthetic-hnrss-freelance.xml');
 
 const FL = 'https://www.freelancer.com';
 const HN = 'https://hnrss.org';
@@ -94,6 +95,30 @@ function harness(clock = new FakeClock()) {
 }
 
 describe('job lock and cycle history (FR-17)', () => {
+  it('reports the items a source filter rejected on the run and its cycle (FR-31 AC3)', async () => {
+    answers.set(`${HN}/whoishiring/freelance`, { status: 200, body: HN_FEED });
+    const { app, jobs } = await buildTestApp({ clock: new FakeClock() });
+    const cookie = await loginAsOperator(app);
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/sources',
+      headers: { cookie },
+      payload: { preset: 'hn-freelance' },
+    });
+    expect(created.statusCode).toBe(201);
+    const started = jobs.startCycle('manual');
+    if (started.kind !== 'started') throw new Error('cycle did not start');
+    await started.done;
+
+    const listed = await app.inject({ method: 'GET', url: '/api/jobs', headers: { cookie } });
+    const items = listed.json().items as { type: string; counters: Record<string, number> }[];
+    for (const type of ['discovery', 'source_run']) {
+      const counters = items.find((i) => i.type === type)?.counters;
+      expect(counters).toMatchObject({ new: 2, sourceFiltered: 1 });
+      expect(counters?.rejected).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it('runs a cycle with one failing source as partial and links signals to their run (AC5)', async () => {
     answers.set(`${FL}/rss.xml?keyword=arduino`, { status: 200, body: WWR_FEED });
     answers.set(`${HN}/whoishiring/freelance`, { status: 500, body: 'oops' });

@@ -12,7 +12,7 @@ import { canonicalizeUrl, contentHash, normaliseSnippet } from '../signals/ident
 import { ingest } from '../signals/ingest.js';
 import type { SignalRepository } from '../signals/ports.js';
 import { MANUAL_ACCESS_NOTE, PRESETS, WITHDRAWN_PRESETS } from './presets.js';
-import { readFilter } from './source-filter.js';
+import { applySourceFilter, readFilter } from './source-filter.js';
 import type {
   AdapterOutcome,
   AttemptOutcome,
@@ -171,7 +171,7 @@ export function createSourceService({
     if (!claim.ok) return refusal(claim);
 
     const runId = repository.startRun(id, startedAt, context);
-    const counts = { fetched: 0, new: 0, duplicates: 0, failed: 0 };
+    const counts = { fetched: 0, new: 0, duplicates: 0, failed: 0, filtered: 0 };
     const fail = (outcome: Extract<AdapterOutcome, { ok: false }>): RunOutcome => {
       const at = clock.now().getTime();
       const { nextAllowedAt } = recordFailure(id, outcome, at);
@@ -199,6 +199,9 @@ export function createSourceService({
       const outcome = await adapter.discover(checked.config);
       if (!outcome.ok) return fail(outcome);
 
+      const stored = readFilter(record.filterJson);
+      if (stored.invalid) logger?.warn(`source ${id} ${logHost(record)}: source_filter_invalid`);
+      const filter = stored.filter;
       const seen = new Set(readSeen(record));
       const remembered: string[] = [];
       counts.fetched = outcome.items.length + outcome.skipped;
@@ -219,8 +222,11 @@ export function createSourceService({
             }
           }
           const at = clock.now().getTime();
-          const result = signals.transaction((tx) =>
-            ingest(tx, {
+          const verdict = filter.enabled
+            ? applySourceFilter(filter, item.title, snippet)
+            : ({ pass: true } as const);
+          const result = signals.transaction((tx) => {
+            const ingested = ingest(tx, {
               sourceType: 'rss',
               sourceId: id,
               externalId: item.key,
@@ -233,10 +239,17 @@ export function createSourceService({
               at,
               sourceFact: snippet !== '' ? snippet : (item.url ?? ''),
               jobRunId: runId,
-            }),
-          );
-          if (result.result === 'created') counts.new += 1;
-          else counts.duplicates += 1;
+            });
+            // D-4: only a new opportunity is rejected; a duplicate keeps whatever status it has.
+            if (ingested.result === 'created' && !verdict.pass) {
+              tx.rejectBySourceFilter(ingested.opportunityId, verdict.phrase, at);
+            }
+            return ingested;
+          });
+          if (result.result === 'created') {
+            counts.new += 1;
+            if (!verdict.pass) counts.filtered += 1;
+          } else counts.duplicates += 1;
           if (item.key !== null) remembered.push(item.key);
         } catch (error) {
           counts.failed += 1;
@@ -253,9 +266,9 @@ export function createSourceService({
       repository.finishRun(runId, { status, at: finishedAt, ...counts });
       repository.finishAttempt(id, { ok: true }, finishedAt);
       logger?.info(
-        `source ${id} ${logHost(record)}: ${status} fetched ${counts.fetched} new ${counts.new} duplicates ${counts.duplicates} failed ${counts.failed}`,
+        `source ${id} ${logHost(record)}: ${status} fetched ${counts.fetched} new ${counts.new} filtered ${counts.filtered} duplicates ${counts.duplicates} failed ${counts.failed}`,
       );
-      if (counts.new > 0) onSignalCreated?.();
+      if (counts.new > counts.filtered) onSignalCreated?.();
       return {
         kind: 'done',
         result: {
@@ -385,6 +398,7 @@ export function createSourceService({
               new: 0,
               duplicates: 0,
               failed: 0,
+              filtered: 0,
               error: { reason: 'internal' },
               nextAllowedAt: iso(clock.now().getTime()),
             },

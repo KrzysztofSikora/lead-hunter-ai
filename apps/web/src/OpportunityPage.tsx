@@ -263,6 +263,7 @@ function History({ events, createdAt }: { events: ActivityEvent[]; createdAt: st
           {event.cause?.kind === 'prefilter' &&
             ` — ${h.prefilter(strings.prefilterRules[event.cause.rule])}`}
           {event.cause?.kind === 'insufficient_data' && ` — ${h.insufficientData}`}
+          {event.cause?.kind === 'source_filter' && ` — ${h.sourceFilter(event.cause.phrase)}`}
           {event.note && <div className={styles.text}>{event.note}</div>}
         </li>
       ))}

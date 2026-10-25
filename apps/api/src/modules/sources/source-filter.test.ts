@@ -1,7 +1,7 @@
 import { SourceFilter } from '@lead-hunter/contracts';
 import { describe, expect, it } from 'vitest';
 import { PRESETS, WITHDRAWN_PRESETS } from './presets.js';
-import { NO_FILTER, readFilter } from './source-filter.js';
+import { applySourceFilter, NO_FILTER, readFilter } from './source-filter.js';
 
 describe('readFilter (S-17 D-1, D-18)', () => {
   it('reads NULL as off and empty', () => {
@@ -49,5 +49,41 @@ describe('presets (S-17 D-7, D-9, D-11)', () => {
       'freelancer-ai-automation',
       'arduino-jobs',
     ]);
+  });
+});
+
+describe('applySourceFilter (S-17 D-3)', () => {
+  const filter = (include: string[], exclude: string[]): SourceFilter => ({
+    enabled: true,
+    include,
+    exclude,
+  });
+  const cases: [string, SourceFilter, string, string, boolean, string | null][] = [
+    ['empty lists pass everything', filter([], []), 'a', 'b', true, null],
+    [
+      'case and whitespace do not matter',
+      filter([], ['for  hire']),
+      'x',
+      'FOR\n\tHIRE now',
+      false,
+      'for  hire',
+    ],
+    [
+      'a bracketed phrase matches',
+      filter([], ['[FOR HIRE]']),
+      '[for hire] dev',
+      '',
+      false,
+      '[FOR HIRE]',
+    ],
+    ['title only', filter(['arduino'], []), 'Arduino hub', 'text', true, null],
+    ['snippet only', filter(['arduino'], []), 'Hub', 'needs ARDUINO', true, null],
+    ['diacritics are kept', filter(['łódź'], []), 'Praca w Lodz', '', false, null],
+    ['include miss has no phrase', filter(['react'], []), 'Vue app', 'x', false, null],
+    ['exclude beats include', filter(['arduino'], ['spam']), 'Arduino', 'spam', false, 'spam'],
+    ['the first configured exclude wins', filter([], ['b', 'a']), 'a b', '', false, 'b'],
+  ];
+  it.each(cases)('%s', (_name, f, title, snippet, pass, phrase) => {
+    expect(applySourceFilter(f, title, snippet)).toEqual(pass ? { pass } : { pass, phrase });
   });
 });

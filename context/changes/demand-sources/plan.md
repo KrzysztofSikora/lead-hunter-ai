@@ -339,11 +339,12 @@ left `PENDING` half-filtered.
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Demand-only presets and filter configuration
-- [ ] Phase 2: Filter at discovery and visible counts
+- [x] Phase 2: Filter at discovery and visible counts
 - [ ] Phase 3: Sources view, reason text and source policy
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+(Phase 2 has none.)
 
 ## Deviations
 - [REVIEW] Plan says the roadmap item is resolved in `context/roadmap.md` and its status set to
@@ -360,6 +361,20 @@ left `PENDING` half-filtered.
 - [minor] Phase 1: `setEnabled` became `update` on both `SourceRepository` and `SourceService`;
   the web `setSourceEnabled` became `updateSource(id, patch)` already in this phase (one call site
   in `SourcesPage.tsx`) so the build stays green. Phase 3 does not need to rename it again.
+- [REVIEW] Phase 2 (plan-review R2 #1, major): the roadmap default `include: SEEKING FREELANCER` for
+  `hn-freelance` never rejects, because every hnrss comment title carries the thread name. Code
+  now ships `hn-freelance` with `include: []`, `exclude: ['SEEKING WORK']` (exclude is checked
+  first, so it works on title+snippet). Alternative: keep the roadmap wording as is (a no-op
+  filter). Existing `hn-freelance` rows are still not backfilled (D-8). Covered by one
+  integration test and one jobs test.
+- [REVIEW] Phase 2 (plan-review R2 #2, major): the test budget lists no TR row for the source
+  filter. Kept: the table-driven unit test for `applySourceFilter`, one integration test for
+  AC1–AC3 plus requeue guard and duplicate/cursor behaviour, one HN-default test and one jobs
+  counter test. Dropped from the plan: the timing test (also plan-review #6), the separate
+  "filter off", "manual import duplicate" and `source.name`/URL cases (the latter is already
+  covered by the S-10 AC6 test).
+- [minor] Phase 2: `move*` helpers in `system-move.ts` keep their original `(D-17)` comment from
+  S-06; no behaviour change.
 - [FOLLOW-UP] elektroda.pl "Projektowanie Bazar" preset: check from a machine with internet
   whether forum 392 has an RSS feed that robots.txt and the terms allow, and add it to
   `presets.ts` if so (D-10).
