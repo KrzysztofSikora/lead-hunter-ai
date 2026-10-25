@@ -248,6 +248,7 @@ export const strings = {
       contractStart: 'Planowany start',
       contractEnd: 'Planowany koniec',
       contractValueInvalid: 'Podaj kwotę, np. 1234,50.',
+      contractValueRequired: 'Podaj wartość umowy, aby zapisać daty.',
       confirmReject: 'Potwierdź odrzucenie',
       cancel: 'Anuluj',
       reasonLabel: 'Powód odrzucenia',
@@ -283,6 +284,7 @@ export const strings = {
       followUp: 'Follow-up',
       followUpSet: (on: string) => `ustawiono na ${on}`,
       followUpCleared: 'usunięto',
+      followUpDropped: 'follow-up usunięty przy zmianie statusu',
     },
     pipeline: {
       followUpTitle: 'Follow-up',

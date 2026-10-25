@@ -269,8 +269,15 @@ describe('eventDetails', () => {
     skipped: [],
     contract: null,
     followUpOn: null,
+    followUpCleared: false,
     occurredAt: NOW,
   };
+
+  it('says when a move dropped the follow-up', () => {
+    expect(eventDetails({ ...event, followUpCleared: true })).toEqual([
+      'follow-up usunięty przy zmianie statusu',
+    ]);
+  });
 
   it('shows the stages a forward move skipped', () => {
     expect(eventDetails({ ...event, skipped: ['OFFER_DRAFTED'] })).toEqual([

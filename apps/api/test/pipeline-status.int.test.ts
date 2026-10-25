@@ -154,6 +154,8 @@ describe('follow-up (FR-14 AC4, storage and API)', () => {
     await t.followUp({ on: '2026-01-05' });
     const back = await t.move({ status: 'SAVED', note: 'czekamy' });
     expect(back.json().followUpOn).toBeNull();
+    // R5: the history says why the reminder vanished
+    expect(back.json().activity[0]).toMatchObject({ toStatus: 'SAVED', followUpCleared: true });
     expect((await t.followUp({ on: null })).statusCode).toBe(409);
 
     await t.move({ status: 'CONTACTED' });
@@ -165,6 +167,14 @@ describe('follow-up (FR-14 AC4, storage and API)', () => {
     await t.followUp({ on: '2026-01-07' });
     const aside = await t.move({ status: 'NEEDS_VERIFICATION' });
     expect(aside.json().followUpOn).toBeNull();
+  });
+
+  it('R5: a move with no follow-up set does not claim to have cleared one', async () => {
+    const t = await contacted();
+    const moved = await t.move({ status: 'CONTACTED' });
+    expect(moved.json().activity[0]).toMatchObject({ followUpCleared: false });
+    const stay = await t.move({ status: 'REPLIED' });
+    expect(stay.json().activity[0]).toMatchObject({ followUpCleared: false });
   });
 });
 

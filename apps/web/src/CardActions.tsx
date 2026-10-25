@@ -125,6 +125,10 @@ export function CardActions({
       body = { status: 'REJECTED', reason: parsed.data, ...(note ? { note } : {}) };
     } else if (target === 'WON') {
       let contract: Contract | undefined;
+      if (!contractValue.trim() && (contractStart || contractEnd)) {
+        setError(a.contractValueRequired);
+        return;
+      }
       if (contractValue.trim()) {
         const minor = inputToMinor(contractValue);
         if (typeof minor !== 'number' || minor < 1) {

@@ -9,7 +9,7 @@ export function createActivityRepository(db: BetterSQLite3Database): ActivityRep
     changeStatus(id, to, decide, event) {
       return db.transaction((tx) => {
         const current = tx
-          .select({ status: opportunities.businessStatus })
+          .select({ status: opportunities.businessStatus, followUpAt: opportunities.followUpAt })
           .from(opportunities)
           .where(eq(opportunities.id, id))
           .get();
@@ -38,7 +38,10 @@ export function createActivityRepository(db: BetterSQLite3Database): ActivityRep
             toStatus: to,
             reason: event.reason,
             note: event.note,
-            metadataJson: event.metadata(check),
+            metadataJson: event.metadata(
+              check,
+              current.followUpAt !== null && !FOLLOW_UP_STATUSES.includes(to),
+            ),
             occurredAt: event.at,
           })
           .run();

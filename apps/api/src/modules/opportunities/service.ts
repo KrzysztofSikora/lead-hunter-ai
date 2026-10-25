@@ -152,6 +152,7 @@ function toActivity(row: ActivityRow): OpportunityDetail['activity'][number] {
     skipped: meta?.skipped ?? [],
     contract: meta?.contract ?? null,
     followUpOn: row.type === 'FOLLOW_UP' ? (meta?.on ?? null) : null,
+    followUpCleared: meta?.followUpCleared === true,
     occurredAt: iso(row.occurredAt),
   };
 }
@@ -250,12 +251,13 @@ export function createOpportunityService({
         {
           reason: request.status === 'REJECTED' ? request.reason : null,
           note: request.note ?? null,
-          metadata: (check) => {
+          metadata: (check, followUpCleared) => {
             const metadata = ActivityMetadata.parse({
               ...(check.skipped.length > 0 ? { skipped: check.skipped } : {}),
               ...(request.status === 'WON' && request.contract
                 ? { contract: request.contract }
                 : {}),
+              ...(followUpCleared ? { followUpCleared: true } : {}),
             });
             return Object.keys(metadata).length === 0 ? null : JSON.stringify(metadata);
           },

@@ -291,6 +291,7 @@ export function eventDetails(event: ActivityEvent): string[] {
         : '';
     parts.push(h.contract(`${formatMinor(valueMinor, currency)}${dates}`));
   }
+  if (event.followUpCleared) parts.push(h.followUpDropped);
   if (event.type === 'FOLLOW_UP') {
     parts.push(
       event.followUpOn ? h.followUpSet(formatCalendarDate(event.followUpOn)) : h.followUpCleared,

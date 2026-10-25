@@ -193,6 +193,8 @@ export const ActivityMetadata = z
     contract: Contract.optional(),
     /** `FOLLOW_UP` events: the day set, or null when cleared. */
     on: calendarDate.nullable().optional(),
+    /** Status events: the move cleared a follow-up that was set. */
+    followUpCleared: z.literal(true).optional(),
   })
   .strict();
 export type ActivityMetadata = z.infer<typeof ActivityMetadata>;
@@ -212,6 +214,8 @@ export const ActivityEvent = z
     contract: Contract.nullable(),
     /** `FOLLOW_UP` events only. */
     followUpOn: calendarDate.nullable(),
+    /** Status events only: the move dropped the follow-up that was set (R5). */
+    followUpCleared: z.boolean(),
     occurredAt: isoInstant,
   })
   .strict();

@@ -138,7 +138,11 @@ export interface ActivityRepository {
       reason: RejectionReason | null;
       note: string | null;
       /** Returns the validated `metadata_json` for the move that was decided, or null. */
-      metadata: (check: Extract<MoveCheck, { allowed: true }>) => string | null;
+      metadata: (
+        check: Extract<MoveCheck, { allowed: true }>,
+        /** The move dropped a follow-up that was set. */
+        followUpCleared: boolean,
+      ) => string | null;
       at: number;
     },
   ): StatusChangeOutcome;
