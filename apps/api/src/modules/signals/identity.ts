@@ -61,7 +61,7 @@ export function isNewEvidence(existing: readonly EvidenceKeys[], candidate: Evid
 /** D-7: first non-blank line of the text, else the URL as pasted. */
 export function deriveTitle(text: string, sourceUrl: string | null): string {
   const line = text.split(/\r\n|\n|\r/).find((l) => l.trim() !== '');
-  if (line !== undefined) return line.trim().slice(0, TITLE_MAX_CHARS);
+  if (line !== undefined) return Array.from(line.trim()).slice(0, TITLE_MAX_CHARS).join('');
   return sourceUrl ?? '';
 }
 

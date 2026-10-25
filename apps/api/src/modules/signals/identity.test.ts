@@ -121,6 +121,12 @@ describe('deriveTitle and normaliseSnippet (D-7)', () => {
     expect(deriveTitle('x'.repeat(250), null)).toHaveLength(200);
   });
 
+  it('cuts by code points, never inside a surrogate pair', () => {
+    const title = deriveTitle('a' + '😀'.repeat(250), null);
+    expect(title.isWellFormed()).toBe(true);
+    expect(Array.from(title)).toHaveLength(200);
+  });
+
   it('falls back to the URL as pasted, not the canonical form', () => {
     expect(deriveTitle('  ', 'https://example.com/job?utm_source=x#top')).toBe(
       'https://example.com/job?utm_source=x#top',
