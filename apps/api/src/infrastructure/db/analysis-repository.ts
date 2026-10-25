@@ -1,5 +1,6 @@
 import { and, asc, count, desc, eq, gte, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { ActivityCause } from '@lead-hunter/contracts';
 import type {
   AnalysisRepository,
   PendingOpportunity,
@@ -43,7 +44,7 @@ function recordSystemMove(
   id: number,
   before: string | undefined,
   to: string | null,
-  cause: object,
+  cause: ActivityCause,
   at: number,
 ): void {
   if (before !== 'NEW' || to === null) return;
@@ -54,7 +55,7 @@ function recordSystemMove(
       actor: 'system',
       fromStatus: before,
       toStatus: to,
-      metadataJson: JSON.stringify(cause),
+      metadataJson: JSON.stringify(ActivityCause.parse(cause)),
       occurredAt: at,
     })
     .run();
