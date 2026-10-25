@@ -14,6 +14,8 @@
     "discover": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/discover.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.3",
+    "@fastify/rate-limit": "11.2.1",
     "@fastify/static": "10.1.7",
     "@fastify/swagger": "9.9.2",
     "@lead-hunter/config": "workspace:*",

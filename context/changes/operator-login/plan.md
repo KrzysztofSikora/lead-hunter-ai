@@ -259,7 +259,7 @@ Migration `0001_*`: `sessions` as in D-3. No foreign keys. Nothing else changes.
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Password hash, `pnpm auth:hash` and config validation
-- [ ] Phase 2: Sessions, auth API, guard and throttle
+- [x] Phase 2: Sessions, auth API, guard and throttle
 - [ ] Phase 3: Login form, logout, e2e and docs
 
 ## Human checks
@@ -270,6 +270,8 @@ Migration `0001_*`: `sessions` as in D-3. No foreign keys. Nothing else changes.
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
 - [minor] Phase 1: plan-review finding 4 applied: `packages/config` bounds the hash parameters (ln 10–20, r 1–32, p 1–16) after the pattern match; tests cover out-of-range values. The existing canary hashes in `health.int.test.ts` and `logging.int.test.ts` became well-formed hashes (they still contain `LEAK-CANARY`), since a placeholder no longer passes config.
 - [minor] Phase 1: plan-review finding 5 applied: `.env.example` and README say the Docker form needs an existing (possibly empty) `.env`.
+- [minor] Phase 2: plan-review finding 1/3/6 applied: the guard decides on `request.routeOptions.url` (test `/%61pi/auth/session` → 401), `modules/health/routes.ts` is marked `public: true`, and the route-table test substitutes `:param` with a dummy value.
+- [minor] Phase 2: plan says the thrown rate-limit object becomes the 429 body; code shows Fastify's default error handler replaces it (and adds `statusCode`), so serialization failed with 500. Consequence: the login route lives in a child plugin with its own error handler that rebuilds the `ThrottledError` body; other errors are rethrown to the default handler. Added `infrastructure/auth/token-source.ts` (the `TokenSource` implementation) which the plan did not list.
 - [FOLLOW-UP] Invalidate all sessions when `OPERATOR_PASSWORD_HASH` changes, or offer "log out
   everywhere" (see *Risks*). Not in S-01's acceptance.
 

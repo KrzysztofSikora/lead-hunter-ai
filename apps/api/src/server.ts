@@ -4,8 +4,11 @@ import { fileURLToPath } from 'node:url';
 import { buildApp } from './app.js';
 import { loadConfigOrExit } from './cli/config.js';
 import { openDb } from './infrastructure/db/client.js';
+import { randomTokenSource } from './infrastructure/auth/token-source.js';
+import { verifyPassword } from './infrastructure/auth/scrypt-password.js';
 import { createHealthProbe } from './infrastructure/db/health-probe.js';
 import { runMigrations } from './infrastructure/db/migrate.js';
+import { createSessionRepository } from './infrastructure/db/session-repository.js';
 import { createLoggerOptions } from './infrastructure/logging/logger.js';
 import { VERSION } from './version.js';
 
@@ -39,10 +42,19 @@ async function main(): Promise<void> {
     );
   }
 
+  const hash = config.operatorPasswordHash ?? '';
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
     version: VERSION,
+    auth: {
+      sessions: createSessionRepository(db),
+      ...(config.operatorPasswordHash
+        ? { verifier: { verify: (password) => verifyPassword(password, hash) } }
+        : {}),
+      clock: { now: () => new Date() },
+      tokens: randomTokenSource,
+    },
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });
