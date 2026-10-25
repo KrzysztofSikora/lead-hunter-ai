@@ -346,7 +346,7 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Contracts, table and spend
 - [x] Phase 2: Offer prompt and adapters
-- [ ] Phase 3: Generate a draft
+- [x] Phase 3: Generate a draft
 - [ ] Phase 4: Draft actions and the no-send proof
 - [ ] Phase 5: Draft panel and the e2e draft step
 
@@ -368,6 +368,13 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 - [minor] Phase 2: the offer prompt asks for the plan sections (`plan`, `valueProposition`, scope,
   timeline, pricing, `questions`) in Polish (working notes for the operator, D-2) and for
   `message`/`proposal` in the target or source language; the plan only fixed the latter.
+- [minor] Phase 3: the service reads the opportunity through a new port `OfferSourceReader`
+  (`modules/offers/ports.ts`, implemented in `offer-draft-repository.ts`), because the plan's
+  `OfferInput` needs the source text, pre-filter language and newest completed analysis, which no
+  existing repository returns. The guard's allowed text is source title + text + profile `experience`.
+- [minor] Phase 3: `AppDeps.offers` is the built `OfferService`; `server.ts` and `buildTestApp`
+  build it with `createOpportunityService(...).get` as its `detail` reader (one shared
+  `opportunityDeps`). An added test covers the global in-flight guard (D-20).
 - [FOLLOW-UP] S-14: Pipeline/Insights "sent" should count `SENT_MANUALLY` drafts (S-08 D-9).
 
 ## Review response

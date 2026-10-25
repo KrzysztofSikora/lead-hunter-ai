@@ -8,7 +8,18 @@ import { randomTokenSource } from './infrastructure/auth/token-source.js';
 import { verifyPassword } from './infrastructure/auth/scrypt-password.js';
 import { createActivityRepository } from './infrastructure/db/activity-repository.js';
 import { createAnalysisRepository } from './infrastructure/db/analysis-repository.js';
-import { createLlmProvider, llmRunnerDeps } from './infrastructure/llm/create-provider.js';
+import {
+  createLlmProvider,
+  createOfferDrafter,
+  llmRunnerDeps,
+  offerDrafterDeps,
+} from './infrastructure/llm/create-provider.js';
+import { createOfferService } from './modules/offers/service.js';
+import { createOpportunityService } from './modules/opportunities/service.js';
+import {
+  createOfferDraftRepository,
+  createOfferSourceReader,
+} from './infrastructure/db/offer-draft-repository.js';
 import { createAnalysisRunner } from './modules/analysis/service.js';
 import { createProfileService } from './modules/profile/service.js';
 import { createHealthProbe } from './infrastructure/db/health-probe.js';
@@ -70,8 +81,9 @@ async function main(): Promise<void> {
   let logger: { error: (message: string) => void } = { error: () => undefined };
   let logInfo: (message: string) => void = () => undefined;
   let logWarn: (message: string) => void = () => undefined;
+  const analysisRepository = createAnalysisRepository(db);
   const runner = createAnalysisRunner({
-    repository: createAnalysisRepository(db),
+    repository: analysisRepository,
     provider: createLlmProvider(config.llm),
     profile: { get: () => profileService.get().profile },
     clock,
@@ -102,6 +114,25 @@ async function main(): Promise<void> {
     onSignalCreated: () => runner.kick(),
     logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
   });
+  const opportunityDeps = {
+    repository: createOpportunityRepository(db),
+    activity: createActivityRepository(db),
+    payments: createPaymentRepository(db),
+    sourceStatus: sourceRuntime.statusReader,
+    clock,
+  };
+  const offers = createOfferService({
+    repository: createOfferDraftRepository(db),
+    sources: createOfferSourceReader(db),
+    drafter: createOfferDrafter(config.llm),
+    profile: { get: () => profileService.get().profile },
+    activity: opportunityDeps.activity,
+    spentSince: (at) => analysisRepository.spentSince(at),
+    detail: createOpportunityService(opportunityDeps).get,
+    clock,
+    dailyLimit: config.offerDraftDailyLimit,
+    ...offerDrafterDeps(config.llm),
+  });
   // The list shows the next slot; the scheduler starts after the app, so it is read lazily.
   const running: { scheduler?: Scheduler } = {};
   const app = await buildApp({
@@ -117,13 +148,7 @@ async function main(): Promise<void> {
     profile: profileDeps,
     signals: { repository: createSignalRepository(db), clock, pageFetcher },
     onSignalCreated: () => runner.kick(),
-    opportunities: {
-      repository: createOpportunityRepository(db),
-      activity: createActivityRepository(db),
-      payments: createPaymentRepository(db),
-      sourceStatus: sourceRuntime.statusReader,
-      clock,
-    },
+    opportunities: opportunityDeps,
     pipeline: { repository: createPipelineRepository(db), clock },
     digest: {
       repository: createDigestRepository(db),
@@ -131,6 +156,7 @@ async function main(): Promise<void> {
       clock,
     },
     analysis: runner,
+    offers,
     sources: sourceRuntime.service,
     jobs: sourceRuntime.jobs,
     schedule: {

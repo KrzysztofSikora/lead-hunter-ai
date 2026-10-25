@@ -1,7 +1,12 @@
 import { and, count, desc, eq, gte, ne } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import type { OfferDraftRepository, OfferDraftRow } from '../../modules/offers/ports.js';
-import { offerDrafts } from './schema.js';
+import type {
+  OfferDraftRepository,
+  OfferDraftRow,
+  OfferSource,
+  OfferSourceReader,
+} from '../../modules/offers/ports.js';
+import { analyses, offerDrafts, opportunities, rawSignals } from './schema.js';
 
 type Stored = typeof offerDrafts.$inferSelect;
 
@@ -72,6 +77,41 @@ export function createOfferDraftRepository(db: BetterSQLite3Database): OfferDraf
         .where(and(eq(offerDrafts.id, id), eq(offerDrafts.status, expected)))
         .run();
       return result.changes > 0;
+    },
+  };
+}
+
+/** What the offer prompt is built from: the source text and the newest completed analysis. */
+export function createOfferSourceReader(db: BetterSQLite3Database): OfferSourceReader {
+  return {
+    source(opportunityId) {
+      const row = db
+        .select({
+          title: rawSignals.title,
+          text: rawSignals.snippet,
+          sourceType: rawSignals.sourceType,
+          language: opportunities.language,
+        })
+        .from(opportunities)
+        .innerJoin(rawSignals, eq(opportunities.primarySignalId, rawSignals.id))
+        .where(eq(opportunities.id, opportunityId))
+        .get();
+      if (!row) return undefined;
+      const analysis = db
+        .select({ resultJson: analyses.resultJson, schemaVersion: analyses.schemaVersion })
+        .from(analyses)
+        .where(and(eq(analyses.opportunityId, opportunityId), eq(analyses.status, 'COMPLETE')))
+        .orderBy(desc(analyses.id))
+        .limit(1)
+        .get();
+      return {
+        ...row,
+        sourceType: row.sourceType as OfferSource['sourceType'],
+        language: row.language as OfferSource['language'],
+        analysis: analysis?.resultJson
+          ? { resultJson: analysis.resultJson, schemaVersion: analysis.schemaVersion }
+          : null,
+      };
     },
   };
 }

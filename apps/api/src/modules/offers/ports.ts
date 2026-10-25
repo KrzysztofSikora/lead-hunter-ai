@@ -100,3 +100,18 @@ export interface OfferDraftRepository {
     at: number,
   ): boolean;
 }
+
+/** What the service reads about an opportunity before asking for a draft (S-07 D-10). */
+export interface OfferSource {
+  title: string;
+  text: string;
+  sourceType: SourceType;
+  /** The pre-filter language; null until it ran or when it could not tell. */
+  language: 'pl' | 'en' | null;
+  /** The newest completed analysis, still as stored. */
+  analysis: { resultJson: string; schemaVersion: number } | null;
+}
+
+export interface OfferSourceReader {
+  source(opportunityId: number): OfferSource | undefined;
+}
