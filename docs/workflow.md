@@ -132,6 +132,7 @@ PRs. Without them the description is left in `context/changes/<id>/pr-body.md`.
 | `WORKFLOW_REVIEW_ROUNDS` | 2 | Review / fix rounds. |
 | `WORKFLOW_MAX_PHASES` | 12 | Implement sessions per change. |
 | `WORKFLOW_STEP_RETRIES` | 1 | Fresh sessions when a step's artifact is incomplete. |
+| `WORKFLOW_MUTATION` | `0` | Run the `/mutation` step (`ship --mutation` / `--no-mutation` override). Off here: the test plan names only two mutation targets. |
 | `WORKFLOW_STOPS` | `none` | Early draft PRs: `none`, `plan`, `checkpoint`, `all` or a comma list. `--stops` on `ship` / `address-pr` overrides it. See *Optional stops*. |
 
 ## Files

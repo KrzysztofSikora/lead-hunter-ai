@@ -32,6 +32,10 @@
 # `--stops` on ship or address-pr overrides this for one run.
 : "${WORKFLOW_STOPS:=none}"
 
+# 1: run the /mutation step in every ship run. 0 (default here): skip it unless `ship --mutation`
+# is given (test-plan: mutation only for S-04 and S-09).
+: "${WORKFLOW_MUTATION:=0}"
+
 # Loop limits. When a limit is hit the run does not stop for a person: it opens a draft PR.
 : "${WORKFLOW_PLAN_REVIEW_ROUNDS:=2}"   # plan-review / plan-revise rounds
 : "${WORKFLOW_REVIEW_ROUNDS:=2}"        # review / fix-review rounds

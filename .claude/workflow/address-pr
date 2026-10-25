@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Act on the review comments of a pull request opened by `ship`, without stopping for a person.
 #
-#   .claude/workflow/address-pr <PR number> [--no-review] [--no-mutation] [--stops none|plan|checkpoint|all]
+#   .claude/workflow/address-pr <PR number> [--no-review] [--mutation|--no-mutation] [--stops none|plan|checkpoint|all]
 #
 # Reads every PR comment, review and inline comment newer than the last reply this script
 # posted, lets the agent apply the decisions (e.g. "D-3: take B", "R4: fix it"), re-runs
@@ -13,17 +13,18 @@ cd "$(git rev-parse --show-toplevel)"
 # shellcheck source=lib.sh
 source .claude/workflow/lib.sh
 
-PR="" REVIEW=1 MUTATION=1
+PR="" REVIEW=1 MUTATION="${WORKFLOW_MUTATION}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-review) REVIEW=0; shift ;;
     --no-mutation) MUTATION=0; shift ;;
+    --mutation) MUTATION=1; shift ;;
     --stops) WORKFLOW_STOPS=$2; shift 2 ;;
     -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
     *) [ -z "$PR" ] || die "unexpected argument: $1"; PR=${1#\#}; shift ;;
   esac
 done
-[ -n "$PR" ] || die "usage: address-pr <PR number> [--no-review] [--no-mutation] [--stops <list>]"
+[ -n "$PR" ] || die "usage: address-pr <PR number> [--no-review] [--mutation|--no-mutation] [--stops <list>]"
 check_stops
 
 # ---------------------------------------------------------------------------- preflight

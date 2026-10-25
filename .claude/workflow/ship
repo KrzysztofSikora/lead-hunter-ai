@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Take one roadmap item from plan to pull request without stopping for a person.
 #
-#   .claude/workflow/ship <S-01 | change-id | #issue> [--base <branch>] [--no-mutation] [--no-pr]
+#   .claude/workflow/ship <S-01 | change-id | #issue> [--base <branch>] [--mutation|--no-mutation] [--no-pr]
 #                         [--stops none|plan|checkpoint|all]
 #   .claude/workflow/ship <S-01 | change-id | #issue> --publish-only
 #
@@ -17,11 +17,12 @@ cd "$(git rev-parse --show-toplevel)"
 # shellcheck source=lib.sh
 source .claude/workflow/lib.sh
 
-ITEM="" BASE="" MUTATION=1 OPEN_PR=1 PUBLISH_ONLY=0
+ITEM="" BASE="" MUTATION="" OPEN_PR=1 PUBLISH_ONLY=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --base) BASE=$2; shift 2 ;;
     --no-mutation) MUTATION=0; shift ;;
+    --mutation) MUTATION=1; shift ;;
     --no-pr) OPEN_PR=0; shift ;;
     --publish-only) PUBLISH_ONLY=1; shift ;;
     --stops) WORKFLOW_STOPS=$2; shift 2 ;;
@@ -29,7 +30,8 @@ while [ $# -gt 0 ]; do
     *) [ -z "$ITEM" ] || die "unexpected argument: $1"; ITEM=$1; shift ;;
   esac
 done
-[ -n "$ITEM" ] || die "usage: ship <S-01 | change-id | #issue> [--base <branch>] [--no-mutation] [--no-pr] [--stops <list>] | --publish-only"
+MUTATION=${MUTATION:-$WORKFLOW_MUTATION}
+[ -n "$ITEM" ] || die "usage: ship <S-01 | change-id | #issue> [--base <branch>] [--mutation|--no-mutation] [--no-pr] [--stops <list>] | --publish-only"
 check_stops
 [ "$PUBLISH_ONLY" -eq 0 ] || [ "$OPEN_PR" -eq 1 ] || die "--publish-only and --no-pr exclude each other"
 

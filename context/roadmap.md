@@ -111,6 +111,7 @@ than building on it.
   five-part breakdown.
 - Covers: FR-07 AC1–AC3, FR-08 AC5, AC6, AC8, FR-10 AC1–AC6.
 - Depends on: S-03
+- Ship with `--mutation` (scoring is a mutation target).
 - Acceptance: PRD FR-07 AC1–AC3, FR-08 AC5–AC6, AC8, FR-10 AC1–AC6; schema version `1`; the
   scoring rubric is documented in `docs/scoring.md` and every rule has a table-driven test.
 - Unknowns: how the mock derives a plausible analysis from text (keyword rules) — agent decides.
@@ -181,6 +182,7 @@ than building on it.
 - Goal: a pasted URL is fetched once, safely, and its main text becomes the signal.
 - Covers: FR-03 AC1–AC4.
 - Depends on: S-03
+- Ship with `--mutation` (the address guard is a mutation target).
 - Acceptance: PRD FR-03 AC1–AC4; guard tests for each blocked range (IPv4 and IPv6), redirects
   to private hosts, DNS rebinding, oversize and timeout. The shared HTTP client from this item is
   used by every later adapter.
