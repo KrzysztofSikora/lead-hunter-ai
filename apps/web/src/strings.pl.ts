@@ -51,6 +51,7 @@ export const strings = {
     analysisPending: 'Analiza: oczekuje',
     analysisComplete: 'Analiza: gotowa',
     analysisFailed: 'Analiza: nieudana',
+    analysisSkipped: 'Analiza: pominięta',
     noScore: 'brak oceny',
     score: (n: number) => `Ocena: ${n}`,
     previous: 'Poprzednia',

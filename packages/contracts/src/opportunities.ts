@@ -23,7 +23,7 @@ export const BusinessStatus = z.enum([
 ]);
 export type BusinessStatus = z.infer<typeof BusinessStatus>;
 
-export const AnalysisStatus = z.enum(['PENDING', 'COMPLETE', 'FAILED']);
+export const AnalysisStatus = z.enum(['PENDING', 'COMPLETE', 'FAILED', 'SKIPPED']);
 export type AnalysisStatus = z.infer<typeof AnalysisStatus>;
 
 /** Brief §6.1. */

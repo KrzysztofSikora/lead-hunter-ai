@@ -202,7 +202,9 @@ function Results({ data, onPage }: { data: OpportunityList; onPage: (page: numbe
                 ? t.analysisPending
                 : item.analysisStatus === 'COMPLETE'
                   ? t.analysisComplete
-                  : t.analysisFailed}{' '}
+                  : item.analysisStatus === 'SKIPPED'
+                    ? t.analysisSkipped
+                    : t.analysisFailed}{' '}
               · {item.analysis?.score != null ? t.score(item.analysis.score) : t.noScore}
             </p>
             {item.source.excerpt && <p className={styles.excerpt}>{item.source.excerpt}</p>}

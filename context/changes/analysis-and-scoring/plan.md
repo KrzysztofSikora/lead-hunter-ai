@@ -376,7 +376,7 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Analysis contracts and the scoring rubric
+- [x] Phase 1: Analysis contracts and the scoring rubric
 - [ ] Phase 2: Pre-filter, output guard and mock provider
 - [ ] Phase 3: Storage, runner and configuration
 - [ ] Phase 4: Status route, DTOs and list filters
@@ -387,6 +387,9 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] (Phase 1) plan-review #1: `SKIPPED` added to `AnalysisStatus` in Phase 1 (not Phase 4), with the placeholder label `analysisSkipped` in `strings.pl.ts` and the list falling through to it, so no later phase can break response serialization.
+- [REVIEW] (Phase 1) plan-review #7: profitability scores only a budget stated by the source; a model-proposed price (hypothesis) is neutral 5, because judging it against the profile's own rates is circular. The plan's Rubric row said "sourceBudget else proposedPrice"; `docs/scoring.md` states the new rule. Alternative: score the proposed price too (every budget-less mock result with rates would get 15/15).
+- [minor] (Phase 1) plan-review #9: `confidenceFor` takes only `ANALYSED` results; `INSUFFICIENT_DATA` rows get no score and no confidence (both stay null), decided in Phase 3.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
