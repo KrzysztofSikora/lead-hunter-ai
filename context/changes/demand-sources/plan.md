@@ -67,9 +67,29 @@ When done:
   `strings.opportunities.history.prefilter` (`strings.pl.ts:430`).
 - **Source name on the card** is already generic for every feed (`SourceFacts.name`, S-10 D-19;
   `opportunityCard.ts:145-147`), so FR-04 AC6 needs a test, not new code.
-- **Tests pinned to withdrawn presets:** `apps/api/test/sources.int.test.ts:86-110` and
-  `apps/api/test/jobs.int.test.ts` create `wwr-programming`. They must move to a current preset,
-  and a new assertion must cover the withdrawn case (no assertion is weakened).
+- **Tests pinned to withdrawn presets:** every call site must move to a current preset, and a
+  new assertion must cover the withdrawn case (no assertion is weakened, and none of these tests
+  switches to asserting the 400):
+  - `apps/api/test/sources.int.test.ts`: `wwr-programming` at `:86`, `:91`, `:110`, `:124`,
+    `:171`, `:207`, `:277`, `:307`; `wwr-full-stack` at `:188`, `:212`; `hn-jobs-contract` at
+    `:211`, `:266`; `wwr-devops` in the offered-list assertion at `:108`.
+  - `apps/api/test/jobs.int.test.ts`: `wwr-programming` at `:103`, `:369`, `:520`, `:578`.
+  - Both files serve `synthetic-wwr-programming.xml` (`WWR_FEED`, `sources.int.test.ts:10`,
+    `jobs.int.test.ts:18`) through MockAgent. The fixture stays (it is a valid RSS shape and
+    S-10 tests parse it); only the preset id and intercepted URL change.
+- **Serialisation of response schemas:** `fastify-type-provider-zod@7.0.0` serialises with
+  `safeEncode(schema, data)` (`dist/esm/core.js:114-120`). In Zod 4.6.7 a `.transform()` anywhere
+  in a response schema throws `$ZodEncodeError: Encountered unidirectional transform during
+  encode`, so the route answers 500. `z.string().trim()` and `.refine()` encode fine
+  (plan-review #1, reproduced there). So no schema reachable from a response (`Source`,
+  `SourcePreset`, `SourceFilter`) may use `.transform()` (D-16).
+- **System-move helpers** `moveFromNew`, `statusOf`, `recordSystemMove` and the `Tx` type are
+  module-private in `apps/api/src/infrastructure/db/analysis-repository.ts:29-60`. The
+  source-filter rejection needs the same event shape.
+- **Text bound:** feed text is cut to `maxTextChars` in `parseFeed`
+  (`apps/api/src/infrastructure/sources/rss/parse-feed.ts:172`), which `compose.ts:58` sets from
+  `config.importMaxTextChars` (default `DEFAULT_IMPORT_MAX_TEXT_CHARS = 20_000`,
+  `packages/contracts/src/opportunities.ts:9`).
 - **Fixtures:** `parse-feed.test.ts:160-170` already runs `it.each` over every non-`synthetic-`
   file in `test/fixtures/feeds/` (S-10 D-14), so fixtures recorded in the human check join the
   suite without code changes.
@@ -89,26 +109,30 @@ When done:
 | ID | Question | Chosen | Alternatives (and what they would buy) | Why | Reversal | Decided by |
 |----|----------|--------|----------------------------------------|-----|----------|------------|
 | D-1 | Where the per-source filter is stored | New nullable column `sources.filter_json` (`SourceFilter` JSON). `NULL` reads as `{ enabled: false, include: [], exclude: [] }` | B: inside `config_json` (no migration, but that JSON is adapter-owned and strict, and the S-18/S-19 adapters would each need to carry it); C: a `source_filters` table (normalised, but one row per source adds a join for no query need) | The filter is adapter-independent (S-18 reuses it). Additive and nullable, in one column | costly (data shape) | agent |
-| D-2 | Filter shape and limits | `SourceFilter = { enabled: boolean, include: string[], exclude: string[] }`, strict. Each list holds ≤ 30 phrases of 1–100 chars, trimmed, empty lines dropped, deduplicated case-insensitively. Validated with Zod in the service before it is stored (lesson: validate before storing) | B: one combined list with `+`/`-` prefixes (shorter, but easy to mistype); C: unlimited lists (no reason to; lesson: bound CPU on input) | Mirrors FR-31 wording directly. Small bounded loops | costly (API contract) | agent |
+| D-2 | Filter shape and limits | `SourceFilter = { enabled: boolean, include: string[], exclude: string[] }`, strict. Each list holds ≤ 30 phrases of 1–100 chars after `trim()`; a list with a case-insensitive duplicate is rejected (D-16). Validated with Zod in the service before it is stored (lesson: validate before storing) | B: one combined list with `+`/`-` prefixes (shorter, but easy to mistype); C: unlimited lists (no reason to; lesson: bound CPU on input) | Mirrors FR-31 wording directly. Small bounded loops | costly (API contract) | agent |
 | D-3 | How a phrase matches | Case-insensitive substring. Both sides are normalised with NFKC, `toLowerCase()` and whitespace runs collapsed to one space. Text = `title + "\n" + snippet`. Diacritics are kept. Exclude is checked first, and the first configured exclude phrase that matches is the reason. Otherwise, a non-empty include list with no match gives "brak frazy". An enabled filter with both lists empty passes everything | B: whole-word match (stops `react` matching `reactive`, but breaks `[FOR HIRE]` and Polish inflections); C: regular expressions (powerful, but ReDoS on a single process; lesson on CPU-bound steps) | Predictable for the operator and linear time. Swappable inside one pure function | cheap | agent |
 | D-4 | When and to what the filter applies | In `service.run`, per item that is not already in the cursor. The verdict is computed before `ingest`, and the rejection is applied **only when `ingest` creates a new opportunity**, in the same transaction. A duplicate (an existing or manually imported opportunity) is never re-rejected. The filter as stored at run time applies. Edits do not touch signals already stored | B: in the analysis pre-filter stage (state at pre-filter time, but AC3's counts are not known when the run ends, and S-18 non-RSS sources must still pass through it); C: drop filtered items without storing (cheaper, but AC1 requires "stored as rejected", and it would turn noise into silent "no results") | Meets AC1 and AC3 at discovery time, and never overrides an operator's earlier import | cheap | agent |
 | D-5 | How a source-filter rejection is stored | `PrefilterRule` gains `source_filter`. New nullable column `opportunities.prefilter_phrase` (the matched exclude phrase; `NULL` = "brak frazy"). The row gets `prefilter_rule = 'source_filter'`, `prefilter_matches = 0`, `prefilter_at = now`, `analysis_status = 'SKIPPED'`, `business_status = 'REJECTED'`, plus a system `STATUS_CHANGE` event `NEW → REJECTED` with a new `ActivityCause` variant `{ kind: 'source_filter', phrase: string \| null }`. `PrefilterOutcome` gains `phrase: string \| null` | B: separate `source_filter_*` columns (leaves the pre-filter untouched, but the queue, requeue guard, live `rejected` count, list and card would each need a second check); C: a free-text reason column (unstructured; the UI could not localise it) | Reuses every existing guard: not queued, not requeueable, counted as rejected. One enum value and one column | costly (data shape, API contract) | agent |
 | D-6 | How filtered items are counted (AC3) | `SourceRunResult` gains `filtered`. Filtered items still count in `new` (they are new stored signals) and in the live `rejected`. `JobCounters` gains `sourceFiltered`, read live as `prefilter_rule = 'source_filter'` over the run's signals. `pnpm discover` prints it | B: a stored `job_runs.filtered` column (frozen, but another migration and a second source of truth); C: a bucket separate from `new` (`fetched = new + dup + failed + filtered`; arguably clearer, but changes the meaning of `new` for every existing reader) | Additive; no existing counter changes meaning | costly (API contract) | agent |
-| D-7 | Mechanism for withdrawn presets | `presets.ts` exports `PRESETS` (offered) and `WITHDRAWN_PRESETS` (WWR ×4, `hn-jobs-contract`), and both are used to look up access notes. `Source` gains `presetWithdrawn: boolean`. `POST /api/sources { preset: <withdrawn> }` answers 400 `unknown_preset`. Existing rows are not changed (roadmap) | B: delete the presets (existing sources would lose their access note and terms link, FR-04 AC7); C: keep them offered behind a "legacy" flag (contradicts AC2) | Keeps AC7 for old rows. One file | cheap | agent |
+| D-7 | Mechanism for withdrawn presets | `presets.ts` exports `PRESETS` (offered) and `WITHDRAWN_PRESETS` (WWR ×4, `hn-jobs-contract`), and both are used to look up access notes. `Source` gains `presetWithdrawn: boolean`. `POST /api/sources { preset: <withdrawn> }` answers 400 `unknown_preset`. Existing rows are not changed (roadmap) | B: delete the presets (existing sources would lose their access note and terms link, FR-04 AC7); C: keep them offered behind a "legacy" flag (contradicts AC2) | Keeps AC7 for old rows. One file for the lists; the response field is additive | costly (API contract: new `Source` field, and a previously valid `POST` body now answers 400) | agent |
 | D-8 | Filter defaults for new and existing sources | A source created from a preset copies the preset's `filter` (enabled iff it has phrases). A hand-added feed starts with `filter_json = NULL` (off, empty). Existing rows are **not** backfilled, including existing `hn-freelance` sources | B: a migration that writes the HN default into existing HN rows (operator benefit, but it silently rewrites operator data); C: presets ship filters switched off (safer, but the roadmap calls them "sensible defaults") | Never changes what the operator already has, and the operator can add the phrase in two clicks | cheap | agent |
-| D-9 | Freelancer.com feed URL form | `https://www.freelancer.com/rss.xml?keyword=<k>` with `k` ∈ `nodejs`, `react`, `typescript`, `arduino`, `raspberry pi`, `iot`, `3d printing`, `pcb layout`, `ai automation` (URL-encoded), ids `freelancer-<slug>`, terms `https://www.freelancer.com/about/terms`. `UNVERIFIED`; corrected in `presets.ts` only | B: `/rss/job_<Skill>.xml` per-skill paths (no source found for them); C: one site-wide feed plus the include filter (one request, but most items would be noise and filtered out) | The only form public sources mention. Runtime robots.txt check makes a wrong guess fail loudly, not silently | cheap | research |
+| D-9 | Freelancer.com feed URL form | `https://www.freelancer.com/rss.xml?keyword=<k>` with `k` ∈ `nodejs`, `react`, `typescript`, `arduino`, `raspberry pi`, `iot`, `3d printing`, `pcb layout`, `ai automation` (URL-encoded), ids `freelancer-<slug>`, terms `https://www.freelancer.com/about/terms`. `UNVERIFIED`; corrected in `presets.ts` only | B: `/rss/job_<Skill>.xml` per-skill paths (no source found for them); C: one site-wide feed plus the include filter (one request, but most items would be noise and filtered out) | The only form public sources mention. Runtime robots.txt check makes a wrong guess fail loudly, not silently. If the parameter is ignored, all nine sources would fetch the same feed and succeed; human check 1 compares two presets' samples and, if they match, switches to C in `presets.ts` | costly (third party: new host the app calls, though only for presets the operator adds) | research |
 | D-10 | elektroda.pl "Projektowanie Bazar" | No preset in this change, logged as `[FOLLOW-UP]` | B: add `UNVERIFIED` preset (the roadmap says add it only "if a permitted feed exists", which nobody could confirm) | Roadmap rule; permitted access first (CLAUDE.md) | cheap | agent |
-| D-11 | Arduino Forum preset | `https://forum.arduino.cc/c/community/jobs/42.rss`, id `arduino-jobs`, terms `https://www.arduino.cc/en/terms-conditions`, default filter exclude `[FOR HIRE]`, `looking for work` (roadmap). `UNVERIFIED` | B: the Discourse JSON API (`/c/…/42.json`; richer, but a new adapter type for one source) | Reuses the RSS adapter | cheap | research |
+| D-11 | Arduino Forum preset | `https://forum.arduino.cc/c/community/jobs/42.rss`, id `arduino-jobs`, terms `https://www.arduino.cc/en/terms-conditions`, default filter exclude `[FOR HIRE]`, `looking for work` (roadmap). `UNVERIFIED` | B: the Discourse JSON API (`/c/…/42.json`; richer, but a new adapter type for one source) | Reuses the RSS adapter | costly (third party: new host the app calls, though only for a preset the operator adds) | research |
 | D-12 | Fixtures for feeds the agent cannot reach | `synthetic-freelancer.xml` (RSS 2.0, a budget line in the description) and `synthetic-discourse.xml` (Discourse category RSS: CDATA HTML excerpt, `dc:creator`, topic guid), marked `DEMO`. Recorded files from the human check join `it.each` automatically (S-10 D-14) | B: wait for recordings (blocks the run); C: "real-looking" hand-written files (passes fiction off as recordings) | Truth first, same as S-10 | cheap | agent |
 | D-13 | API for editing the filter | `PATCH /api/sources/:id` body becomes `{ enabled?: boolean, filter?: SourceFilter }`, strict, at least one key. `filter` replaces the whole filter. The response is `Source`, which now carries `filter` | B: a new `PUT /api/sources/:id/filter` route (cleaner separation, but a new route, an OpenAPI entry and a second client call); C: separate `/filter/enable` toggle routes (more surface) | Additive change to an existing route; the old `{ enabled }` body still works | costly (API contract) | agent |
 | D-14 | Sources view UX for the filter | Inside each source item, a "Filtr źródła" block: a checkbox (saves at once and keeps the phrases), two textareas "Odrzucaj, gdy zawiera" and "Wymagaj jednej z fraz" (one phrase per line), and a "Zapisz filtr" button. The count appears in the run message ("odrzucone przez filtr źródła N") and as the `sourceFiltered` counter in the job history already in this view. Withdrawn presets show the badge "preset wycofany" | B: a separate filter page (more navigation); C: a per-source "last run" panel (nice, but job history already shows it per source) | Smallest UI that meets AC3. Local to `SourcesPage.tsx` | cheap | agent |
 | D-15 | Reason wording | "filtr źródła: <phrase>" and "filtr źródła: brak frazy", exactly as FR-31. The list shows `Analiza: pominięta — filtr źródła: …`, and history shows the same reason. Formatted in one helper `prefilterReason()` in `apps/web/src/opportunityCard.ts` | - | Fixed by the PRD | costly (AC wording) | prd |
+| D-16 | Duplicates and blank lines in a filter, given that response schemas cannot transform (plan-review #1) | One `SourceFilter` schema, used for the PATCH body, `SourcePreset` and `Source`, with no `.transform()`: phrases `z.string().trim().min(1).max(100)`, lists `.max(30)` and a `.refine()` that rejects a case-insensitive duplicate (400 `validation_failed`, path `filter.include`). The web editor splits lines, trims, drops empty lines and dedupes before it sends, so the operator never sees that 400 from the UI | B: dedupe in the service before `SourceFilter.parse` (forgiving API, but the stored value then differs from the request silently); C: `SourceFilterInput` with a transform for the body plus a plain `SourceFilter` for responses (forgiving and explicit, but two schemas to keep in step) | One schema, encodes in responses, and the API never rewrites what it was sent. Loosening to B or C later is additive | costly (API contract) | agent |
+| D-17 | Where the shared system-move helpers live (plan-review #5) | New `apps/api/src/infrastructure/db/system-move.ts` exports `Tx`, `moveFromNew`, `statusOf`, `recordSystemMove`, moved verbatim from `analysis-repository.ts`, which imports them. `signal-repository.ts` uses the same functions | B: copy them into `signal-repository.ts` (no move, but the two rejection paths' event shapes can drift); C: call the analysis repository from the signal repository (couples two repositories inside one transaction) | One definition of the event shape. Pure move, covered by the existing analysis tests | cheap | agent |
+| D-18 | A stored filter that fails validation (plan-review #8) | `readFilter` returns off and empty, and the run logs `source_filter_invalid` with the source id. Unit-tested for `NULL`, invalid JSON and JSON that fails the schema. Not shown in the UI | B: fail the run with an explicit error (louder, but one bad row would stop a source that otherwise works); C: a `filterInvalid` flag on `Source` (visible, but another API field for a state that validate-before-store makes unreachable except by hand-editing the DB) | Only a hand-edited DB can reach it; the log names it | cheap | agent |
 
 ## Design
 
 ### Contracts (`packages/contracts/src/sources.ts`, `analysis.ts`, `opportunities.ts`, `jobs.ts`)
-- `SourceFilter` (D-2): `{ enabled, include, exclude }`, strict; phrases trimmed, 1–100 chars,
-  ≤ 30 per list. A transform drops case-insensitive duplicates.
+- `SourceFilter` (D-2, D-16): `{ enabled, include, exclude }`, strict; phrases trimmed, 1–100
+  chars, ≤ 30 per list; a `.refine()` rejects case-insensitive duplicates. No `.transform()`
+  anywhere, because `Source` and `SourcePreset` are response schemas.
 - `SourcePreset` += `filter: SourceFilter`.
 - `Source` += `filter: SourceFilter`, `presetWithdrawn: boolean`.
 - `UpdateSourceRequest` = `{ enabled?: boolean, filter?: SourceFilter }`, strict, refined to at
@@ -133,7 +157,7 @@ reports the phrase as the operator typed it.
 
 ### Data flow of a run (changes to `service.run`)
 1. `const filter = readFilter(record.filterJson)`. A stored value that is not valid reads as off
-   and logs a warning (source id only).
+   and logs `source_filter_invalid` (source id only, D-18).
 2. For each item not in the cursor: `verdict = filter.enabled ? applySourceFilter(...) : pass`.
 3. Inside `signals.transaction`: `ingest(...)`. If the result is `created` and the verdict
    rejects, call `tx.rejectBySourceFilter(opportunityId, verdict.phrase, at)`, then
@@ -143,13 +167,17 @@ reports the phrase as the operator typed it.
    (counts only, FR-24 AC2).
 
 `SignalTx.rejectBySourceFilter(opportunityId, phrase, at)` (implemented in
-`signal-repository.ts`) updates the opportunity as in D-5 and inserts the system event. Both
-happen in the caller's transaction, so an item is never left `PENDING` half-filtered.
+`signal-repository.ts`) updates the opportunity as in D-5 and inserts the system event through
+`statusOf`, `moveFromNew` and `recordSystemMove` from `db/system-move.ts` (D-17), the same
+functions `savePrefilter` uses. Both happen in the caller's transaction, so an item is never
+left `PENDING` half-filtered.
 
 ### Error model
-- Bad filter in PATCH: 400 `validation_failed` with field paths (`filter.include.3`, …).
+- Bad filter in PATCH (too long, too many, empty after trim, duplicate): 400
+  `validation_failed` with field paths (`filter.include.3`, `filter.include`, …).
 - Unknown or withdrawn preset: 400 `unknown_preset`.
-- Matching cannot fail. Text is already bounded by `IMPORT_MAX_TEXT_CHARS`, and phrases by D-2.
+- Matching cannot fail. Text is already bounded by `config.importMaxTextChars` (passed to
+  `parseFeed` as `maxTextChars`), and phrases by D-2.
 
 ## Phases
 
@@ -163,7 +191,10 @@ happen in the caller's transaction, so an item is never left `PENDING` half-filt
     `SEEKING FREELANCER`; nine `freelancer-*` with no phrases; `arduino-jobs` with two excludes)
     and `WITHDRAWN_PRESETS`. Polish access notes. Contract: D-7, D-8, D-9, D-11.
   - `apps/api/src/modules/sources/source-filter.ts` (new): `readFilter` (and the normalisation
-    helper used in Phase 2). Contract: `readFilter(json | null): SourceFilter`.
+    helper used in Phase 2). Contract: `readFilter(json | null): SourceFilter` (D-18).
+    `source-filter.test.ts` (new): `readFilter` on `NULL`, a valid value, invalid JSON and JSON
+    that fails the schema; every entry of `PRESETS` and `WITHDRAWN_PRESETS` has a filter that
+    `SourceFilter.parse` accepts.
   - `apps/api/src/modules/sources/ports.ts`, `service.ts`: `SourceRecord.filterJson`,
     `NewSource.filterJson`. `create` copies the preset filter. `setEnabled` becomes
     `update(id, { enabled?, filter? })`, which validates with `SourceFilter` before storing.
@@ -173,19 +204,27 @@ happen in the caller's transaction, so an item is never left `PENDING` half-filt
   - `apps/api/src/modules/sources/routes.ts`: PATCH uses the new body and service call.
     Validation errors map to `validation_failed`.
   - `apps/web/src/api/sources.ts`: types follow (no UI change yet, so the build stays green).
+  - `packages/contracts/src/sources.test.ts` (new or extended, following the existing contracts
+    tests): `SourceFilter` rejects a case-insensitive duplicate, a 101-char phrase, 31 phrases
+    and a blank phrase, trims accepted phrases, and `z.encode(Source, value)` with a filter set
+    does not throw (guards D-16).
   - `apps/api/test/fixtures/feeds/synthetic-freelancer.xml`,
     `apps/api/test/fixtures/feeds/synthetic-discourse.xml` (new, `DEMO`), and
     `apps/api/src/infrastructure/sources/rss/parse-feed.test.ts`: parse both shapes (title, link,
     date, text with the budget line kept as source text, CDATA HTML stripped). Contract: D-12.
-  - `apps/api/test/sources.int.test.ts`, `apps/api/test/jobs.int.test.ts`: move from
-    `wwr-programming` to a `freelancer-*` preset with equal-strength assertions. New tests:
+  - `apps/api/test/sources.int.test.ts`, `apps/api/test/jobs.int.test.ts`: move every call site
+    listed in *Findings* (`wwr-*`, `hn-jobs-contract`) to a current preset (`freelancer-*`,
+    `arduino-jobs`, `hn-freelance`) with equal-strength assertions and the matching MockAgent
+    URL. New tests:
     - presets offered = new list, no WWR or `jobs?q=contract`;
     - `{ preset: 'wwr-programming' }` → 400;
     - a row inserted with `preset_id = 'wwr-programming'` lists with `presetWithdrawn: true` and
       its WWR access note;
     - creating from `hn-freelance` / `arduino-jobs` stores the preset filter;
-    - PATCH filter round-trips, off keeps the phrases, over-limit / empty phrase → 400, and
-      `{ enabled }` alone still works.
+    - PATCH filter round-trips, off keeps the phrases, over-limit / empty / duplicate phrase →
+      400 `validation_failed`, and `{ enabled }` alone still works;
+    - after a PATCH that sets a filter, `GET /api/sources` and `POST /api/sources` (preset with a
+      filter) answer 200 with that filter in the body (guards D-16 at the serialiser).
 - Proves: FR-04 AC2 (integration), FR-04 AC7 for withdrawn rows (integration), the D-2
   validation (integration).
 - Agent checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
@@ -205,10 +244,13 @@ happen in the caller's transaction, so an item is never left `PENDING` half-filt
     - exclude beats include, first exclude in configured order wins;
     - empty include passes, include miss → `phrase: null`;
     - bracketed phrase `[FOR HIRE]`, a phrase in title only and in snippet only;
-    - a maximum-size text (`IMPORT_MAX_TEXT_CHARS`) with 30 + 30 phrases finishes under 50 ms
-      (lesson on CPU bounds).
+    - a maximum-size text (`DEFAULT_IMPORT_MAX_TEXT_CHARS` characters) with 30 + 30 phrases of
+      100 chars finishes under 50 ms (lesson on CPU bounds).
+  - `apps/api/src/infrastructure/db/system-move.ts` (new) and `analysis-repository.ts`: move
+    `Tx`, `moveFromNew`, `statusOf`, `recordSystemMove` and import them back (D-17). No
+    behaviour change; the existing analysis tests cover it.
   - `apps/api/src/modules/signals/ports.ts`, `apps/api/src/infrastructure/db/signal-repository.ts`:
-    `SignalTx.rejectBySourceFilter(opportunityId, phrase, at)` (D-5).
+    `SignalTx.rejectBySourceFilter(opportunityId, phrase, at)` (D-5), using `system-move.ts`.
   - `apps/api/src/modules/sources/service.ts`: run flow per *Design*; `filtered` in result and log.
   - `apps/api/src/infrastructure/db/opportunity-repository.ts`,
     `apps/api/src/modules/opportunities/ports.ts`, `apps/api/src/modules/opportunities/service.ts`:
@@ -256,7 +298,8 @@ happen in the caller's transaction, so an item is never left `PENDING` half-filt
   - `docs/source-policy.md`:
     - entries for Freelancer.com presets and the Arduino Forum preset (access, terms, limits,
       `DO WERYFIKACJI`);
-    - HN `hn-jobs-contract` and WWR sections marked "wycofany (D-15)";
+    - HN `hn-jobs-contract` and WWR sections marked "wycofany (shape D-15)" (the shape-notes
+      decision, not this plan's D-15);
     - a section "Filtr źródła" covering the rules of D-3/D-4 and the fact that filtered items are
       stored and counted.
   - `README.md` (section on sources, if present) and `CLAUDE.md` Commands (`pnpm discover`
@@ -270,6 +313,9 @@ happen in the caller's transaction, so an item is never left `PENDING` half-filt
      `evidence/real-run.md`, per preset: status, fetched / new / odrzucone przez filtr źródła,
      and one sample signal (title, URL, date). Note any preset that fails with
      `robots_disallowed`, 404 or `invalid_feed`, so its URL is corrected in `presets.ts`.
+     Compare the first five item URLs of `freelancer-nodejs` and `freelancer-arduino` and record
+     whether they differ. If they are the same, `?keyword=` is ignored: D-9 switches to C (one
+     `freelancer-projects` preset on `rss.xml` with the skills as include phrases).
   2. Record fixtures: `pnpm fixtures:record <id>` for one `freelancer-*` source and
      `arduino-jobs`. Review that the files hold no real names, handles or e-mails, then commit
      and run `pnpm test`.
@@ -314,3 +360,16 @@ happen in the caller's transaction, so an item is never left `PENDING` half-filt
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
+- #1 (blocker): no `.transform()` in `SourceFilter`; duplicates are rejected by `.refine()` and
+  the web editor dedupes before sending (new D-16, D-2 and *Design* updated). Added a contracts
+  test that `Source` encodes with a filter set and an integration assertion that `GET`/`POST
+  /api/sources` answer 200 with a filter (Phase 1). *Findings* records the serialiser fact.
+- #2 (major): D-7 marked `costly (API contract)`; D-9 and D-11 marked `costly (third party)`.
+- #3: *Findings* lists every withdrawn-preset call site in both test files; Phase 1 moves all
+  of them to current presets.
+- #4: uses `DEFAULT_IMPORT_MAX_TEXT_CHARS` / `config.importMaxTextChars` (`maxTextChars` in
+  `parseFeed`).
+- #5: new D-17, `db/system-move.ts` exports the helpers, moved in Phase 2.
+- #6: human check 1 compares two `freelancer-*` presets' items and names the fallback to D-9 C.
+- #7: the source-policy text says "shape D-15".
+- #8: new D-18 records the fail-open choice; Phase 1 adds unit tests for the invalid branches.
