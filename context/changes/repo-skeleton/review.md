@@ -54,7 +54,7 @@ Gates: typecheck ok, lint ok, unit tests ok (85/85), e2e ok (local Chromium 1243
 - Fix: add `environment: { NODE_ENV: production, HOST: 0.0.0.0, PORT: '8080', DATA_DIR: /data }` to the `app` service (it takes precedence over `env_file`), which also makes the template comment true. Optionally add a test or agent check that `docker compose config` with an uncommented template still yields `HOST=0.0.0.0` and `DATA_DIR=/data`.
 - Effort: small
 - Lesson candidate: When a plan-review finding is accepted, apply its primary fix or log why not; a comment must never describe config that does not exist.
-- Decision: open
+- Decision: fixed (5ee7993) + lesson proposed
 
 ### R2: Health `version` is always `0.0.0`
 - Severity: minor
@@ -63,7 +63,7 @@ Gates: typecheck ok, lint ok, unit tests ok (85/85), e2e ok (local Chromium 1243
 - Fix: add `"version": "0.1.0"` to `apps/api/package.json` (and bump it with releases), or drop the `?? '0.0.0'` fallback so a missing version fails loudly; a test that `VERSION` matches the package manifest would hold it.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (939dcc6)
 
 ### R3: Dockerfile keeps the build toolchain that plan-review finding 4 asked to drop
 - Severity: minor
@@ -72,7 +72,7 @@ Gates: typecheck ok, lint ok, unit tests ok (85/85), e2e ok (local Chromium 1243
 - Fix: remove both `RUN apt-get ...` blocks; or keep them and log a `[minor]` deviation that says why.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (2da780e)
 
 ### R4: SPA fallback answers `/api` and missing assets with `200 text/html`
 - Severity: minor
@@ -81,4 +81,4 @@ Gates: typecheck ok, lint ok, unit tests ok (85/85), e2e ok (local Chromium 1243
 - Fix: treat the path (without query) `=== '/api'` or starting with `/api/` as API, and skip the fallback for paths with a file extension (or under `/assets/`); add the two cases to `static.int.test.ts`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (85712e6)
