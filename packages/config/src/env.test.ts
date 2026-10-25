@@ -14,6 +14,8 @@ describe('loadConfig', () => {
       dataDir: './data',
       logLevel: 'info',
       importMaxTextChars: 20_000,
+      analysisDailyLimit: 20,
+      prefilterMaxAgeDays: 30,
     });
   });
 
@@ -26,6 +28,9 @@ describe('loadConfig', () => {
         DATA_DIR: '/data',
         LOG_LEVEL: 'debug',
         IMPORT_MAX_TEXT_CHARS: '5000',
+        LLM_PROVIDER: 'mock',
+        ANALYSIS_DAILY_LIMIT: '5',
+        PREFILTER_MAX_AGE_DAYS: '7',
         ...HASH,
       }),
     ).toEqual({
@@ -36,6 +41,9 @@ describe('loadConfig', () => {
       logLevel: 'debug',
       operatorPasswordHash: VALID_HASH,
       importMaxTextChars: 5000,
+      llmProvider: 'mock',
+      analysisDailyLimit: 5,
+      prefilterMaxAgeDays: 7,
     });
   });
 
@@ -58,6 +66,11 @@ describe('loadConfig', () => {
     ['NODE_ENV', 'prod'],
     ['LOG_LEVEL', 'loud'],
     ['IMPORT_MAX_TEXT_CHARS', '999'],
+    ['LLM_PROVIDER', 'openai'],
+    ['ANALYSIS_DAILY_LIMIT', '0'],
+    ['ANALYSIS_DAILY_LIMIT', '1001'],
+    ['PREFILTER_MAX_AGE_DAYS', '0'],
+    ['PREFILTER_MAX_AGE_DAYS', '366'],
     ['IMPORT_MAX_TEXT_CHARS', '200001'],
     ['IMPORT_MAX_TEXT_CHARS', 'dużo'],
   ])('rejects %s=%s and names the variable', (variable, value) => {

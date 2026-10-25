@@ -1,12 +1,41 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { BusinessStatus, Category, SourceType, type OpportunityList } from '@lead-hunter/contracts';
+import {
+  BusinessStatus,
+  Category,
+  Currency,
+  DEFAULT_MIN_SCORE,
+  SourceType,
+  type AnalysisServiceStatus,
+  type OpportunityList,
+  type OpportunitySummary,
+} from '@lead-hunter/contracts';
 import styles from './OpportunitiesPage.module.css';
+import { getAnalysisStatus } from './api/analysis.js';
 import { listOpportunities, PAGE_SIZE, type ListFilters } from './api/opportunities.js';
 import { strings } from './strings.pl.js';
 import { formatWarsaw, isCalendarDate, warsawDayEnd, warsawDayStart } from './warsawTime.js';
 
 const t = strings.opportunities;
+
+const LANGUAGES = ['pl', 'en'] as const;
+const WORK_MODES = ['REMOTE', 'HYBRID', 'ONSITE'] as const;
+
+/** The contract's upper bound for `maxAgeDays`. */
+const MAX_AGE_DAYS = 3650;
+
+function positiveInt(value: string | null, max = 999_999_999): number | undefined {
+  return value !== null && /^\d{1,9}$/.test(value) && Number(value) > 0 && Number(value) <= max
+    ? Number(value)
+    : undefined;
+}
+
+/** An amount in currency units with at most two decimals. */
+function positiveAmount(value: string | null): number | undefined {
+  return value !== null && /^\d{1,9}(\.\d{1,2})?$/.test(value) && Number(value) > 0
+    ? Number(value)
+    : undefined;
+}
 
 /** What the URL query says; unknown or malformed values are ignored, never sent. */
 function readQuery(params: URLSearchParams) {
@@ -14,6 +43,7 @@ function readQuery(params: URLSearchParams) {
   const minScore = params.get('minScore');
   const from = params.get('from') ?? '';
   const to = params.get('to') ?? '';
+  const country = (params.get('country') ?? '').trim().toUpperCase();
   return {
     page: Number.isInteger(page) && page >= 1 ? page : 1,
     sort: params.get('sort') === 'score' ? ('score' as const) : ('date' as const),
@@ -26,8 +56,32 @@ function readQuery(params: URLSearchParams) {
     status: BusinessStatus.safeParse(params.get('status')).data,
     from: isCalendarDate(from) ? from : undefined,
     to: isCalendarDate(to) ? to : undefined,
+    maxAgeDays: positiveInt(params.get('maxAgeDays'), MAX_AGE_DAYS),
+    minAmount: positiveAmount(params.get('minAmount')),
+    currency: Currency.safeParse(params.get('currency')).data,
+    language: LANGUAGES.find((value) => value === params.get('language')),
+    workMode: WORK_MODES.find((value) => value === params.get('workMode')),
+    country: /^[A-Z]{2}$/.test(country) ? country : undefined,
+    excludeIndustries: (params.get('excludeIndustries') ?? '').trim() || undefined,
   };
 }
+
+const FORM_FIELDS = [
+  'minScore',
+  'category',
+  'sourceType',
+  'status',
+  'from',
+  'to',
+  'sort',
+  'maxAgeDays',
+  'minAmount',
+  'currency',
+  'language',
+  'workMode',
+  'country',
+  'excludeIndustries',
+];
 
 type Query = ReturnType<typeof readQuery>;
 
@@ -40,13 +94,29 @@ function toFilters(query: Query): ListFilters {
   };
 }
 
+type StatusLoad =
+  { state: 'loading' } | { state: 'error' } | { state: 'ready'; data: AnalysisServiceStatus };
+
 type Load = { state: 'loading' } | { state: 'error' } | { state: 'ready'; data: OpportunityList };
 
 export function OpportunitiesPage() {
   const [params, setParams] = useSearchParams();
   const [load, setLoad] = useState<Load>({ state: 'loading' });
+  const [analysis, setAnalysis] = useState<StatusLoad>({ state: 'loading' });
+  const [formError, setFormError] = useState<string | null>(null);
   const query = readQuery(params);
   const key = params.toString();
+
+  useEffect(() => {
+    let active = true;
+    getAnalysisStatus().then(
+      (data) => active && setAnalysis({ state: 'ready', data }),
+      () => active && setAnalysis({ state: 'error' }),
+    );
+    return () => {
+      active = false;
+    };
+  }, [key]);
 
   useEffect(() => {
     let active = true;
@@ -64,10 +134,15 @@ export function OpportunitiesPage() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const next = new URLSearchParams();
-    for (const name of ['minScore', 'category', 'sourceType', 'status', 'from', 'to', 'sort']) {
+    for (const name of FORM_FIELDS) {
       const value = String(form.get(name) ?? '').trim();
       if (value) next.set(name, value);
     }
+    if (next.has('minAmount') && !next.has('currency')) {
+      setFormError(t.amountNeedsCurrency);
+      return;
+    }
+    setFormError(null);
     setParams(next);
   };
 
@@ -80,6 +155,7 @@ export function OpportunitiesPage() {
   return (
     <section>
       <h2>{t.title}</h2>
+      <AnalysisLine load={analysis} />
       <form key={key} className={styles.filters} onSubmit={apply} aria-label={t.filters}>
         <label className={styles.field}>
           {t.minScore}
@@ -134,6 +210,69 @@ export function OpportunitiesPage() {
           <input name="to" type="date" defaultValue={query.to ?? ''} />
         </label>
         <label className={styles.field}>
+          {t.maxAgeDays}
+          <input
+            name="maxAgeDays"
+            type="number"
+            min={1}
+            max={MAX_AGE_DAYS}
+            inputMode="numeric"
+            defaultValue={query.maxAgeDays ?? ''}
+          />
+        </label>
+        <label className={styles.field}>
+          {t.minAmount}
+          <input
+            name="minAmount"
+            type="number"
+            min={0.01}
+            step="0.01"
+            inputMode="decimal"
+            defaultValue={query.minAmount ?? ''}
+          />
+        </label>
+        <label className={styles.field}>
+          {t.currency}
+          <select name="currency" defaultValue={query.currency ?? ''}>
+            <option value="">{t.any}</option>
+            {Currency.options.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          {t.language}
+          <select name="language" defaultValue={query.language ?? ''}>
+            <option value="">{t.any}</option>
+            {LANGUAGES.map((value) => (
+              <option key={value} value={value}>
+                {t.languages[value]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          {t.workMode}
+          <select name="workMode" defaultValue={query.workMode ?? ''}>
+            <option value="">{t.any}</option>
+            {WORK_MODES.map((value) => (
+              <option key={value} value={value}>
+                {t.workModes[value]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className={styles.field}>
+          {t.country}
+          <input name="country" maxLength={2} defaultValue={query.country ?? ''} />
+        </label>
+        <label className={styles.field}>
+          {t.excludeIndustries}
+          <input name="excludeIndustries" defaultValue={query.excludeIndustries ?? ''} />
+        </label>
+        <label className={styles.field}>
           {t.sort}
           <select name="sort" defaultValue={query.sort}>
             <option value="date">{t.sortDate}</option>
@@ -145,8 +284,10 @@ export function OpportunitiesPage() {
           <button type="button" onClick={() => setParams(new URLSearchParams())}>
             {t.reset}
           </button>
+          <Link to={`/okazje?minScore=${DEFAULT_MIN_SCORE}`}>{t.onlyTop(DEFAULT_MIN_SCORE)}</Link>
         </div>
       </form>
+      {formError && <p role="alert">{formError}</p>}
 
       {load.state === 'loading' && <p role="status">{t.loading}</p>}
       {load.state === 'error' && (
@@ -198,12 +339,9 @@ function Results({ data, onPage }: { data: OpportunityList; onPage: (page: numbe
               {t.businessStatus[item.businessStatus]}
             </p>
             <p className={styles.meta}>
-              {item.analysisStatus === 'PENDING'
-                ? t.analysisPending
-                : item.analysisStatus === 'COMPLETE'
-                  ? t.analysisComplete
-                  : t.analysisFailed}{' '}
-              · {item.analysis?.score != null ? t.score(item.analysis.score) : t.noScore}
+              {analysisLabel(item)} ·{' '}
+              {item.analysis?.score != null ? t.score(item.analysis.score) : t.noScore}
+              {item.analysis?.demo && <strong className={styles.demo}> · {t.demoBadge}</strong>}
             </p>
             {item.source.excerpt && <p className={styles.excerpt}>{item.source.excerpt}</p>}
           </li>
@@ -224,4 +362,30 @@ function Results({ data, onPage }: { data: OpportunityList; onPage: (page: numbe
       </div>
     </>
   );
+}
+
+function analysisLabel(item: OpportunitySummary): string {
+  switch (item.analysisStatus) {
+    case 'PENDING':
+      return t.analysisPending;
+    case 'COMPLETE':
+      return t.analysisComplete;
+    case 'SKIPPED':
+      return item.prefilter?.rule
+        ? t.skippedBecause(strings.prefilterRules[item.prefilter.rule])
+        : t.analysisSkipped;
+    default:
+      return t.analysisFailed;
+  }
+}
+
+function AnalysisLine({ load }: { load: StatusLoad }) {
+  if (load.state === 'loading') return null;
+  if (load.state === 'error') return <p className={styles.meta}>{t.analysisStatusFailed}</p>;
+  const status = load.data;
+  if (!status.configured) return <p role="status">{t.analysisNotConfigured}</p>;
+  if (status.limitReached) {
+    return <p role="status">{t.analysisLimit(status.dailyLimit, status.waiting)}</p>;
+  }
+  return status.waiting > 0 ? <p role="status">{t.analysisWaiting(status.waiting)}</p> : null;
 }

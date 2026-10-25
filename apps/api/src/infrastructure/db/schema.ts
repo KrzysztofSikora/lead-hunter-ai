@@ -59,12 +59,53 @@ export const opportunities = sqliteTable(
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
     lastVerifiedAt: integer('last_verified_at'),
+    /** D-8: pre-filter outcome and the analysis columns that list filters read as plain SQL. */
+    prefilterRule: text('prefilter_rule'),
+    prefilterMatches: integer('prefilter_matches'),
+    prefilterAt: integer('prefilter_at'),
+    language: text('language'),
+    analysisProvider: text('analysis_provider'),
+    industry: text('industry'),
+    workMode: text('work_mode'),
+    /** `,PL,DE,` so a country is matched with LIKE '%,PL,%'. */
+    countries: text('countries'),
+    /** The budget the source stated, never a model's price (plan-review #8). */
+    amountMaxMinor: integer('amount_max_minor'),
+    amountCurrency: text('amount_currency'),
   },
   (table) => [
     check('score_range', sql`${table.score} IS NULL OR ${table.score} BETWEEN 0 AND 100`),
     index('opportunities_business_status_idx').on(table.businessStatus),
     index('opportunities_score_idx').on(table.score),
     index('opportunities_created_at_idx').on(table.createdAt),
+  ],
+);
+
+/** D-8: one row per analysis attempt; the latest row is the current analysis. */
+export const analyses = sqliteTable(
+  'analyses',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    opportunityId: integer('opportunity_id')
+      .notNull()
+      .references(() => opportunities.id, { onDelete: 'cascade' }),
+    status: text('status').notNull(),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+    resultJson: text('result_json'),
+    breakdownJson: text('breakdown_json'),
+    guardNotesJson: text('guard_notes_json'),
+    /** A reason (issue paths or provider message), never source text. */
+    error: text('error'),
+    inputTokens: integer('input_tokens'),
+    outputTokens: integer('output_tokens'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (table) => [
+    index('analyses_opportunity_idx').on(table.opportunityId, table.id),
+    index('analyses_created_at_idx').on(table.createdAt),
   ],
 );
 

@@ -1,3 +1,21 @@
+export {
+  ANALYSIS_SCHEMA_VERSION,
+  AnalysisServiceStatus,
+  AnalysisWorkMode,
+  DEFAULT_MIN_SCORE,
+  HoursRange,
+  MonetizationModel,
+  MoneyRange,
+  OpportunityAnalysis,
+  PrefilterRule,
+  SCORE_COMPONENT_MAX,
+  SCORING_VERSION,
+  ScoreBreakdown,
+  ScoreComponent,
+  ScoreComponentKey,
+  SourceBudget,
+} from './analysis.js';
+export type { AnalysedResult, InsufficientDataResult } from './analysis.js';
 export { HealthResponse } from './health.js';
 export { ApiError, LoginRequest, SessionResponse, ThrottledError } from './auth.js';
 export {
@@ -21,6 +39,7 @@ export {
   Confidence,
   DEFAULT_IMPORT_MAX_TEXT_CHARS,
   Evidence,
+  LatestAnalysis,
   EvidenceLevel,
   ImportResult,
   importRequestSchema,
@@ -28,6 +47,7 @@ export {
   OpportunityList,
   OpportunityListQuery,
   OpportunitySummary,
+  PrefilterOutcome,
   SourceFacts,
   SourcesStatus,
   SourceType,

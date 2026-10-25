@@ -17,6 +17,15 @@ export type ListFilters = {
   /** ISO UTC instants; `from` inclusive, `to` exclusive. */
   from?: string;
   to?: string;
+  /** D-13: a row is excluded only when its value is known and fails. */
+  maxAgeDays?: number;
+  /** Major units of `currency`; converted to minor units for the API. */
+  minAmount?: number;
+  currency?: string;
+  language?: string;
+  workMode?: string;
+  country?: string;
+  excludeIndustries?: string;
 };
 
 export const PAGE_SIZE = 20;
@@ -28,9 +37,24 @@ export async function listOpportunities(filters: ListFilters): Promise<Opportuni
     sort: filters.sort,
   });
   if (filters.minScore !== undefined) query.set('minScore', String(filters.minScore));
-  for (const key of ['category', 'sourceType', 'status', 'from', 'to'] as const) {
+  for (const key of [
+    'category',
+    'sourceType',
+    'status',
+    'from',
+    'to',
+    'language',
+    'workMode',
+    'country',
+    'excludeIndustries',
+  ] as const) {
     const value = filters[key];
     if (value) query.set(key, value);
+  }
+  if (filters.maxAgeDays !== undefined) query.set('maxAgeDays', String(filters.maxAgeDays));
+  if (filters.minAmount !== undefined && filters.currency) {
+    query.set('minAmount', String(Math.round(filters.minAmount * 100)));
+    query.set('currency', filters.currency);
   }
   const response = await apiFetch(`/api/opportunities?${query}`);
   if (response.status !== 200) throw new Error(`opportunity list failed: ${response.status}`);

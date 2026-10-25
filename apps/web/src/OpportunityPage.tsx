@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import type { OpportunityDetail } from '@lead-hunter/contracts';
+import type { LatestAnalysis, OpportunityDetail } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
 import { getOpportunity } from './api/opportunities.js';
 import { strings } from './strings.pl.js';
@@ -92,7 +92,7 @@ function Detail({ data }: { data: OpportunityDetail }) {
       </dl>
 
       <h3>{t.analysisSection}</h3>
-      <p>{data.analysis ? list.analysisComplete : t.noAnalysis}</p>
+      <AnalysisSection data={data} />
 
       <h3>{t.evidenceSection}</h3>
       <ul className={styles.evidence}>
@@ -108,6 +108,144 @@ function Detail({ data }: { data: OpportunityDetail }) {
             )}
             <pre className={styles.text}>{item.sourceFact}</pre>
           </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
+const labelled = (label: string, text: string) => (
+  <>
+    {text} <span className={styles.tag}>({label})</span>
+  </>
+);
+
+function money(minMinor: number, maxMinor: number, currency: string) {
+  const fmt = (minor: number) => (minor / 100).toLocaleString('pl-PL');
+  return `${fmt(minMinor)}–${fmt(maxMinor)} ${currency}`;
+}
+
+function AnalysisSection({ data }: { data: OpportunityDetail }) {
+  const latest = data.latestAnalysis;
+  if (data.prefilter?.rule && data.analysisStatus === 'SKIPPED') {
+    return <p>{list.skippedBecause(strings.prefilterRules[data.prefilter.rule])}</p>;
+  }
+  if (data.prefilter?.rule) {
+    return <p>{strings.prefilterRules[data.prefilter.rule]}</p>;
+  }
+  if (!latest) {
+    return <p>{data.analysisStatus === 'PENDING' ? t.noAnalysis : list.analysisFailed}</p>;
+  }
+  return <Analysis analysis={latest} score={data.analysis?.score ?? null} />;
+}
+
+function Analysis({ analysis, score }: { analysis: LatestAnalysis; score: number | null }) {
+  const { result, breakdown } = analysis;
+  return (
+    <div>
+      {analysis.demo && (
+        <p role="note" className={styles.demo}>
+          <strong>{t.demoBanner}</strong>
+        </p>
+      )}
+      <p className={styles.meta}>
+        {t.provider}: {analysis.provider} ({analysis.model}) · {t.analysedAt}{' '}
+        {formatWarsaw(analysis.createdAt)}
+      </p>
+      {analysis.status === 'FAILED' && (
+        <p role="alert" className={styles.error}>
+          {t.failedReason}: {analysis.error}
+        </p>
+      )}
+      {result?.verdict === 'INSUFFICIENT_DATA' && (
+        <>
+          <p>{t.insufficientData}</p>
+          <p>{labelled(t.modelInference, result.reason)}</p>
+          <StringList title={t.unknownsTitle} items={result.unknowns} />
+          <StringList title={t.sourceFactsTitle} items={result.sourceFacts} tag={t.fromSource} />
+        </>
+      )}
+      {result?.verdict === 'ANALYSED' && (
+        <>
+          <p>
+            <strong>
+              {t.score}: {score ?? t.noScore}
+            </strong>
+            {breakdown && ` · ${t.confidence}: ${t.confidences[breakdown.confidence]}`}
+          </p>
+          {breakdown && (
+            <ul className={styles.components}>
+              {breakdown.components.map((component) => (
+                <li key={component.key}>
+                  <strong>{t.components[component.key]}</strong>{' '}
+                  {t.scoreOf(component.points, component.max)}
+                  <div>{component.justification}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+          <dl className={styles.facts}>
+            <dt>{t.evidenceLevel}</dt>
+            <dd>{labelled(t.modelInference, t.evidenceLevels[result.evidenceLevel])}</dd>
+            <dt>{t.category}</dt>
+            <dd>{labelled(t.modelInference, list.categories[result.category])}</dd>
+            <dt>{t.problem}</dt>
+            <dd>{labelled(t.modelInference, result.problem)}</dd>
+            <dt>{t.buyer}</dt>
+            <dd>
+              {result.buyerOrAudience
+                ? labelled(t.modelInference, result.buyerOrAudience)
+                : t.unknown}
+            </dd>
+            <dt>{t.nextAction}</dt>
+            <dd>{labelled(t.modelInference, result.nextAction)}</dd>
+            <dt>{t.sourceBudgetTitle}</dt>
+            <dd>
+              {result.sourceBudget
+                ? `${money(
+                    result.sourceBudget.minMinor,
+                    result.sourceBudget.maxMinor,
+                    result.sourceBudget.currency,
+                  )} — ${t.sourceBudget(result.sourceBudget.quote)}`
+                : t.noBudget}
+            </dd>
+            <dt>{t.estimatedPrice}</dt>
+            <dd>
+              {result.proposedPrice
+                ? `${money(
+                    result.proposedPrice.minMinor,
+                    result.proposedPrice.maxMinor,
+                    result.proposedPrice.currency,
+                  )} — ${t.hypothesis}`
+                : `${t.unknown} — ${t.hypothesis}`}
+            </dd>
+            <dt>{t.estimatedHours}</dt>
+            <dd>
+              {result.estimatedHours
+                ? labelled(
+                    t.hypothesis,
+                    t.hours(result.estimatedHours.min, result.estimatedHours.max),
+                  )
+                : t.unknown}
+            </dd>
+          </dl>
+          <StringList title={t.sourceFactsTitle} items={result.sourceFacts} tag={t.fromSource} />
+          <StringList title={t.unknownsTitle} items={result.unknowns} />
+        </>
+      )}
+      <StringList title={t.guardNotesTitle} items={analysis.guardNotes} />
+    </div>
+  );
+}
+
+function StringList({ title, items, tag }: { title: string; items: string[]; tag?: string }) {
+  if (items.length === 0) return null;
+  return (
+    <>
+      <h4>{title}</h4>
+      <ul className={styles.plain}>
+        {items.map((item, index) => (
+          <li key={index}>{tag ? labelled(tag, item) : item}</li>
         ))}
       </ul>
     </>

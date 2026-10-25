@@ -5,7 +5,7 @@ import { createSignalService, type SignalDeps } from './service.js';
 
 export function registerSignalRoutes(
   app: FastifyInstance,
-  deps: SignalDeps & { importMaxTextChars: number },
+  deps: SignalDeps & { importMaxTextChars: number; onCreated?: () => void },
 ): void {
   const service = createSignalService(deps);
   const typed = app.withTypeProvider<ZodTypeProvider>();
@@ -20,6 +20,7 @@ export function registerSignalRoutes(
     },
     async (request, reply) => {
       const result = service.importSignal(request.body);
+      if (result.result === 'created') deps.onCreated?.();
       return reply.code(result.result === 'created' ? 201 : 200).send(result);
     },
   );

@@ -160,6 +160,8 @@ Don't (see *Test budget*). UI behaviour is covered by the e2e main path and huma
 2. Create data through the UI or `request.post('/api/signals/import')`.
 3. Assert user-visible text and roles; set the viewport to 360×740 for phone checks.
 4. Run one spec: `pnpm e2e e2e/<flow>.spec.ts`; all: `pnpm e2e`.
+   Evidence screenshots go through `evidence(page, …)` in `e2e/smoke.spec.ts` and are written
+   only with `E2E_EVIDENCE=1 pnpm e2e`; a gate run never rewrites committed evidence.
 5. The suite has at most 2 specs (smoke, main path). Put anything else into an integration
    test only if a `test` risk requires it.
 

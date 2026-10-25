@@ -166,6 +166,7 @@ dedup identity) imports nothing but `packages/contracts`. Lint rules enforce it.
 
 ## Local development
 `pnpm dev` starts the API with tsx (watch) on 127.0.0.1 and the Vite dev server proxying
-`/api`; database in `${DATA_DIR}/lead-hunter.db`, dev default `apps/api/data/lead-hunter.db` (gitignored; D-6 of repo-skeleton); LLM provider defaults to `mock` when no key is
-set. `pnpm build` produces `apps/api/dist` and `apps/web/dist`; `pnpm start` serves both from
+`/api`; database in `${DATA_DIR}/lead-hunter.db`, dev default `apps/api/data/lead-hunter.db` (gitignored; D-6 of repo-skeleton); with `LLM_PROVIDER` unset
+analysis is "not configured" (FR-08 AC5); set `LLM_PROVIDER=mock` for demo analyses (D-10 of
+analysis-and-scoring). `pnpm build` produces `apps/api/dist` and `apps/web/dist`; `pnpm start` serves both from
 one process. `pnpm db:migrate` applies migrations; `pnpm discover` runs one cycle from the CLI.
