@@ -8,7 +8,7 @@ Re-importing the same thing is recognised; a fresh install shows an honest empty
 
 Observable when done:
 - FR-02 AC1: `POST /api/signals/import` with text only stores a raw signal with
-  `sourceType = manual_text`, `canonicalUrl = null`, `fetchedAt = now`, the text as snippet; no
+  `sourceType = manual_text`, `sourceUrl` and `canonicalUrl` null, `fetchedAt = now`, the text as snippet; no
   URL appears anywhere in the response or the row.
 - FR-02 AC2 / FR-06 AC1: importing a URL a second time, or a variant that differs only in
   `utm_*`/`fbclid`/`gclid`/`ref`, fragment, trailing slash, default port or scheme/host case,
@@ -21,7 +21,8 @@ Observable when done:
   gets 400 `ValidationError` and nothing is stored.
 - FR-06 AC2: two imports with similar titles but different URLs and different text stay two
   opportunities.
-- FR-06 AC3: every opportunity exposes its provenance as source facts (`source.type`, `url`,
+- FR-06 AC3: every opportunity exposes its provenance as source facts (`source.type`, `url` =
+  the exact URL the operator pasted, `canonicalUrl` = its identity form,
   `title`, `snippet`, `publishedAt` = null, `fetchedAt`, `availability`, `lastVerifiedAt`) and
   keeps inferred values in a separate `analysis` group (null until S-04, `evidenceLevel` lives
   there).
@@ -99,14 +100,14 @@ Observable when done:
 ## Decisions
 | ID | Question | Chosen | Alternatives (and what they would buy) | Why | Reversal | Decided by |
 |----|----------|--------|----------------------------------------|-----|----------|------------|
-| D-1 | Opportunities per signal; what a duplicate does | One opportunity per distinct signal identity (`opportunities.primary_signal_id` unique). A duplicate import creates no signal and no opportunity; it adds an `opportunity_evidence` row (`REPEAT_IMPORT`) only when it brings something new: a canonical URL not yet recorded for that opportunity, or text whose content hash is not yet recorded. A URL-only repeat of a known URL adds nothing. Every identity value a duplicate brings that no opportunity owns yet (the second URL, the new text's hash) is also claimed for that opportunity in `signal_identities` (D-14), so a later import of that URL or text alone is recognised | B: duplicates add nothing (simpler, but drops the second URL/text the operator pasted, against the roadmap's "links its evidence"); C: always add a row (no rule, but repeated clicks pile up identical evidence) | Roadmap *Decided up front*; the "something new" rule keeps evidence meaningful | costly (data shape) | user (roadmap S-03) + agent |
-| D-2 | Signal identity and normalisation | Identity order: canonical URL, then content hash (FR-06 AC1; `externalId` arrives with the first source that has one, D-3). Canonical URL per roadmap: lower-case scheme and host, drop fragment, default port, trailing slash on a non-root path, and query parameters `utm_*`, `fbclid`, `gclid`, `ref` (names matched case-insensitively); other parameters keep their order; an empty query loses `?`. URLs with user info (`user:pass@`) are rejected. Content hash = SHA-256 hex of the text after NFKC, lower-case, whitespace runs → one space, trim; `null` when the text is missing or empty after normalisation (whitespace-only text gives no hash, `snippet ''` and the URL-derived title, so blank-text URL imports never share a hash) | B: also sort query parameters and strip `www.` (catches more variants, but merges URLs the roadmap did not list and is hard to undo once stored); C: hash the raw text (no normalisation, misses copy-paste whitespace differences) | Follows the roadmap list exactly; normalised hash catches the common copy-paste variants | costly (stored identity values) | user (roadmap S-03) + agent |
+| D-1 | Opportunities per signal; what a duplicate does | One opportunity per distinct signal identity (`opportunities.primary_signal_id` unique). A duplicate import creates no signal and no opportunity; it adds an `opportunity_evidence` row (`REPEAT_IMPORT`) only when it brings something new: a canonical URL not yet recorded for that opportunity, or text whose content hash is not yet recorded. A URL-only repeat of a known URL adds nothing. Every evidence row (`IMPORT` and `REPEAT_IMPORT`) has `raw_signal_id` NOT NULL = the opportunity's primary signal, `source_url` = the URL as pasted (or null), and `source_fact` = the full snippet of that import (D-7 normalisation: trim, CRLF → LF), or its source URL when the import had no text; for a duplicate this row is the only copy of the second pasted text. Every identity value a duplicate brings that no opportunity owns yet (the second URL, the new text's hash) is also claimed for that opportunity in `signal_identities` (D-14), so a later import of that URL or text alone is recognised | B: duplicates add nothing (simpler, but drops the second URL/text the operator pasted, against the roadmap's "links its evidence"); C: always add a row (no rule, but repeated clicks pile up identical evidence) | Roadmap *Decided up front*; the "something new" rule keeps evidence meaningful | costly (data shape) | user (roadmap S-03) + agent |
+| D-2 | Signal identity and normalisation | Identity order: canonical URL, then content hash (FR-06 AC1; `externalId` arrives with the first source that has one, D-3). Canonical URL per roadmap: lower-case scheme and host, drop fragment, default port, trailing slash on a non-root path, and query parameters `utm_*`, `fbclid`, `gclid`, `ref` (names matched case-insensitively). The query is filtered on the raw string split at `&` (the name is the part before the first `=`), not rebuilt through `URLSearchParams`, so the kept parameters stay byte-identical (`?q=a%20b&x=1,2&utm_source=z` → `?q=a%20b&x=1,2`) and keep their order; an empty query loses `?`. The canonical URL is used only for identity (`signal_identities`, evidence keys); the pasted URL is stored separately as the source URL (D-8, plan-review R3 #1). URLs with user info (`user:pass@`) are rejected. Content hash = SHA-256 hex of the text after NFKC, lower-case, whitespace runs → one space, trim; `null` when the text is missing or empty after normalisation (whitespace-only text gives no hash, `snippet ''` and the URL-derived title, so blank-text URL imports never share a hash) | B: also sort query parameters and strip `www.` (catches more variants, but merges URLs the roadmap did not list and is hard to undo once stored); C: hash the raw text (no normalisation, misses copy-paste whitespace differences) | Follows the roadmap list exactly; normalised hash catches the common copy-paste variants | costly (stored identity values) | user (roadmap S-03) + agent |
 | D-3 | Where the source of a signal is recorded before `sources` exists | `raw_signals.source_type` text (`manual_text` when no URL, `manual_url` when a URL is given, with or without text); no `sources` table and no `external_id` yet. S-10 adds `sources` and a nullable `source_id` FK plus `external_id` with a unique `(source_id, external_id)` index (additive `ALTER TABLE ADD COLUMN`) | B: create the full `sources` table now and seed a "manual" row (S-10's shape decided early, a fake source row in the list); C: `source_id` pointing at a seeded row only | Manual import has no configured source; everything later is additive | costly (data shape) | agent |
 | D-4 | Storage of opportunities in this slice | `opportunities(id INTEGER PK, primary_signal_id UNIQUE FK, business_status TEXT 'NEW', analysis_status TEXT 'PENDING', category TEXT NULL, evidence_level TEXT NULL, score INTEGER NULL CHECK 0–100, confidence TEXT NULL, created_at, updated_at, last_verified_at NULL)`; indexes on `business_status`, `score`, `created_at`. The four nullable analysis columns exist now because FR-11 AC1 filters on score and category; problem, buyer, next action etc. are S-04's columns | B: only status columns now, S-04 adds the rest (smaller now, but the score/category filters would have nothing to read); C: all §14 columns now (S-04's shape decided early) | Minimum that makes the list filters real; all additive | costly (data shape) | agent |
-| D-5 | Import API contract | `POST /api/signals/import` body strict `{ text?: string, url?: string }`; at least one non-blank; `url` = `z.httpUrl()`, ≤ 2048 chars, with a `.refine` that rejects user info (`username`/`password` of `new URL(value)` non-empty; `code: "custom"`, message 'adres URL nie może zawierać loginu ani hasła'), so every 400 goes through the shared Zod handler and OpenAPI documents it; `text` ≤ `IMPORT_MAX_TEXT_CHARS`. 201 `{ result: "created", opportunityId, signalId }`; 200 `{ result: "duplicate", opportunityId, matchedBy: "canonical_url" \| "content_hash", evidenceAdded }`; 400 `ValidationError` | B: 409 for a duplicate (REST-ish, but it is an expected outcome the UI shows as a success-like message); C: `POST /api/opportunities` (one resource, but §15 names `/api/signals/import`) | Brief §15 endpoint; a discriminated result is easy to render | costly (public API) | agent |
+| D-5 | Import API contract | `POST /api/signals/import` body strict `{ text?: string, url?: string }`; at least one non-blank; `url` = `z.httpUrl()`, ≤ 2048 chars, with a `.refine` that rejects user info and is total: `URL.canParse(v) ? (!u.username && !u.password) : true`, so an unparsable value is left to `httpUrl`'s own `invalid_format` issue instead of throwing `TypeError` (which `http-errors.ts:16` would rethrow as a 500; probed on Zod 4.6.7: `'nie-adres'` → `invalid_format`, `'https://u:p@a.pl/'` → `custom`; `code: "custom"`, message 'adres URL nie może zawierać loginu ani hasła'), so every 400 goes through the shared Zod handler and OpenAPI documents it; `text` ≤ `IMPORT_MAX_TEXT_CHARS`. 201 `{ result: "created", opportunityId, signalId }`; 200 `{ result: "duplicate", opportunityId, matchedBy: "canonical_url" \| "content_hash", evidenceAdded }`; 400 `ValidationError` | B: 409 for a duplicate (REST-ish, but it is an expected outcome the UI shows as a success-like message); C: `POST /api/opportunities` (one resource, but §15 names `/api/signals/import`) | Brief §15 endpoint; a discriminated result is easy to render | costly (public API) | agent |
 | D-6 | Maximum text length | Env `IMPORT_MAX_TEXT_CHARS`, integer 1 000–200 000, default 20 000 (UTF-16 length, as Zod counts); the route schema is built from config at registration (`importRequestSchema(max)` in contracts), so the OpenAPI document shows the real limit | B: a fixed constant in contracts (simpler, but FR-02 AC4 says "configured"); C: check in the service (then the 400 shape and OpenAPI would not carry it) | AC4 wording; one place for the limit | cheap | agent |
-| D-7 | Title and snippet of a manual signal | `snippet` = the text trimmed with CRLF → LF (whole text, AC1); `title` = first non-blank line, cut to 200 characters; URL-only import → `title` = the canonical URL, `snippet` = `''`. `publishedAt` = null, `availability` = `NOT_CHECKED`, `lastVerifiedAt` = null for every manual signal | B: an optional title field in the form (operator types it; one more input); C: title null (no derived value, but the list needs a label) | Title is a verbatim extract, not an inference; nothing about publication or availability is known, so it stays empty | cheap | agent |
-| D-8 | How the DTO separates facts from inferences | Opportunity DTO groups fields: `source { type, url, title, snippet \| excerpt, publishedAt, fetchedAt, availability, lastVerifiedAt }` = source facts; `analysis { category, evidenceLevel, score, confidence } \| null` = model inferences and derived values, `null` until S-04 | B: flat fields plus a `fieldOrigins` map (flexible, but every consumer must look it up); C: flat fields only (FR-06 AC3 not expressed) | The structure itself states origin; S-04 extends `analysis` | costly (public API) | agent |
+| D-7 | Title and snippet of a manual signal | `snippet` = the text trimmed with CRLF → LF (whole text, AC1); `title` = first non-blank line, cut to 200 characters; URL-only import → `title` = the source URL as pasted, `snippet` = `''`. `publishedAt` = null, `availability` = `NOT_CHECKED`, `lastVerifiedAt` = null for every manual signal | B: an optional title field in the form (operator types it; one more input); C: title null (no derived value, but the list needs a label) | Title is a verbatim extract, not an inference; nothing about publication or availability is known, so it stays empty | cheap | agent |
+| D-8 | How the DTO separates facts from inferences | Opportunity DTO groups fields: `source { type, url (the exact URL the operator pasted, trimmed by the contract; FR-06 AC3), canonicalUrl (identity form, for display of what was matched), title, snippet \| excerpt, publishedAt, fetchedAt, availability, lastVerifiedAt }` = source facts; `analysis { category, evidenceLevel, score, confidence } \| null` = model inferences and derived values, `null` until S-04 | B: flat fields plus a `fieldOrigins` map (flexible, but every consumer must look it up); C: flat fields only (FR-06 AC3 not expressed) | The structure itself states origin; S-04 extends `analysis`. `url` is the pasted URL, not the canonical one: canonicalisation drops the fragment and tracking parameters, so it is not the "exact source URL" (plan-review R3 #1) | costly (public API) | agent |
 | D-9 | List API contract | `GET /api/opportunities?page=1&pageSize=20&sort=date\|score&minScore&category&sourceType&status&from&to`; `page` ≥ 1, `pageSize` 1–100 (default 20); `from`/`to` are ISO UTC instants on `createdAt` (detection date, `from` inclusive, `to` exclusive); `minScore` excludes unscored rows; `sort=score` = score desc, unscored last, then newest; `sort=date` (default) = newest first; ties by id desc. Response `{ items: OpportunitySummary[], page, pageSize, total, sources: { checked, errors[] } }`; items carry `source.excerpt` (first 280 chars) instead of the full snippet | B: cursor pagination (stable under inserts, more code; 10 000 rows are fine with offset, NFR-02); C: date filter as Warsaw calendar days (`YYYY-MM-DD`, then the API does time-zone math) | Conventional offset pagination; the UI converts its Warsaw dates to instants | costly (public API) | agent |
 | D-10 | Source count and adapter errors for the empty state | The list response carries `sources: { checked: number, errors: { source, message, at }[] }` read through a `SourceStatusReader` port; this slice's implementation returns `{ checked: 0, errors: [] }` because no automatic source exists yet (manual import is not a checked source). S-10/S-12 replace it with job-run data | B: a fixed sentence in the UI ("brak skonfigurowanych źródeł"; no contract now, but S-12 must change UI and API together); C: a separate `/api/sources/summary` (S-10's route decided early) | FR-12 AC1 asks for the numbers; the port keeps the stub in one file. The shape lives only in `packages/contracts/src/opportunities.ts` | costly (public API) | agent |
 | D-11 | Target of the "już zaimportowane" link | A minimal read-only view `/okazje/:id` backed by `GET /api/opportunities/:id` (`OpportunityDetail` = summary with full `snippet` + `evidence[]`; 404 `{ error: "not_found" }`); S-06 grows it into the §8 card | B: link to the list with the row highlighted (no new route, but the item may sit on another page); C: no link (breaks FR-02 AC2) | §15 already names the endpoint; smallest honest target. The `OpportunityDetail`/`Evidence` shape lives only in `packages/contracts/src/opportunities.ts` | costly (public API) | agent |
@@ -127,29 +128,32 @@ EvidenceLevel   = DIRECT_REQUEST | EXPLICIT_PROBLEM | INDIRECT_SIGNAL | SPECULAT
 Confidence      = LOW | MEDIUM | HIGH
 Availability    = NOT_CHECKED | AVAILABLE | UNAVAILABLE
 DEFAULT_IMPORT_MAX_TEXT_CHARS = 20_000
-importRequestSchema(maxTextChars) = strict { text?: string max maxTextChars, url?: z.url({ protocol: /^https?$/ }) max 2048 }
+importRequestSchema(maxTextChars) = strict { text?: string max maxTextChars, url?: z.httpUrl() max 2048, total user-info refine (D-5) }
                   refine: text?.trim() or url present, path ['text'], message 'wklej treść lub podaj adres URL'
 ImportResult    = { result: 'created', opportunityId: int, signalId: int }
                 | { result: 'duplicate', opportunityId: int, matchedBy: 'canonical_url' | 'content_hash', evidenceAdded: boolean }
-SourceFacts     = { type, url: string|null, title, publishedAt: iso|null, fetchedAt: iso, availability, lastVerifiedAt: iso|null }
+SourceFacts     = { type, url: string|null (as pasted), canonicalUrl: string|null, title, publishedAt: iso|null, fetchedAt: iso, availability, lastVerifiedAt: iso|null }
 AnalysisSummary = { category|null, evidenceLevel|null, score: int 0–100|null, confidence|null }
 OpportunitySummary = { id, businessStatus, analysisStatus, createdAt, updatedAt,
                        source: SourceFacts & { excerpt: string }, analysis: AnalysisSummary | null }
-Evidence        = { id, type: 'IMPORT' | 'REPEAT_IMPORT', sourceFact: string, url: string|null, extractedAt }
+Evidence        = { id, type: 'IMPORT' | 'REPEAT_IMPORT', sourceFact: string, url: string|null (source URL as pasted), extractedAt }
 OpportunityDetail = OpportunitySummary with source.snippet (full) instead of excerpt, plus evidence: Evidence[]
 OpportunityListQuery = { page, pageSize, sort, minScore?, category?, sourceType?, status?, from?, to? } (coerced from strings)
 OpportunityList = { items, page, pageSize, total, sources: { checked: int, errors: { source, message, at }[] } }
 ```
 
 ### Data (`apps/api/migrations/0003_*`, additive)
-- `raw_signals(id INTEGER PK, source_type TEXT NOT NULL, canonical_url TEXT NULL,
+- `raw_signals(id INTEGER PK, source_type TEXT NOT NULL, source_url TEXT NULL (as pasted, after
+  the contract's trim), canonical_url TEXT NULL (identity only),
   title TEXT NOT NULL, snippet TEXT NOT NULL, published_at INTEGER NULL, fetched_at INTEGER NOT
   NULL, content_hash TEXT NULL, availability TEXT NOT NULL, last_verified_at INTEGER NULL)`; no
   unique index here, identity is `signal_identities` (D-14).
 - `opportunities` as D-4, `primary_signal_id` → `raw_signals.id`.
-- `opportunity_evidence(id INTEGER PK, opportunity_id FK ON DELETE CASCADE, raw_signal_id FK,
-  evidence_type TEXT NOT NULL, source_fact TEXT NOT NULL, canonical_url TEXT NULL, content_hash
-  TEXT NULL, extracted_at INTEGER NOT NULL)`, index on `opportunity_id`.
+- `opportunity_evidence(id INTEGER PK, opportunity_id FK ON DELETE CASCADE, raw_signal_id INTEGER
+  NOT NULL FK → raw_signals (the primary signal), evidence_type TEXT NOT NULL, source_fact TEXT NOT
+  NULL (full snippet, or the source URL when no text; D-1), source_url TEXT NULL, canonical_url
+  TEXT NULL, content_hash TEXT NULL, extracted_at INTEGER NOT NULL)`, index on `opportunity_id`.
+  `canonical_url`/`content_hash` here are the keys for the "something new" rule (D-1).
 - `signal_identities(kind TEXT NOT NULL, value TEXT NOT NULL, opportunity_id INTEGER NOT NULL
   FK → opportunities ON DELETE CASCADE, created_at INTEGER NOT NULL, PRIMARY KEY (kind, value))`,
   index on `opportunity_id` (D-14).
@@ -168,7 +172,10 @@ the URL identity → else of the hash identity (D-14) → if found: maybe add `R
 evidence (D-1), claim the unowned identity values for that opportunity and return `duplicate`;
 else insert signal, opportunity (`NEW`/`PENDING`), `IMPORT` evidence and both identity rows and
 return `created`. The `signal_identities` primary key is the backstop. Port
-`SignalRepository.transaction(fn)` exposes `findOwner(kind, value)`,
+`SignalRepository.transaction<T>(fn: (tx: SignalTx) => T): T` is synchronous: better-sqlite3
+rejects a callback that returns a promise (`TypeError: Transaction function cannot return a
+promise`), so the use case has no `await` inside the callback and the service function itself is
+synchronous. `SignalTx` exposes `findOwner(kind, value)`,
 `evidenceKeys(opportunityId)`, `claimIdentity(kind, value, opportunityId)` (insert or ignore),
 `insertSignal`, `insertOpportunity`, `insertEvidence`. The pasted text is never logged.
 
@@ -215,7 +222,8 @@ rendered as text (React escaping), never as HTML.
   - `apps/api/migrations/0003_*.sql`, `meta/*`: generated by `db:generate`. Contract: additive.
   - `apps/api/src/modules/signals/identity.ts` (new) + `identity.test.ts` (new): D-1/D-2/D-7
     rules; table-driven unit tests (TR-06): each canonicalisation rule from the roadmap,
-    a kept non-tracking parameter, parameter order kept, root path, IDN host, `UTM_Source`,
+    a kept non-tracking parameter, parameter order kept, kept parameters byte-identical
+    (`?q=a%20b&x=1,2&utm_source=z` → `?q=a%20b&x=1,2`), root path, IDN host, `UTM_Source`,
     non-http scheme and user info rejected; hash equal across whitespace/case/NFKC variants and
     different for different words; whitespace-only text → `null`; `isNewEvidence` cases.
   - `apps/api/src/modules/signals/{ports,service,routes}.ts` (new): import use case and
@@ -229,12 +237,14 @@ rendered as text (React escaping), never as HTML.
   - `apps/api/test/signals-import.int.test.ts` (new).
 - Proves (integration, `inject` + real temp SQLite; rows are read back through
   `openTestDb(dir)` on the app's database file):
-  - FR-02 AC1: text only → 201; row has `source_type = manual_text`, `canonical_url` null,
+  - FR-02 AC1: text only → 201; row has `source_type = manual_text`, `source_url` and `canonical_url` null,
     `fetched_at` = fake clock, snippet = text; response and row contain no URL.
   - FR-02 AC2 / FR-06 AC1 (TR-06): URL import, then `HTTPS://Example.com:443/job/?utm_source=x#top`
     → 200 duplicate `matchedBy: canonical_url`, 1 signal + 1 opportunity; same text without URL
     twice → duplicate `content_hash`; a repeat with new text adds one `REPEAT_IMPORT` evidence
-    row, an identical repeat adds none.
+    row whose `source_fact` is the full second text and whose `raw_signal_id` is the primary
+    signal; an identical repeat adds none. The created row keeps `source_url` =
+    the pasted URL byte for byte (with `?utm_source=x#top`), `canonical_url` = the canonical form.
   - FR-02 AC2 across identities (D-14, plan-review #1): text T + URL A → created; T + URL B →
     duplicate `content_hash`; URL B alone → duplicate `canonical_url` of the same opportunity.
     Likewise T1 + A, then T2 + A (evidence), then T2 alone → duplicate `content_hash`. Conflict:
@@ -246,7 +256,8 @@ rendered as text (React escaping), never as HTML.
     opportunities.
   - FR-02 AC3: created opportunity has `business_status NEW`, `analysis_status PENDING`.
   - FR-02 AC4: table — `{}`, `{ text: "   " }`, text of `max + 1` chars (with
-    `IMPORT_MAX_TEXT_CHARS=1000`), `ftp://` URL, URL with user info, unknown field → 400
+    `IMPORT_MAX_TEXT_CHARS=1000`), `ftp://` URL, `url: "nie-adres"` (unparsable; must be 400, not a thrown 500), URL with user
+    info, unknown field → 400
     `validation_failed` with the expected `path`; row counts unchanged.
   - Restart: import, close, `buildTestApp({ dir })`, import the same URL → duplicate.
 - Agent checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
@@ -266,12 +277,16 @@ rendered as text (React escaping), never as HTML.
 - Proves (integration):
   - FR-12 AC1 (API part): fresh database → `total 0`, `items []`, `sources { checked: 0,
     errors: [] }` (no demo row).
-  - FR-11 AC1: import 3 signals through the API, then set score/category/status on two rows
-    directly through the test DB (S-04 does not exist yet) and advance the fake clock between
-    imports; a table of queries checks each filter (`minScore`, `category`, `sourceType`,
-    `status`, `from`/`to`), both sorts (unscored last), `pageSize=2` pages and `total`; an
-    invalid `pageSize=0` → 400.
-  - FR-06 AC3: detail of a URL import has `source.url` = canonical URL, `publishedAt` null,
+  - FR-11 AC1, one main-path test (test-plan "one or two integration tests for the main path";
+    plan-review R3 #6): import 3 signals through the API with the fake clock advanced between
+    them, set score/category/status on two rows directly through the test DB (S-04 does not exist
+    yet); then one query with every filter set (`minScore`, `category`, `sourceType`, `status`,
+    `from`/`to`) returns exactly the one matching row, `sort=score` puts the unscored row last,
+    `pageSize=2&page=2` returns the third row with `total 3`, and `pageSize=0` → 400. Each
+    filter on its own is a Phase 4 human check.
+  - FR-06 AC3: detail of an import of `https://example.com/job?utm_source=x#top` has
+    `source.url` equal to that pasted string, `source.canonicalUrl` = `https://example.com/job`,
+    the evidence row's `url` = the pasted string, `publishedAt` null,
     `availability NOT_CHECKED`, `analysis` null, one `IMPORT` evidence row; unknown id → 404.
 - Agent checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 - Human checks: none.
@@ -300,7 +315,9 @@ rendered as text (React escaping), never as HTML.
   - `apps/web/src/api/signals.ts` (new): `importSignal(body)` → `ImportResult | { fields }`.
   - `apps/web/src/ImportPage.tsx`, `ImportPage.module.css` (new): the form and result line.
   - `apps/web/src/App.tsx`, `strings.pl.ts`: nav *Import*, route `/import`, texts.
-  - `e2e/smoke.spec.ts`: the D-13 test; screenshots to
+  - `e2e/smoke.spec.ts`: the D-13 test, with the existing `scrollWidth - clientWidth` no-scroll
+    assertion (`e2e/smoke.spec.ts:24,66`) repeated on `/okazje` and `/import` (FR-11 AC4);
+    screenshots to
     `context/changes/manual-text-import/evidence/{empty-360,list-360,duplicate-360}.png`.
   - `README.md`: *Co działa* gains manual import, list and `IMPORT_MAX_TEXT_CHARS`.
 - Proves: FR-02 AC1–AC2 and FR-12 AC1 end to end in the browser (e2e).
@@ -312,7 +329,7 @@ rendered as text (React escaping), never as HTML.
     `evidence/empty-360.png`.
   - Import a pasted post with a URL containing `?utm_source=x#frag`, then the same URL without
     them: second time "Już zaimportowane" with a working link; the opportunity view shows the
-    canonical URL, "wklejony tekst"/link label, "brak analizy — w kolejce"; evidence
+    URL exactly as pasted the first time, "wklejony tekst"/link label, "brak analizy — w kolejce"; evidence
     `evidence/duplicate-360.png`.
   - With 3+ imports, try each filter, both sorts and *Następna*: results match, the filter
     survives a reload, Polish labels read well, no horizontal scroll; evidence
@@ -333,6 +350,10 @@ rendered as text (React escaping), never as HTML.
   error; whether S-09 then merges the two is for its plan.
 - `from`/`to` conversion of Warsaw dates is done in the browser; DST days are covered by
   `warsawTime.test.ts`, which runs in the test runner's time zone, not the phone's.
+- Canonicalisation drops the fragment (roadmap rule), so on hash-routed boards
+  (`https://site/#/job/123` and `https://site/#/job/456`) different posts share one canonical
+  URL and merge into one opportunity; the second pasted URL is still kept as `source_url` on its
+  evidence row. Changing that rule is a roadmap decision (S-09/S-10 may meet such boards).
 - `sources.checked = 0` is a stub (D-10) until S-10/S-12; if they forget to replace it, the
   empty state under-reports. S-12's plan must replace `source-status.ts`.
 
@@ -365,3 +386,19 @@ rendered as text (React escaping), never as HTML.
 - #6 (minor, references): line numbers fixed; `AppDeps.config` widening, `openTestDb(dir)` for
   row access and `ENV_VARIABLES` named.
 - #7 (minor, Zod): `z.httpUrl()` used; the service canonicalises the parsed (trimmed) value.
+- R3 #1 (blocker, exact source URL): new columns `raw_signals.source_url` and
+  `opportunity_evidence.source_url` hold the URL as the contract parsed it; `canonical_url` is
+  identity only; DTO `source.url` = pasted URL plus `source.canonicalUrl`; D-2 filters tracking
+  parameters on the raw `&`-split query; D-1, D-7, D-8, *Contracts*, *Data*, Phase 1 unit and
+  integration cases, the Phase 2 detail assertion, the Phase 4 human check and a fragment-routing
+  risk updated.
+- R3 #2 (major, refine throws): the user-info refine is total (`URL.canParse` guard, probed);
+  `url: "nie-adres"` → 400 added to the AC4 table.
+- R3 #3 (minor, `REPEAT_IMPORT` content): D-1 and *Data* define `source_fact` (full snippet, or
+  source URL without text) and `raw_signal_id` (primary signal, NOT NULL); asserted in Phase 1.
+- R3 #4 (minor, transaction signature): `transaction<T>(fn: (tx: SignalTx) => T): T`, synchronous,
+  no `await` inside.
+- R3 #5 (minor, `z.url` vs `z.httpUrl`): *Contracts* now says `z.httpUrl()` like D-5.
+- R3 #6 (minor, test budget): Phase 2 list coverage reduced to one main-path test; per-filter
+  checks stay a Phase 4 human check.
+- R3 #7 (minor, horizontal scroll): the no-scroll assertion is repeated on `/okazje` and `/import`.
