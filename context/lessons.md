@@ -37,3 +37,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: url-import-guard, R1, R5
 - Scope: `apps/api/src/infrastructure/sources/**` and any parser or extractor of fetched content
 - Status: proposed in the PR for url-import-guard
+
+## Bound every date or time that comes from a source to the range the contract can serialise before storing it
+- Why: a feed date and a `Retry-After` date in year 12026 were stored as valid, then made `GET /api/opportunities` and `GET /api/sources` answer 500 for good.
+- Seen in: rss-sources, R1, R2
+- Scope: parsers and services that store source-supplied dates, delays or counts (`apps/api/src/infrastructure/sources/**`, `apps/api/src/modules/sources/**`)
+- Status: proposed in the PR for rss-sources
