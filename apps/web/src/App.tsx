@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router';
 import styles from './App.module.css';
 import { LoginForm } from './LoginForm.js';
+import { OpportunitiesPage } from './OpportunitiesPage.js';
+import { OpportunityPage } from './OpportunityPage.js';
 import { ProfilePage } from './ProfilePage.js';
 import { getSession, logout } from './api/auth.js';
 import { setUnauthorizedHandler } from './api/client.js';
@@ -39,6 +41,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         <NavLink to="/" end>
           {strings.nav.start}
         </NavLink>
+        <NavLink to="/okazje">{strings.nav.opportunities}</NavLink>
         <NavLink to="/profil">{strings.nav.profile}</NavLink>
         <button type="button" className={styles.logout} onClick={onLogout}>
           {strings.login.logout}
@@ -46,6 +49,8 @@ function Shell({ onLogout }: { onLogout: () => void }) {
       </nav>
       <Routes>
         <Route path="/" element={<StatusView />} />
+        <Route path="/okazje" element={<OpportunitiesPage />} />
+        <Route path="/okazje/:id" element={<OpportunityPage />} />
         <Route path="/profil" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
