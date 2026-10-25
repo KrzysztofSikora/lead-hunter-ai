@@ -125,6 +125,7 @@ export const strings = {
     sourceTypes: {
       manual_text: 'Wklejony tekst',
       manual_url: 'Wklejony adres URL',
+      manual_fetch: 'Pobrana strona (jednorazowo)',
     },
   },
   prefilterRules: {

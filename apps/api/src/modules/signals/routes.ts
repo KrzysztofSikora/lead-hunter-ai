@@ -15,13 +15,14 @@ export function registerSignalRoutes(
     {
       schema: {
         body: importRequestSchema(deps.importMaxTextChars),
-        response: { 200: ImportResult, 201: ImportResult, 400: ValidationError },
+        response: { 200: ImportResult, 201: ImportResult, 422: ImportResult, 400: ValidationError },
       },
     },
     async (request, reply) => {
-      const result = service.importSignal(request.body);
+      const result = await service.importSignal(request.body);
       if (result.result === 'created') deps.onCreated?.();
-      return reply.code(result.result === 'created' ? 201 : 200).send(result);
+      const status = ({ created: 201, duplicate: 200, fetch_failed: 422 } as const)[result.result];
+      return reply.code(status).send(result);
     },
   );
 }

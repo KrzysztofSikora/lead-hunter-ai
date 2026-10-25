@@ -8,8 +8,8 @@ export { Category, Confidence, EvidenceLevel };
 
 export const DEFAULT_IMPORT_MAX_TEXT_CHARS = 20_000;
 
-/** S-10/S-11 add `rss` and `imap`. */
-export const SourceType = z.enum(['manual_text', 'manual_url']);
+/** S-10/S-11 add `rss` and `imap`. `manual_fetch`: the text came from a one-off page fetch. */
+export const SourceType = z.enum(['manual_text', 'manual_url', 'manual_fetch']);
 export type SourceType = z.infer<typeof SourceType>;
 
 /** Brief §10.1. */
@@ -65,6 +65,22 @@ export const importRequestSchema = (maxTextChars: number) =>
     });
 export type ImportRequest = z.infer<ReturnType<typeof importRequestSchema>>;
 
+/** S-09 D-3: why a page fetch was refused or failed; the web app words each one. */
+export const FetchFailureReason = z.enum([
+  'blocked_address',
+  'blocked_url',
+  'robots_disallowed',
+  'robots_unavailable',
+  'timeout',
+  'too_large',
+  'http_status',
+  'unsupported_content',
+  'no_text',
+  'too_many_redirects',
+  'network',
+]);
+export type FetchFailureReason = z.infer<typeof FetchFailureReason>;
+
 export const ImportResult = z.discriminatedUnion('result', [
   z
     .object({
@@ -79,6 +95,14 @@ export const ImportResult = z.discriminatedUnion('result', [
       opportunityId: z.number().int(),
       matchedBy: z.enum(['canonical_url', 'content_hash']),
       evidenceAdded: z.boolean(),
+    })
+    .strict(),
+  /** S-09 D-2: nothing was stored; the operator is asked to paste the text. */
+  z
+    .object({
+      result: z.literal('fetch_failed'),
+      reason: FetchFailureReason,
+      httpStatus: z.number().int().min(100).max(599).optional(),
     })
     .strict(),
 ]);

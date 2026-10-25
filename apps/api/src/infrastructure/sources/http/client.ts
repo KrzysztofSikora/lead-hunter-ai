@@ -1,4 +1,5 @@
 import type net from 'node:net';
+import type { FetchFailureReason } from '@lead-hunter/contracts';
 import { Agent, request, type Dispatcher } from 'undici';
 import {
   checkTarget,
@@ -7,20 +8,6 @@ import {
   type GuardedLookupOptions,
   type IsAllowed,
 } from './address-guard.js';
-
-// Moves to @lead-hunter/contracts in phase 2.
-export type FetchFailureReason =
-  | 'blocked_address'
-  | 'blocked_url'
-  | 'robots_disallowed'
-  | 'robots_unavailable'
-  | 'timeout'
-  | 'too_large'
-  | 'http_status'
-  | 'unsupported_content'
-  | 'no_text'
-  | 'too_many_redirects'
-  | 'network';
 
 export class HttpFetchError extends Error {
   constructor(

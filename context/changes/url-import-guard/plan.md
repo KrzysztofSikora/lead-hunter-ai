@@ -301,7 +301,9 @@ apps/api/src/modules/signals/ports.ts   PageFetcher port
 - Agent checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`, `pnpm e2e` (existing specs still
   pass; they paste text and never fetch).
 - Human checks:
-  - `pnpm dev`, log in, Import, URL `http://127.0.0.1:8080/` with no text, submit. Expected: an
+  - `pnpm dev`, log in, Import, a URL whose name resolves to a private address (the contract
+    rejects IP literals with 400, see Deviations) such as `http://10.0.0.5.nip.io/` with no text,
+    submit. Expected: an
     alert with the "adres prywatny/lokalny" reason and the paste prompt, the URL still in its
     field, the cursor in the text area. Paste any text and submit: "Zaimportowano", and the card
     shows the URL as the source. Evidence: two 360 px screenshots.
@@ -324,15 +326,25 @@ apps/api/src/modules/signals/ports.ts   PageFetcher port
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Address guard and shared HTTP client
-- [ ] Phase 2: Page fetch with robots.txt and the import contract
+- [x] Phase 2: Page fetch with robots.txt and the import contract
 - [ ] Phase 3: Import page handles a refused or failed fetch
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 2) Import a real public job page (a Useme or justjoin.it offer you may open) with only the URL filled — run: `pnpm dev`, log in, Import, paste the URL, or `curl -s -X POST localhost:8080/api/signals/import -H 'content-type: application/json' -H "cookie: $COOKIE" -d '{"url":"https://<offer>"}'` — expected: 201, card shows the page title, readable main text without menus, label "Pobrana strona (jednorazowo)" — evidence: none (the run has no internet; save the response JSON and a card screenshot under `evidence/`)
+- [ ] (Phase 2) Import a page of a site whose robots.txt disallows all bots (`curl -s https://<site>/robots.txt` shows `User-agent: *` + `Disallow: /`) with only the URL — run: same as above — expected: 422 `{"result":"fetch_failed","reason":"robots_disallowed"}` and the server log shows only the robots.txt request for that host — evidence: none (no internet here)
+- [ ] (Phase 2) `pnpm docker:build` succeeds with the new runtime dependencies (`@mozilla/readability`, `linkedom`, `robots-parser`, `ipaddr.js`, `undici`) — run: `pnpm docker:build` on a machine where Corepack can download pnpm — evidence: none (in this sandbox the build stops at `corepack` with `SELF_SIGNED_CERT_IN_CHAIN` before reaching the project; `pnpm build` and a node import of the built `robots.js` pass)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
 - [minor] (Phase 1) `HttpClient.get` returns non-2xx responses to the caller instead of throwing `http_status`, because robots.txt needs the 4xx/5xx status (D-7); the page fetcher maps a bad page status to `http_status` in Phase 2. Plan-review findings 4, 5, 8, 10, 11 applied: `beforeHop` runs before a slot is taken, a 3xx body is destroyed, no `--` in test paths, caller lookup options are kept with `all: true`, `ipaddr.js` added to `DRIVERS` (the Phase 2 libs follow in Phase 2).
+
+- [minor] (Phase 2) `importRequestSchema` (`z.httpUrl()`) already rejects IP-literal and single-label hosts with 400, so the plan's route test `http://127.0.0.1/x → 422 blocked_address` cannot happen. The route test asserts 400 with 0 requests; `blocked_address` for literals, DNS answers and redirect hops is covered by `page-fetcher.test.ts`/`http-client.int.test.ts` (real guarded client, fake resolver) and the route test for a redirect to `10.0.0.5`. Consequence for Phase 3: its human check must use a name that resolves privately (or a `10.x.nip.io` host), not `http://127.0.0.1:8080/`.
+- [minor] (Phase 2) Plan-review 1, 7, 9 applied: `robots.ts` rethrows `blocked_address`, `blocked_url` and `timeout` from the robots request unchanged and folds only network, 5xx, `too_large` and `too_many_redirects` into `robots_unavailable`; `createPageFetcher` takes `robots` and `logger`; the interface is `check(url, signal)`. Plan-review 2 applied: the `signals-import` test "never merges URL imports with blank text" now mocks both pages and asserts `manual_fetch` (S-03's empty-snippet URL-only signal is retired), and the restart test imports `{ text, url }`. Plan-review 6 applied: route tests for `timeout`, `too_large`, `unsupported_content`, `no_text`, plus `extract.test.ts`. Plan-review 4's nested-`get` client test and 12's e2e wording were not added (`beforeHop` already runs before a slot is taken; the e2e duplicate flow works because a known URL is answered before any fetch).
+- [REVIEW] (Phase 2) Plan-review 3: D-2 reads FR-03 AC4's "the URL is kept as the signal's source" as "kept in the form and stored on resubmit with pasted text". Alternative: store a URL-only signal for `timeout`/`too_large`/`http_status`/`network` failures. Nothing is stored on a failed fetch as implemented.
+- [minor] (Phase 2) Web: until Phase 3, `ImportOutcome` and `ImportPage` state exclude `fetch_failed` (a 422 throws the generic failure) so typecheck stays green; Phase 3 widens it.
+- [minor] (Phase 2) `.prettierignore` gains `apps/api/test/fixtures/pages` (an ISO-8859-2 fixture must stay byte-exact); `eslint.config.js` `DRIVERS` gains `linkedom`, `@mozilla/readability`, `robots-parser`; `robots-parser` is CommonJS, so `robots.ts` casts the default import to the callable.
+- [minor] (Phase 2) linkedom keeps the text of an HTML fragment without `<html>` in `documentElement` and leaves `<body>` empty; `extract.ts` falls back to it (the plan's `UNVERIFIED` item). robots-parser matches the token `LeadHunterAI` as expected (`Disallow` in a `LeadHunterAI` group applies, `*` group otherwise).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

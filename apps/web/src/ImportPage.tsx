@@ -13,7 +13,7 @@ type State =
   | { state: 'sending' }
   | { state: 'failed' }
   | { state: 'invalid'; fields: FieldError[] }
-  | { state: 'done'; result: ImportResult };
+  | { state: 'done'; result: Exclude<ImportResult, { result: 'fetch_failed' }> };
 
 /** Custom schema rules carry Polish text; library codes get a Polish text by code. */
 function errorText(error: FieldError): string {
