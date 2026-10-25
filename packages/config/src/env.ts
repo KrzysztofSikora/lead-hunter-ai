@@ -18,6 +18,7 @@ export const ENV_VARIABLES = [
   'FETCH_MAX_BYTES',
   'SOURCE_MIN_INTERVAL_MINUTES',
   'SOURCE_MAX_ATTEMPTS',
+  'DISCOVERY_TIMES',
 ] as const;
 
 /** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
@@ -29,6 +30,20 @@ function isValidPasswordHash(value: string): boolean {
   if (!match) return false;
   const [ln, r, p] = [Number(match[1]), Number(match[2]), Number(match[3])];
   return ln >= 10 && ln <= 20 && r >= 1 && r <= 32 && p >= 1 && p <= 16;
+}
+
+const DISCOVERY_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const DEFAULT_DISCOVERY_TIMES = ['08:00', '18:00'];
+
+/** D-6: `HH:MM` list in Europe/Warsaw; the 02:xx hour is the DST change, so it is refused. */
+function discoveryTimesIssue(value: string): string | undefined {
+  const times = value.split(',').map((t) => t.trim());
+  if (times.length > 6) return 'najwyżej 6 godzin';
+  if (!times.every((t) => DISCOVERY_TIME.test(t)))
+    return 'oczekiwano godzin HH:MM oddzielonych przecinkami';
+  if (times.some((t) => t.startsWith('02:'))) return 'godzina 02:xx to godzina zmiany czasu';
+  if (new Set(times).size !== times.length) return 'godziny nie mogą się powtarzać';
+  return undefined;
 }
 
 // An empty string counts as unset, so `FOO=` in .env falls back to the default.
@@ -55,6 +70,12 @@ export const EnvSchema = z
     FETCH_MAX_BYTES: optional(z.coerce.number().int().min(65_536).max(5_242_880)),
     SOURCE_MIN_INTERVAL_MINUTES: optional(z.coerce.number().int().min(60).max(1_440)),
     SOURCE_MAX_ATTEMPTS: optional(z.coerce.number().int().min(1).max(5)),
+    DISCOVERY_TIMES: optional(
+      z.string().superRefine((value, ctx) => {
+        const message = discoveryTimesIssue(value);
+        if (message) ctx.addIssue({ code: 'custom', message });
+      }),
+    ),
   })
   .superRefine((env, ctx) => {
     const host = env.HOST ?? '127.0.0.1';
@@ -90,6 +111,8 @@ export interface Config {
   sourceMinIntervalMinutes: number;
   /** Requests one source run may make while the source answers 429/503 (S-10 D-6). */
   sourceMaxAttempts: number;
+  /** Daily discovery slots as `HH:MM` in Europe/Warsaw, sorted (S-12 D-6). */
+  discoveryTimes: string[];
 }
 
 export interface ConfigIssue {
@@ -150,6 +173,11 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     fetchMaxBytes: v.FETCH_MAX_BYTES ?? 1_048_576,
     sourceMinIntervalMinutes: v.SOURCE_MIN_INTERVAL_MINUTES ?? 60,
     sourceMaxAttempts: v.SOURCE_MAX_ATTEMPTS ?? 3,
+    discoveryTimes: v.DISCOVERY_TIMES
+      ? v.DISCOVERY_TIMES.split(',')
+          .map((t) => t.trim())
+          .sort()
+      : DEFAULT_DISCOVERY_TIMES,
     ...(v.LLM_PROVIDER ? { llmProvider: v.LLM_PROVIDER } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };
