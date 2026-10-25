@@ -83,7 +83,9 @@ describe('operator actions and history (FR-11 AC2 elements 11, 12)', () => {
     expect((await status({ status: 'REJECTED', reason: 'OTHER', note: '  ' })).statusCode).toBe(
       400,
     );
-    expect((await status({ status: 'WON' })).statusCode).toBe(400);
+    expect(
+      (await status({ status: 'WON', contract: { valueMinor: 0, currency: 'PLN' } })).statusCode,
+    ).toBe(400);
     expect((await t.call('POST', `/api/opportunities/${id}/notes`, { text: ' ' })).statusCode).toBe(
       400,
     );
@@ -104,9 +106,13 @@ describe('operator actions and history (FR-11 AC2 elements 11, 12)', () => {
       reason: 'NO_BUDGET',
     });
 
-    const again = await t.call('POST', `/api/opportunities/${id}/status`, { status: 'SAVED' });
+    const again = await t.call('POST', `/api/opportunities/${id}/status`, { status: 'WON' });
     expect(again.statusCode).toBe(409);
     expect(again.json()).toEqual({ error: 'transition_not_allowed' });
+
+    const reopen = await t.call('POST', `/api/opportunities/${id}/status`, { status: 'SAVED' });
+    expect(reopen.statusCode).toBe(409);
+    expect(reopen.json()).toEqual({ error: 'note_required' });
 
     const detail = (await t.call('GET', `/api/opportunities/${id}`)).json();
     expect(detail.businessStatus).toBe('REJECTED');

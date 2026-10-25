@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { OpportunityAnalysis, PrefilterRule, ScoreBreakdown } from './analysis.js';
 import { Category, Confidence, EvidenceLevel } from './classification.js';
 import { Currency } from './profile.js';
-import { RejectionReason } from './status.js';
+import { calendarDate, Contract, RejectionReason } from './status.js';
 
 export { Category, Confidence, EvidenceLevel };
 
@@ -183,16 +183,35 @@ export const ActivityCause = z.discriminatedUnion('kind', [
 ]);
 export type ActivityCause = z.infer<typeof ActivityCause>;
 
+/**
+ * S-08 D-2, D-3, D-7: what an operator event stores in `metadata_json` (system events store an
+ * `ActivityCause` instead; the reader picks by `actor`).
+ */
+export const ActivityMetadata = z
+  .object({
+    skipped: z.array(BusinessStatus).min(1).optional(),
+    contract: Contract.optional(),
+    /** `FOLLOW_UP` events: the day set, or null when cleared. */
+    on: calendarDate.nullable().optional(),
+  })
+  .strict();
+export type ActivityMetadata = z.infer<typeof ActivityMetadata>;
+
 export const ActivityEvent = z
   .object({
     id: z.number().int(),
-    type: z.enum(['STATUS_CHANGE', 'NOTE']),
+    type: z.enum(['STATUS_CHANGE', 'NOTE', 'FOLLOW_UP']),
     actor: z.enum(['operator', 'system']),
     fromStatus: BusinessStatus.nullable(),
     toStatus: BusinessStatus.nullable(),
     reason: RejectionReason.nullable(),
     note: z.string().nullable(),
     cause: ActivityCause.nullable(),
+    /** Main-path stages this move passed over (D-2). */
+    skipped: z.array(BusinessStatus),
+    contract: Contract.nullable(),
+    /** `FOLLOW_UP` events only. */
+    followUpOn: calendarDate.nullable(),
     occurredAt: isoInstant,
   })
   .strict();

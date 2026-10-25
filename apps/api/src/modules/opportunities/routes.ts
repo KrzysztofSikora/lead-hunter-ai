@@ -42,7 +42,9 @@ export function registerOpportunityRoutes(app: FastifyInstance, deps: Opportunit
   );
 
   const idParams = z.object({ id: z.coerce.number().int().min(1) });
-  const conflict = z.object({ error: z.literal('transition_not_allowed') }).strict();
+  const conflict = z
+    .object({ error: z.enum(['transition_not_allowed', 'note_required']) })
+    .strict();
 
   typed.post(
     '/api/opportunities/:id/status',
@@ -63,7 +65,9 @@ export function registerOpportunityRoutes(app: FastifyInstance, deps: Opportunit
       if (outcome.result === 'ok') return outcome.detail;
       return outcome.result === 'not_found'
         ? reply.code(404).send({ error: 'not_found' })
-        : reply.code(409).send({ error: 'transition_not_allowed' });
+        : reply.code(409).send({
+            error: outcome.result === 'note_required' ? 'note_required' : 'transition_not_allowed',
+          });
     },
   );
 

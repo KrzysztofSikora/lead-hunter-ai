@@ -6,7 +6,7 @@ import { activityEvents, opportunities } from './schema.js';
 
 export function createActivityRepository(db: BetterSQLite3Database): ActivityRepository {
   return {
-    changeStatus(id, to, allowed, event) {
+    changeStatus(id, to, decide, event) {
       return db.transaction((tx) => {
         const current = tx
           .select({ status: opportunities.businessStatus })
@@ -15,7 +15,9 @@ export function createActivityRepository(db: BetterSQLite3Database): ActivityRep
           .get();
         if (!current) return 'not_found';
         const from = current.status as BusinessStatus;
-        if (!allowed(from)) return 'not_allowed';
+        const check = decide(from);
+        if (!check.allowed) return 'not_allowed';
+        if (check.noteRequired && event.note === null) return 'note_required';
         const updated = tx
           .update(opportunities)
           .set({ businessStatus: to, updatedAt: event.at })
@@ -31,6 +33,7 @@ export function createActivityRepository(db: BetterSQLite3Database): ActivityRep
             toStatus: to,
             reason: event.reason,
             note: event.note,
+            metadataJson: event.metadata(check),
             occurredAt: event.at,
           })
           .run();

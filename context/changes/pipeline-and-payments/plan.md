@@ -253,7 +253,7 @@ Observably true when done:
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Transition rules and the widened status API
+- [x] Phase 1: Transition rules and the widened status API
 - [ ] Phase 2: Follow-ups and payments
 - [ ] Phase 3: Pipeline summary API
 - [ ] Phase 4: Card: status panel, contact, follow-up, payments
@@ -269,6 +269,26 @@ Observably true when done:
   (FR-14 AC4 second half, D-12).
 - [FOLLOW-UP] S-14: "sent" should count `SENT_MANUALLY` drafts once they exist (D-9); weekly
   figures read the WON event's contract metadata (D-3).
+
+- [minor] Phase 1: plan-review finding 1 applied: `opportunity-actions.int.test.ts` keeps each
+  test's intent (invalid WON body → 400 via `valueMinor: 0`; illegal move → 409 via REJECTED → WON;
+  REJECTED → SAVED without note → `note_required`).
+- [minor] Phase 1: plan-review finding 8 applied: "Zapisz" is offered only when the move is allowed
+  and needs no note. `StatusChangeRequest` is a plain `z.union` (not discriminated) because the
+  "other targets" member shares no single literal; same parsed shapes as D-4.
+- [minor] Phase 1: plan-review finding 7 applied: `ActivityMetadata` is one strict object
+  (`skipped?`, `contract?`, `on?`) for all operator events; system events keep `ActivityCause`; the
+  service picks by `actor`. Metadata is validated (`ActivityMetadata.parse`) before it is stored.
+- [REVIEW] Phase 1: plan-review finding 3 (moves from off-path states record no `skipped`, so a row
+  can reach MEETING/WON with `CONTACTED` absent from its history). Plan says `contacted` = events
+  to `CONTACTED` or `CONTACTED` in `skipped`; code shows `skipped` stays `[]` out of
+  `NEEDS_VERIFICATION`/`REJECTED`/`EXPIRED`. Consequence: Phase 3 counts `contacted` as opportunities
+  with any event whose `to_status` ∈ CONTACTED, REPLIED, MEETING, WON, LOST, or `CONTACTED` in
+  `skipped` (option a of the review); inventing skipped stages for reopen moves was the alternative.
+- [REVIEW] Phase 2 must apply plan-review finding 4: clear `follow_up_at` on every move to a status
+  outside CONTACTED/REPLIED/MEETING, and define `followUpsDue` with that same set. Findings 5
+  (D-8, D-9, D-11 treated as `costly`: public `GET /api/pipeline` shape) and 6 (the S-08 roadmap
+  acceptance is met minus the draft step, because S-08 depends on S-06 only; D-13) stand for the PR.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

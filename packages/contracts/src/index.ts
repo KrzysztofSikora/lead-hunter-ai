@@ -34,6 +34,7 @@ export {
 export {
   ActivityCause,
   ActivityEvent,
+  ActivityMetadata,
   AnalysisSummary,
   Availability,
   BusinessStatus,
@@ -57,10 +58,13 @@ export {
 } from './opportunities.js';
 export type { ImportRequest } from './opportunities.js';
 export {
+  calendarDate,
+  checkMove,
+  Contract,
   NOTE_MAX_CHARS,
   NoteRequest,
-  operatorMoves,
+  OPERATOR_TARGETS,
   RejectionReason,
   StatusChangeRequest,
 } from './status.js';
-export type { OperatorMove } from './status.js';
+export type { MoveCheck } from './status.js';

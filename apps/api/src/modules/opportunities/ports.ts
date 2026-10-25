@@ -5,6 +5,7 @@ import type {
   Category,
   Confidence,
   EvidenceLevel,
+  MoveCheck,
   OpportunityListQuery,
   RejectionReason,
   PrefilterRule,
@@ -67,7 +68,7 @@ export interface EvidenceRow {
 /** One `activity_events` row; `metadataJson` is still text here. */
 export interface ActivityRow {
   id: number;
-  type: 'STATUS_CHANGE' | 'NOTE';
+  type: 'STATUS_CHANGE' | 'NOTE' | 'FOLLOW_UP';
   actor: 'operator' | 'system';
   fromStatus: BusinessStatus | null;
   toStatus: BusinessStatus | null;
@@ -107,18 +108,24 @@ export interface SourceStatusReader {
   summary(): SourcesStatus;
 }
 
-export type StatusChangeOutcome = 'changed' | 'not_found' | 'not_allowed';
+export type StatusChangeOutcome = 'changed' | 'not_found' | 'not_allowed' | 'note_required';
 
 export interface ActivityRepository {
   /**
-   * One transaction: reads the current status, asks `allowed` about it, then updates the status
+   * One transaction: reads the current status, asks `decide` about it, then updates the status
    * (conditional on the status read) and inserts the event.
    */
   changeStatus(
     id: number,
-    to: 'SAVED' | 'REJECTED',
-    allowed: (from: BusinessStatus) => boolean,
-    event: { reason: RejectionReason | null; note: string | null; at: number },
+    to: BusinessStatus,
+    decide: (from: BusinessStatus) => MoveCheck,
+    event: {
+      reason: RejectionReason | null;
+      note: string | null;
+      /** Returns the validated `metadata_json` for the move that was decided, or null. */
+      metadata: (check: Extract<MoveCheck, { allowed: true }>) => string | null;
+      at: number;
+    },
   ): StatusChangeOutcome;
   /** False when the opportunity does not exist. */
   addNote(id: number, text: string, at: number): boolean;

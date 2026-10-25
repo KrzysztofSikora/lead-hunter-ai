@@ -1,7 +1,8 @@
 import {
   ActivityCause,
+  ActivityMetadata,
   OpportunityAnalysis,
-  operatorMoves,
+  checkMove,
   ScoreBreakdown,
   upgradeStoredAnalysis,
   type NoteRequest,
@@ -37,7 +38,8 @@ export interface OpportunityService {
 }
 
 export type ActionResult =
-  { result: 'ok'; detail: OpportunityDetail } | { result: 'not_found' | 'not_allowed' };
+  | { result: 'ok'; detail: OpportunityDetail }
+  | { result: 'not_found' | 'not_allowed' | 'note_required' };
 
 const EXCERPT_CHARS = 280;
 
@@ -126,7 +128,8 @@ function parseStored<T>(
 }
 
 function toActivity(row: ActivityRow): OpportunityDetail['activity'][number] {
-  const cause = row.metadataJson === null ? null : parseStored(ActivityCause, row.metadataJson);
+  const system = row.actor === 'system';
+  const meta = system ? null : parseStored(ActivityMetadata, row.metadataJson);
   return {
     id: row.id,
     type: row.type,
@@ -135,7 +138,10 @@ function toActivity(row: ActivityRow): OpportunityDetail['activity'][number] {
     toStatus: row.toStatus,
     reason: row.reason,
     note: row.note,
-    cause,
+    cause: system ? parseStored(ActivityCause, row.metadataJson) : null,
+    skipped: meta?.skipped ?? [],
+    contract: meta?.contract ?? null,
+    followUpOn: row.type === 'FOLLOW_UP' ? (meta?.on ?? null) : null,
     occurredAt: iso(row.occurredAt),
   };
 }
@@ -217,10 +223,19 @@ export function createOpportunityService({
       const outcome = activity.changeStatus(
         id,
         request.status,
-        (from) => operatorMoves(from).includes(request.status),
+        (from) => checkMove(from, request.status),
         {
           reason: request.status === 'REJECTED' ? request.reason : null,
           note: request.note ?? null,
+          metadata: (check) => {
+            const metadata = ActivityMetadata.parse({
+              ...(check.skipped.length > 0 ? { skipped: check.skipped } : {}),
+              ...(request.status === 'WON' && request.contract
+                ? { contract: request.contract }
+                : {}),
+            });
+            return Object.keys(metadata).length === 0 ? null : JSON.stringify(metadata);
+          },
           at: clock.now().getTime(),
         },
       );

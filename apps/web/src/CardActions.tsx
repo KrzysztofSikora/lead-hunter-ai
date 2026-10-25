@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import {
   NOTE_MAX_CHARS,
   RejectionReason,
-  operatorMoves,
+  checkMove,
   type OpportunityDetail,
 } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
@@ -27,7 +27,8 @@ export function CardActions({
   const [reason, setReason] = useState('');
   const [noteText, setNoteText] = useState('');
   const [rejectNote, setRejectNote] = useState('');
-  const moves = operatorMoves(data.businessStatus);
+  const toSaved = checkMove(data.businessStatus, 'SAVED');
+  const toRejected = checkMove(data.businessStatus, 'REJECTED');
 
   async function run(action: () => Promise<ActionOutcome>) {
     setBusy(true);
@@ -85,14 +86,14 @@ export function CardActions({
     <div className={styles.actions}>
       <button
         type="button"
-        disabled={busy || !moves.includes('SAVED')}
+        disabled={busy || !toSaved.allowed || toSaved.noteRequired}
         onClick={() => void run(() => changeStatus(data.id, { status: 'SAVED' }))}
       >
         {a.save}
       </button>
       <button
         type="button"
-        disabled={busy || !moves.includes('REJECTED')}
+        disabled={busy || !toRejected.allowed}
         aria-expanded={panel === 'reject'}
         onClick={() => open('reject')}
       >
