@@ -47,10 +47,20 @@ function sourceFacts(row: OpportunityRow) {
 /** Only the mock produces DEMO / MOCK results in this item (D-12). */
 const isDemo = (provider: string | null): boolean => provider === 'mock';
 
-/** D-8: null while every analysis column is empty (before S-04). */
+/**
+ * D-8: null while every analysis column is empty and nothing was analysed. A completed
+ * INSUFFICIENT_DATA result has empty columns too, but still carries its provider (and DEMO label).
+ */
 function analysisOf(row: OpportunityRow): OpportunitySummary['analysis'] {
   const { category, evidenceLevel, score, confidence } = row;
-  if (category === null && evidenceLevel === null && score === null && confidence === null) {
+  const analysed = row.analysisStatus === 'COMPLETE' && row.analysisProvider !== null;
+  if (
+    !analysed &&
+    category === null &&
+    evidenceLevel === null &&
+    score === null &&
+    confidence === null
+  ) {
     return null;
   }
   return { category, evidenceLevel, score, confidence, demo: isDemo(row.analysisProvider) };

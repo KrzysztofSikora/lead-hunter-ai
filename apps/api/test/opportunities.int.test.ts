@@ -223,4 +223,25 @@ describe('analysis in the DTOs (D-12)', () => {
     expect(skippedDetail.latestAnalysis).toBeNull();
     expect(skippedDetail.prefilter.rule).toBe('seeking_work');
   });
+
+  it('labels an INSUFFICIENT_DATA mock result as demo although it has no score', async () => {
+    const built = await buildTestApp({ env: { LLM_PROVIDER: 'mock' } });
+    const cookie = await loginAsOperator(built.app);
+    const { opportunityId } = (
+      await built.app.inject({
+        method: 'POST',
+        url: '/api/signals/import',
+        headers: { cookie },
+        payload: { text: 'DEMO: Szukam programisty do sterownika IoT.' },
+      })
+    ).json<{ opportunityId: number }>();
+    await built.runner.drain();
+    const list = (
+      await built.app.inject({ method: 'GET', url: '/api/opportunities', headers: { cookie } })
+    ).json();
+    expect(list.items.find((i: { id: number }) => i.id === opportunityId)).toMatchObject({
+      analysisStatus: 'COMPLETE',
+      analysis: { score: null, demo: true },
+    });
+  });
 });
