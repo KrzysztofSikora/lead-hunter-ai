@@ -247,15 +247,23 @@ field errors next to their inputs (`aria-describedby`), and a status line `Zapis
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Profile contract, storage and API
-- [ ] Phase 2: Profile view in the web app
+- [x] Phase 2: Profile view in the web app
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 2) `/profil` at 360 px: sections readable, labels Polish and clear, `PRZYKŁAD` visible on a fresh install — run: `pnpm build && DATA_DIR=$(mktemp -d) OPERATOR_PASSWORD_HASH=<hash from pnpm auth:hash> pnpm start`, open `/profil` — evidence: `context/changes/operator-profile/evidence/profile-360.png`
+- [ ] (Phase 2) Split `70` / `20` and a rate range with max < min, press *Zapisz*: Polish errors next to those fields, nothing saved (reload shows old values) — run: same server, *Profil* → *Dodaj przedział*, Od `100`, Do `50` — evidence: none
+- [ ] (Phase 2) AC4: no real name, rate, amount or client in the repository — run: read `apps/api/src/modules/profile/example.ts` and `git grep -n -i -E "[0-9]+ ?(zł|pln|eur|usd)\b" -- apps packages e2e` — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
 - [minor] Phase 1: plan-review findings applied in tests: login `{ password: 1 }` returns the new 400 shape (finding 1); a corrupt stored row gives 500 and a valid `PUT` repairs it (3); the AC4 assertion is `experience === ''` plus null/empty money (4); `openTestDb(dir?)` reuses a dir for the restart test and the first app's connection stays open until `afterEach` (6). Findings 5 and 7 concern Phase 2 (the profile e2e is the third test, 3 of 5 login attempts; D-7 truncation of non-whole amounts to be handled on load). Finding 8: validation mapping covers Zod schema errors only, malformed JSON keeps Fastify's default body.
 - [minor] Phase 1: drizzle-kit emitted the `CHECK (id = 1)` constraint (`0002_lyrical_the_hood.sql`), no fallback needed.
+
+- [minor] Phase 2: D-7 extended. The form shows a non-whole stored amount exactly (`1500.50`) and accepts up to two decimals (`,` or `.`), converted by string arithmetic (no floats), so nothing is truncated silently (plan-review finding 7). Whole amounts still show as `1500`.
+- [minor] Phase 2: react-router 8.5.0 exports `BrowserRouter`, `Routes`, `Route`, `NavLink`, `Navigate`, `MemoryRouter` from `react-router` as the tech-stack assumed. `App.test.tsx` wraps `App` in `MemoryRouter` (renderApp helper); no new component tests.
+- [minor] Phase 2: form-to-payload conversion lives in `apps/web/src/profileForm.ts` (pure functions), not in `ProfilePage.tsx`, to keep the component readable. Client-side errors come from the same Zod schema, mapped to the server's `{ path, code, message }` shape.
+- [minor] Phase 2: `pnpm e2e` ran green (3 tests, 3 of 5 login attempts). The run rewrites `operator-login/evidence/shell-360.png`; that change was reverted, not part of this phase.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

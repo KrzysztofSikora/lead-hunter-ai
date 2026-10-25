@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { afterEach, expect, it, vi } from 'vitest';
 import { App } from './App.js';
 import { strings } from './strings.pl.js';
@@ -30,6 +31,13 @@ const session =
     new Response(null, { status });
 const healthy: Handler = () => new Response(JSON.stringify(health('ok')));
 
+const renderApp = () =>
+  render(
+    <MemoryRouter>
+      <App />
+    </MemoryRouter>,
+  );
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -37,7 +45,7 @@ afterEach(() => {
 
 it('shows the heading and an OK status for a logged-in operator', async () => {
   stubApi({ '/api/auth/session': session(200), '/api/health': healthy });
-  render(<App />);
+  renderApp();
   expect(screen.getByRole('heading', { name: strings.appName })).toBeTruthy();
   expect(await screen.findByText(strings.status.ok)).toBeTruthy();
 });
@@ -47,7 +55,7 @@ it('shows the error text for a 503 health answer', async () => {
     '/api/auth/session': session(200),
     '/api/health': () => new Response(JSON.stringify(health('degraded')), { status: 503 }),
   });
-  render(<App />);
+  renderApp();
   expect(await screen.findByText(strings.status.error)).toBeTruthy();
 });
 
@@ -58,7 +66,7 @@ it('shows the error text when the health call fails on the network', async () =>
       throw new TypeError('network');
     },
   });
-  render(<App />);
+  renderApp();
   expect(await screen.findByText(strings.status.error)).toBeTruthy();
 });
 
@@ -68,7 +76,7 @@ it('shows the login form without a session and the shell after logging in', asyn
     '/api/auth/login': session(204),
     '/api/health': healthy,
   });
-  render(<App />);
+  renderApp();
   expect(await screen.findByRole('heading', { name: strings.login.title })).toBeTruthy();
   fireEvent.change(screen.getByLabelText(strings.login.passwordLabel), {
     target: { value: 'correct horse battery' },
@@ -83,14 +91,14 @@ it('shows the server error, not the login form, when the session check cannot re
       throw new TypeError('network');
     },
   });
-  render(<App />);
+  renderApp();
   expect(await screen.findByText(strings.status.error)).toBeTruthy();
   expect(screen.queryByRole('heading', { name: strings.login.title })).toBeNull();
 });
 
 it('shows the server error when the session check answers 5xx', async () => {
   stubApi({ '/api/auth/session': session(503) });
-  render(<App />);
+  renderApp();
   expect(await screen.findByText(strings.status.error)).toBeTruthy();
 });
 
@@ -100,7 +108,7 @@ it('returns to the login form after logout', async () => {
     '/api/auth/logout': session(204),
     '/api/health': healthy,
   });
-  render(<App />);
+  renderApp();
   fireEvent.click(await screen.findByRole('button', { name: strings.login.logout }));
   expect(await screen.findByRole('heading', { name: strings.login.title })).toBeTruthy();
   expect(calls).toContain('POST /api/auth/logout');
