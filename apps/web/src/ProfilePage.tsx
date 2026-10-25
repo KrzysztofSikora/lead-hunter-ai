@@ -18,6 +18,7 @@ const CURRENCIES: Currency[] = ['PLN', 'EUR', 'USD'];
 const UNITS = ['HOUR', 'DAY', 'PROJECT'] as const;
 const BILLING = ['FIXED_PRICE', 'HOURLY', 'DAILY', 'RETAINER'] as const;
 const MODES = ['REMOTE', 'HYBRID', 'ONSITE'] as const;
+const MAX_RATE_RANGES = 10;
 
 type Load = 'loading' | 'ready' | 'error';
 type Save = 'idle' | 'saving' | 'saved' | 'failed' | 'invalid';
@@ -240,6 +241,8 @@ export function ProfilePage() {
     );
   };
 
+  const listError = errors.find((error) => error.path === 'rateRanges');
+
   return (
     <form className={styles.form} onSubmit={submit} noValidate>
       <h2>
@@ -301,6 +304,7 @@ export function ProfilePage() {
           {form.rateRanges.map(rateRow)}
           <button
             type="button"
+            disabled={form.rateRanges.length >= MAX_RATE_RANGES}
             onClick={() =>
               update({
                 rateRanges: [
@@ -312,6 +316,11 @@ export function ProfilePage() {
           >
             {t.fields.addRate}
           </button>
+          {listError && (
+            <p id="rateRanges-error" className={styles.error}>
+              {errorText(listError)}
+            </p>
+          )}
         </div>
         {money('monthlyRevenueGoal')}
         <fieldset className={styles.field} {...errorProps('effortSplit', 'effortSplit')}>
