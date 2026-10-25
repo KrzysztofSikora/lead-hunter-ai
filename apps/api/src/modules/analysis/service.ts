@@ -7,18 +7,22 @@ import {
   type PrefilterRule,
 } from '@lead-hunter/contracts';
 import type { Clock } from '../shared/clock.js';
-import { startOfWarsawDay } from '../shared/warsaw-day.js';
+import type { ModelPrice } from '@lead-hunter/config';
+import { startOfWarsawDay, startOfWarsawMonth } from '../shared/warsaw-day.js';
 import { scoreAnalysis } from '../scoring/score.js';
+import { budgetGate, costMicroUsd, type BudgetBlock } from './budget.js';
 import { guardAnalysis } from './output-guard.js';
 import { prefilter } from './prefilter.js';
 import type {
   AnalysisInput,
   AnalysisRepository,
   CompletedAnalysis,
+  FailedAnalysis,
   LlmProvider,
   ProfileReader,
   WaitingOpportunity,
 } from './ports.js';
+import { ProviderError } from './ports.js';
 
 export interface AnalysisDeps {
   repository: AnalysisRepository;
@@ -29,6 +33,10 @@ export interface AnalysisDeps {
   /** Analyses per Europe/Warsaw day (D-9). */
   dailyLimit: number;
   maxAgeDays: number;
+  /** D-3, D-5: the monthly cap and the active model's price; both absent for a free provider. */
+  budget?: { monthlyCapMicroUsd: number | null; price: ModelPrice | null };
+  /** Values an answer must not contain, i.e. the API key (D-9). */
+  secrets?: string[];
   /** Receives drain failures; must not log source text. */
   onError: (error: unknown) => void;
 }
@@ -51,6 +59,17 @@ const moveFor = (rule: PrefilterRule | null): BusinessStatus | null => {
 };
 
 const REASON_MAX = 300;
+
+/** D-9: after these the whole provider is unusable for now, so the drain stops instead of failing the queue. */
+const PROVIDER_WIDE: ReadonlySet<ProviderError['kind']> = new Set([
+  'auth',
+  'rate_limited',
+  'unavailable',
+  'timeout',
+]);
+
+type Outcome = 'continue' | 'stop';
+
 const reasonOf = (error: unknown): string =>
   (error instanceof Error ? error.message : String(error)).slice(0, REASON_MAX);
 
@@ -72,7 +91,95 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     }
   }
 
-  async function analyseOne(row: WaitingOpportunity, active: LlmProvider): Promise<void> {
+  /** Guard, score and store one parsed answer: shared by a provider call and a reused result. */
+  function complete(
+    row: WaitingOpportunity,
+    meta: Omit<CompletedAnalysis, 'resultJson' | 'breakdown' | 'guardNotes' | 'columns'>,
+    answer: OpportunityAnalysis,
+  ): void {
+    const profile = deps.profile.get();
+    const guarded = guardAnalysis(answer, row.text);
+    const result = guarded.result;
+    const columns: CompletedAnalysis['columns'] = {
+      category: null,
+      evidenceLevel: null,
+      score: null,
+      confidence: null,
+      industry: null,
+      workMode: null,
+      countries: null,
+      amountMaxMinor: null,
+      amountCurrency: null,
+      businessStatus: 'NEEDS_VERIFICATION',
+    };
+    let breakdown: CompletedAnalysis['breakdown'] = null;
+    if (result.verdict === 'ANALYSED') {
+      breakdown = ScoreBreakdown.parse(scoreAnalysis(result, profile));
+      Object.assign(columns, {
+        category: result.category,
+        evidenceLevel: result.evidenceLevel,
+        score: breakdown.total,
+        confidence: breakdown.confidence,
+        industry: result.industry,
+        workMode: result.workMode === 'UNKNOWN' ? null : result.workMode,
+        countries: result.countries.length > 0 ? `,${result.countries.join(',')},` : null,
+        amountMaxMinor: result.sourceBudget?.maxMinor ?? null,
+        amountCurrency: result.sourceBudget?.currency ?? null,
+        businessStatus: null,
+      });
+    }
+    repository.saveComplete({
+      ...meta,
+      resultJson: JSON.stringify(result),
+      breakdown,
+      guardNotes: guarded.notes,
+      columns,
+    });
+  }
+
+  /** D-3, D-5: whether a provider call may start now; also what `status()` reports. */
+  function blockedNow(active: LlmProvider, spentMicroUsd: number): BudgetBlock | null {
+    return budgetGate({
+      paid: active.paid,
+      capMicroUsd: deps.budget?.monthlyCapMicroUsd ?? null,
+      price: deps.budget?.price ?? null,
+      spentMicroUsd,
+    });
+  }
+
+  const spentThisMonth = () => repository.spentSince(startOfWarsawMonth(clock.now()).getTime());
+
+  /** D-4: stores the earlier result again, re-guarded and re-scored; no provider call, no cost. */
+  function tryReuse(row: WaitingOpportunity, active: LlmProvider, at: number): boolean {
+    const earlier = repository.findReusable(row.id, active.promptVersion, ANALYSIS_SCHEMA_VERSION);
+    if (!earlier) return false;
+    let stored: unknown;
+    try {
+      stored = JSON.parse(earlier.resultJson);
+    } catch {
+      return false;
+    }
+    const parsed = OpportunityAnalysis.safeParse(stored);
+    if (!parsed.success) return false;
+    complete(
+      row,
+      {
+        opportunityId: row.id,
+        provider: earlier.provider,
+        model: earlier.model,
+        promptVersion: earlier.promptVersion,
+        schemaVersion: earlier.schemaVersion,
+        usage: earlier.usage,
+        costMicroUsd: null,
+        reusedFromAnalysisId: earlier.id,
+        at,
+      },
+      parsed.data,
+    );
+    return true;
+  }
+
+  async function analyseOne(row: WaitingOpportunity, active: LlmProvider): Promise<Outcome> {
     const at = clock.now().getTime();
     const meta = {
       opportunityId: row.id,
@@ -82,9 +189,14 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       schemaVersion: ANALYSIS_SCHEMA_VERSION,
       at,
     };
-    const fail = (error: string) => repository.saveFailed({ ...meta, error });
+    const fail = (error: string, paid?: Pick<FailedAnalysis, 'usage' | 'costMicroUsd'>) =>
+      repository.saveFailed({ ...meta, error, ...paid });
 
     try {
+      if (!row.force && tryReuse(row, active, at)) return 'continue';
+
+      if (blockedNow(active, spentThisMonth().microUsd) !== null) return 'stop';
+
       const profile = deps.profile.get();
       const input: AnalysisInput = {
         schemaVersion: ANALYSIS_SCHEMA_VERSION,
@@ -103,59 +215,44 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       try {
         provided = await active.analyzeOpportunity(input);
       } catch (error) {
-        fail(`provider_error: ${reasonOf(error)}`);
-        return;
+        // A JSON.parse SyntaxError quotes the model's text, so it is stored as a code, not a message.
+        fail(
+          error instanceof SyntaxError
+            ? 'invalid_output: not_json'
+            : `provider_error: ${reasonOf(error)}`,
+        );
+        return error instanceof ProviderError && PROVIDER_WIDE.has(error.kind)
+          ? 'stop'
+          : 'continue';
+      }
+
+      // The call is billed from here on, so a rejected answer is stored with its cost too.
+      const cost = active.paid ? costMicroUsd(provided.usage, deps.budget?.price ?? null) : 0;
+      const billed = { usage: provided.usage, costMicroUsd: cost };
+
+      const echoed = JSON.stringify(provided.output) ?? '';
+      if ((deps.secrets ?? []).some((secret) => secret !== '' && echoed.includes(secret))) {
+        fail('invalid_output: secret_echo', billed);
+        return 'continue';
       }
 
       const parsed = OpportunityAnalysis.safeParse(provided.output);
       if (!parsed.success) {
         const paths = [...new Set(parsed.error.issues.map((i) => i.path.join('.') || '(root)'))];
-        fail(`invalid_output: ${paths.join(', ')}`);
-        return;
+        fail(`invalid_output: ${paths.join(', ')}`, billed);
+        return 'continue';
       }
 
-      const guarded = guardAnalysis(parsed.data, row.text);
-      const result = guarded.result;
-      const columns: CompletedAnalysis['columns'] = {
-        category: null,
-        evidenceLevel: null,
-        score: null,
-        confidence: null,
-        industry: null,
-        workMode: null,
-        countries: null,
-        amountMaxMinor: null,
-        amountCurrency: null,
-        businessStatus: 'NEEDS_VERIFICATION',
-      };
-      let breakdown: CompletedAnalysis['breakdown'] = null;
-      if (result.verdict === 'ANALYSED') {
-        breakdown = ScoreBreakdown.parse(scoreAnalysis(result, profile));
-        Object.assign(columns, {
-          category: result.category,
-          evidenceLevel: result.evidenceLevel,
-          score: breakdown.total,
-          confidence: breakdown.confidence,
-          industry: result.industry,
-          workMode: result.workMode === 'UNKNOWN' ? null : result.workMode,
-          countries: result.countries.length > 0 ? `,${result.countries.join(',')},` : null,
-          amountMaxMinor: result.sourceBudget?.maxMinor ?? null,
-          amountCurrency: result.sourceBudget?.currency ?? null,
-          businessStatus: null,
-        });
-      }
-
-      repository.saveComplete({
-        ...meta,
-        resultJson: JSON.stringify(result),
-        breakdown,
-        guardNotes: guarded.notes,
-        usage: provided.usage,
-        columns,
-      });
+      complete(
+        row,
+        { ...meta, usage: provided.usage, costMicroUsd: cost, reusedFromAnalysisId: null },
+        parsed.data,
+      );
+      return 'continue';
     } catch (error) {
       // After the provider answered: a failed save must not leave the row at the head of the queue.
       fail(`internal_error: ${reasonOf(error)}`);
+      return 'continue';
     }
   }
 
@@ -165,7 +262,7 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     while (repository.countSince(startOfWarsawDay(clock.now()).getTime()) < deps.dailyLimit) {
       const [next] = repository.nextWaiting(1);
       if (!next) return;
-      await analyseOne(next, provider);
+      if ((await analyseOne(next, provider)) === 'stop') return;
     }
   }
 
@@ -197,9 +294,19 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     },
     status() {
       const analysedToday = repository.countSince(startOfWarsawDay(clock.now()).getTime());
+      const spent = spentThisMonth();
       return {
         configured: provider !== undefined,
         provider: provider?.name ?? null,
+        model: provider?.model ?? null,
+        paid: provider?.paid ?? false,
+        blocked: provider ? blockedNow(provider, spent.microUsd) : null,
+        budget: {
+          capMicroUsd: deps.budget?.monthlyCapMicroUsd ?? null,
+          spentMicroUsd: spent.microUsd,
+          unknownCostCount: spent.unknownCount,
+          monthStart: startOfWarsawMonth(clock.now()).toISOString(),
+        },
         demo: provider?.demo ?? false,
         dailyLimit: deps.dailyLimit,
         analysedToday,

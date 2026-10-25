@@ -203,6 +203,19 @@ export const AnalysisServiceStatus = z
     analysedToday: z.number().int(),
     waiting: z.number().int(),
     limitReached: z.boolean(),
+    /** D-13 (S-05): what is being used and whether the budget lets it run. */
+    model: z.string().nullable(),
+    paid: z.boolean(),
+    blocked: z.enum(['budget_missing', 'price_unknown', 'budget_reached']).nullable(),
+    budget: z
+      .object({
+        capMicroUsd: z.number().int().nullable(),
+        spentMicroUsd: z.number().int(),
+        unknownCostCount: z.number().int(),
+        /** Start of the current Europe/Warsaw month. */
+        monthStart: z.iso.datetime(),
+      })
+      .strict(),
   })
   .strict();
 export type AnalysisServiceStatus = z.infer<typeof AnalysisServiceStatus>;

@@ -122,6 +122,8 @@ function toLatestAnalysis(row: AnalysisAttemptRow): OpportunityDetail['latestAna
     createdAt: iso(row.createdAt),
     inputTokens: row.inputTokens,
     outputTokens: row.outputTokens,
+    costMicroUsd: row.costMicroUsd,
+    reusedFromAnalysisId: row.reusedFromAnalysisId,
     result: parseStored(OpportunityAnalysis, row.resultJson),
     breakdown: parseStored(ScoreBreakdown, row.breakdownJson),
     guardNotes: row.guardNotesJson === null ? [] : parseNotes(row.guardNotesJson),

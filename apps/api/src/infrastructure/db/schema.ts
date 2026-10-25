@@ -1,5 +1,13 @@
 import { sql } from 'drizzle-orm';
-import { check, index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import {
+  type AnySQLiteColumn as AnyColumn,
+  check,
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+} from 'drizzle-orm/sqlite-core';
 
 export const appMeta = sqliteTable('app_meta', {
   key: text('key').primaryKey(),
@@ -26,21 +34,25 @@ export const operatorProfile = sqliteTable(
 );
 
 /** D-3: the source is a text column until `sources` exists (S-10). */
-export const rawSignals = sqliteTable('raw_signals', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  sourceType: text('source_type').notNull(),
-  /** The URL as the operator pasted it (trimmed). */
-  sourceUrl: text('source_url'),
-  /** Identity form of the URL (D-2); never shown as the source. */
-  canonicalUrl: text('canonical_url'),
-  title: text('title').notNull(),
-  snippet: text('snippet').notNull(),
-  publishedAt: integer('published_at'),
-  fetchedAt: integer('fetched_at').notNull(),
-  contentHash: text('content_hash'),
-  availability: text('availability').notNull(),
-  lastVerifiedAt: integer('last_verified_at'),
-});
+export const rawSignals = sqliteTable(
+  'raw_signals',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    sourceType: text('source_type').notNull(),
+    /** The URL as the operator pasted it (trimmed). */
+    sourceUrl: text('source_url'),
+    /** Identity form of the URL (D-2); never shown as the source. */
+    canonicalUrl: text('canonical_url'),
+    title: text('title').notNull(),
+    snippet: text('snippet').notNull(),
+    publishedAt: integer('published_at'),
+    fetchedAt: integer('fetched_at').notNull(),
+    contentHash: text('content_hash'),
+    availability: text('availability').notNull(),
+    lastVerifiedAt: integer('last_verified_at'),
+  },
+  (table) => [index('raw_signals_content_hash_idx').on(table.contentHash)],
+);
 
 export const opportunities = sqliteTable(
   'opportunities',
@@ -72,6 +84,8 @@ export const opportunities = sqliteTable(
     /** The budget the source stated, never a model's price (plan-review #8). */
     amountMaxMinor: integer('amount_max_minor'),
     amountCurrency: text('amount_currency'),
+    /** D-10: the next analysis must call the provider instead of reusing a stored result. */
+    analysisForce: integer('analysis_force').notNull().default(0),
   },
   (table) => [
     check('score_range', sql`${table.score} IS NULL OR ${table.score} BETWEEN 0 AND 100`),
@@ -101,6 +115,13 @@ export const analyses = sqliteTable(
     error: text('error'),
     inputTokens: integer('input_tokens'),
     outputTokens: integer('output_tokens'),
+    /** D-2: micro-USD, 0 for an unpaid provider, null when usage or price is unknown. */
+    costMicroUsd: integer('cost_micro_usd'),
+    /** D-4: set when the result was copied from an earlier analysis instead of a provider call. */
+    reusedFromAnalysisId: integer('reused_from_analysis_id').references(
+      (): AnyColumn => analyses.id,
+      { onDelete: 'set null' },
+    ),
     createdAt: integer('created_at').notNull(),
   },
   (table) => [

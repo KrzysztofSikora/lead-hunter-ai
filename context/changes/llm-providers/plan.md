@@ -343,7 +343,7 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Config, prices, budget rules and the AC4 guard
 - [x] Phase 2: Anthropic and OpenAI-compatible adapters (checkpoint)
-- [ ] Phase 3: Runner — budget, cost, reuse, failures
+- [x] Phase 3: Runner — budget, cost, reuse, failures
 - [ ] Phase 4: Retry route, UI and docs
 
 ## Human checks
@@ -363,6 +363,11 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 - [minor] (Phase 2) undici's `MockAgent` hides request bodies from reply callbacks under Node 24's `fetch`, so the two tests that read what was sent (injection boundary, no key/tools/URL, `json_object`) talk to a loopback `http` server allowed through `agent.enableNetConnect(host)`; status/timeouts/retries still use `MockAgent`.
 - [minor] (Phase 2) `pnpm docker:build` fails in this sandbox at `pnpm install` inside the image (corepack: self-signed certificate in chain from the proxy), also on the unchanged baseline, so the image gate could not be run here; the new dependencies are plain JS packages with exact pins and a frozen lockfile. Run it on a machine with direct registry access.
 - [minor] (Phase 1) `LLM_PRICES` syntax is validated only for real providers; with `LLM_PROVIDER=mock` all other LLM variables are ignored.
+- [minor] (Phase 3) A non-JSON answer reaches the runner as a `SyntaxError` whose message quotes the model's text; the runner stores `invalid_output: not_json` instead of the message. Other non-`ProviderError` exceptions (our own code, test doubles) still store their message, as before. The failed parse loses the token usage (the adapter throws before returning it), so that call is not costed; a call that timed out or was retried by the SDK is not costed either (plan-review #2, to be stated in `docs/llm.md`).
+- [minor] (Phase 3) A billed answer that is then rejected (schema failure, secret echo) is stored `FAILED` with its tokens and cost, so the cap sees it; `FailedAnalysis` gained optional `usage` and `costMicroUsd`. `unknownCount` counts only `COMPLETE` rows.
+- [minor] (Phase 3, plan-review #8) Race accepted: a forced `requeue` arriving while the runner is analysing that same row is overwritten by the save (status `COMPLETE`, `analysis_force` cleared). The operator can press "Analizuj ponownie" again. A null `content_hash` never matches (test added).
+- [minor] (Phase 3) The TR-12 canary is checked in the database rows, the status and the detail responses; captured logs are not asserted (the runner logs only `onError` messages, which the test helper discards).
+- [minor] (Phase 3) `llmRunnerDeps(config.llm)` in `create-provider.ts` derives the runner's `budget` and `secrets` from config; both `AnalysisDeps` fields are optional so runners built without them behave as free providers.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

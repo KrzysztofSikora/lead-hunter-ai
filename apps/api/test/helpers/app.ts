@@ -7,7 +7,7 @@ import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
 import { createAnalysisRepository } from '../../src/infrastructure/db/analysis-repository.js';
-import { createLlmProvider } from '../../src/infrastructure/llm/create-provider.js';
+import { createLlmProvider, llmRunnerDeps } from '../../src/infrastructure/llm/create-provider.js';
 import { createAnalysisRunner, type AnalysisRunner } from '../../src/modules/analysis/service.js';
 import type { LlmProvider } from '../../src/modules/analysis/ports.js';
 import { createProfileService } from '../../src/modules/profile/service.js';
@@ -93,6 +93,7 @@ export async function buildTestApp(
     clock,
     dailyLimit: config.analysisDailyLimit,
     maxAgeDays: config.prefilterMaxAgeDays,
+    ...llmRunnerDeps(config.llm),
     onError: () => undefined,
   });
   const app = await buildApp({

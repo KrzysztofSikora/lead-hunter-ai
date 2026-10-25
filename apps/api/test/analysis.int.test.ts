@@ -415,6 +415,15 @@ describe('GET /api/analysis/status (D-11)', () => {
       analysedToday: 1,
       waiting: 2,
       limitReached: true,
+      model: 'mock-rules',
+      paid: false,
+      blocked: null,
+      budget: {
+        capMicroUsd: null,
+        spentMicroUsd: 0,
+        unknownCostCount: 0,
+        monthStart: '2025-12-31T23:00:00.000Z',
+      },
     });
   });
 
