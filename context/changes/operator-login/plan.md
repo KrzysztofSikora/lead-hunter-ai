@@ -279,7 +279,7 @@ Migration `0001_*`: `sessions` as in D-3. No foreign keys. Nothing else changes.
 - [minor] Phase 3: a failed logout request keeps the shell (the session is still alive) instead of showing the form; a 401 on logout counts as success.
 - [FOLLOW-UP] Invalidate all sessions when `OPERATOR_PASSWORD_HASH` changes, or offer "log out
   everywhere" (see *Risks*). Not in S-01's acceptance.
+- [minor] Review round 1 (R2): `getSession()` now throws on any status except 200/401 and `App` has an `error` view showing `strings.status.error`; the earlier test pinning "login form on unreachable server" was replaced (not weakened) by two tests expecting the error text and no login form.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
-- [minor] Review round 1 (R2): `getSession()` now throws on any status except 200/401 and `App` has an `error` view showing `strings.status.error`; the earlier test pinning "login form on unreachable server" was replaced (not weakened) by two tests expecting the error text and no login form.
