@@ -320,13 +320,14 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 - [x] Phase 1: Feed parser and retry rules
 - [x] Phase 2: Contracts, schema and shared ingest
 - [x] Phase 3: Sources service, RSS adapter, routes and CLI (checkpoint)
-- [ ] Phase 4: Sources view
+- [x] Phase 4: Sources view
 - [ ] Phase 5: Fixture recorder and documentation
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 3) Real feeds answer and map as assumed — run (machine with internet): `pnpm dev`, log in, then `curl -b <cookie> -X POST localhost:8080/api/sources -H 'content-type: application/json' -d '{"preset":"hn-freelance"}'`, the same for `wwr-programming`, then `POST /api/sources/<id>/run` for both (or `pnpm discover`); record counts and one sample signal (title, URL, date) in `evidence/real-run.md` — evidence: none yet (agent sandbox cannot reach hnrss.org or weworkremotely.com)
 - [ ] (Phase 3) Preset URLs and terms links in `apps/api/src/modules/sources/presets.ts` are right (hnrss `whoishiring/freelancer` and `jobs?q=contract`; WWR `remote-programming-jobs`, `remote-full-stack-programming-jobs`, `remote-back-end-programming-jobs`, `remote-devops-sysadmin-jobs`; WWR/hnrss terms pages), and the hnrss title pattern `New comment by …` of D-12 holds — run: open each URL, `curl -sI <url>` expects 200 — evidence: none
+- [ ] (Phase 4) Sources view at 360 px and on a laptop: add a preset, toggle off/on, press **Uruchom teraz** and **Sprawdź** (with network, or against an unreachable URL added by hand) and read result and error texts; health (OK / błąd) readable without colour — run: `pnpm dev`, open `/zrodla` after login — evidence: none (agent sandbox has no Playwright Chromium; screenshot with one OK and one failing source to be added by the person)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -343,6 +344,8 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 - [minor] (Phase 3) Plan-review #12: D-6 worst case is 3 × 20 s + 2 × 30 s of waiting (plus a robots.txt fetch), about 2 minutes, not 70 s; kept, because `MAX_WAIT_MS` already bounds each wait to 30 s.
 - [minor] (Phase 3) Presets: WWR slugs for full-stack, back-end and devops differ from the plan's `remote-<slug>-jobs` pattern (`remote-full-stack-programming-jobs`, `remote-back-end-programming-jobs`, `remote-devops-sysadmin-jobs`), and the HN freelance feed is `hnrss.org/whoishiring/freelancer`. All `UNVERIFIED` (sandbox cannot reach the hosts); human check above.
 - [minor] (Phase 3) `createSourceRuntime` (`infrastructure/sources/compose.ts`) is the single wiring point for server, CLI and tests; `SourceFailureReason` has no change. Integration case (e) covers an HTTP-date `Retry-After` (plan-review #5).
+- [minor] (Phase 4) No Playwright screenshot: Chromium is not installed in the agent sandbox and installing tools is off-limits (autonomy §4); the screenshot is part of the open human check. No automated web test (D-17).
+- [minor] (Phase 4) Strings live under `strings.sources`; failure reasons reuse `strings.opportunities.sourceFailure`. A source counts as failing when its last error is not older than its last success.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

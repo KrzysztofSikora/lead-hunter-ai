@@ -7,6 +7,7 @@ import { OpportunitiesPage } from './OpportunitiesPage.js';
 import { OpportunityPage } from './OpportunityPage.js';
 import { PipelinePage, DueFollowUps } from './PipelinePage.js';
 import { ProfilePage } from './ProfilePage.js';
+import { SourcesPage } from './SourcesPage.js';
 import { getSession, logout } from './api/auth.js';
 import { setUnauthorizedHandler } from './api/client.js';
 import { fetchHealth } from './api/health.js';
@@ -48,6 +49,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         </NavLink>
         <NavLink to="/okazje">{strings.nav.opportunities}</NavLink>
         <NavLink to="/lejek">{strings.nav.pipeline}</NavLink>
+        <NavLink to="/zrodla">{strings.nav.sources}</NavLink>
         <NavLink to="/import">{strings.nav.import}</NavLink>
         <NavLink to="/profil">{strings.nav.profile}</NavLink>
         <button type="button" className={styles.logout} onClick={onLogout}>
@@ -59,6 +61,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         <Route path="/okazje" element={<OpportunitiesPage />} />
         <Route path="/okazje/:id" element={<OpportunityPage />} />
         <Route path="/lejek" element={<PipelinePage />} />
+        <Route path="/zrodla" element={<SourcesPage />} />
         <Route path="/import" element={<ImportPage />} />
         <Route path="/profil" element={<ProfilePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
