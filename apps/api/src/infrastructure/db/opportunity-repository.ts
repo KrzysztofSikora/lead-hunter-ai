@@ -1,11 +1,28 @@
-import { and, asc, count, desc, eq, gte, isNotNull, lt, sql, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  isNotNull,
+  isNull,
+  like,
+  lt,
+  ne,
+  notInArray,
+  or,
+  sql,
+  type SQL,
+} from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type {
+  AnalysisAttemptRow,
   EvidenceRow,
   OpportunityRepository,
   OpportunityRow,
 } from '../../modules/opportunities/ports.js';
-import { opportunities, opportunityEvidence, rawSignals } from './schema.js';
+import { analyses, opportunities, opportunityEvidence, rawSignals } from './schema.js';
 
 const columns = {
   id: opportunities.id,
@@ -26,6 +43,11 @@ const columns = {
   fetchedAt: rawSignals.fetchedAt,
   availability: rawSignals.availability,
   lastVerifiedAt: rawSignals.lastVerifiedAt,
+  prefilterRule: opportunities.prefilterRule,
+  prefilterMatches: opportunities.prefilterMatches,
+  prefilterAt: opportunities.prefilterAt,
+  language: opportunities.language,
+  analysisProvider: opportunities.analysisProvider,
 };
 
 export function createOpportunityRepository(db: BetterSQLite3Database): OpportunityRepository {
@@ -47,6 +69,41 @@ export function createOpportunityRepository(db: BetterSQLite3Database): Opportun
         filter.status ? eq(opportunities.businessStatus, filter.status) : undefined,
         filter.from !== undefined ? gte(opportunities.createdAt, filter.from) : undefined,
         filter.to !== undefined ? lt(opportunities.createdAt, filter.to) : undefined,
+        // D-13: a row is excluded only when its value is known and fails; unknown passes.
+        filter.notOlderThan !== undefined
+          ? gte(
+              sql`coalesce(${rawSignals.publishedAt}, ${rawSignals.fetchedAt})`,
+              filter.notOlderThan,
+            )
+          : undefined,
+        filter.minAmount !== undefined && filter.currency !== undefined
+          ? or(
+              isNull(opportunities.amountMaxMinor),
+              ne(opportunities.amountCurrency, filter.currency),
+              gte(opportunities.amountMaxMinor, filter.minAmount),
+            )
+          : undefined,
+        filter.language
+          ? or(isNull(opportunities.language), eq(opportunities.language, filter.language))
+          : undefined,
+        filter.workMode
+          ? or(isNull(opportunities.workMode), eq(opportunities.workMode, filter.workMode))
+          : undefined,
+        filter.country
+          ? or(
+              isNull(opportunities.countries),
+              like(opportunities.countries, `%,${filter.country},%`),
+            )
+          : undefined,
+        filter.excludeIndustries && filter.excludeIndustries.length > 0
+          ? or(
+              isNull(opportunities.industry),
+              notInArray(
+                sql`lower(${opportunities.industry})`,
+                filter.excludeIndustries.map((industry) => industry.toLowerCase()),
+              ),
+            )
+          : undefined,
       ];
       const where = and(...conditions);
 
@@ -93,7 +150,27 @@ export function createOpportunityRepository(db: BetterSQLite3Database): Opportun
         .where(eq(opportunityEvidence.opportunityId, id))
         .orderBy(asc(opportunityEvidence.id))
         .all() as EvidenceRow[];
-      return { row, evidence };
+      const latestAnalysis = db
+        .select({
+          status: analyses.status,
+          provider: analyses.provider,
+          model: analyses.model,
+          promptVersion: analyses.promptVersion,
+          schemaVersion: analyses.schemaVersion,
+          resultJson: analyses.resultJson,
+          breakdownJson: analyses.breakdownJson,
+          guardNotesJson: analyses.guardNotesJson,
+          error: analyses.error,
+          inputTokens: analyses.inputTokens,
+          outputTokens: analyses.outputTokens,
+          createdAt: analyses.createdAt,
+        })
+        .from(analyses)
+        .where(eq(analyses.opportunityId, id))
+        .orderBy(desc(analyses.id))
+        .limit(1)
+        .get() as AnalysisAttemptRow | undefined;
+      return { row, evidence, latestAnalysis };
     },
   };
 }

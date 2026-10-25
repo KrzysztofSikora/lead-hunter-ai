@@ -1,4 +1,9 @@
 import { z } from 'zod';
+import { OpportunityAnalysis, PrefilterRule, ScoreBreakdown } from './analysis.js';
+import { Category, Confidence, EvidenceLevel } from './classification.js';
+import { Currency } from './profile.js';
+
+export { Category, Confidence, EvidenceLevel };
 
 export const DEFAULT_IMPORT_MAX_TEXT_CHARS = 20_000;
 
@@ -25,28 +30,6 @@ export type BusinessStatus = z.infer<typeof BusinessStatus>;
 
 export const AnalysisStatus = z.enum(['PENDING', 'COMPLETE', 'FAILED', 'SKIPPED']);
 export type AnalysisStatus = z.infer<typeof AnalysisStatus>;
-
-/** Brief §6.1. */
-export const Category = z.enum([
-  'DIRECT_GIG',
-  'B2B_SUBCONTRACT',
-  'UNMET_NEED',
-  'PRODUCT_HYPOTHESIS',
-  'HARDWARE_IOT',
-]);
-export type Category = z.infer<typeof Category>;
-
-/** Brief §5.4. */
-export const EvidenceLevel = z.enum([
-  'DIRECT_REQUEST',
-  'EXPLICIT_PROBLEM',
-  'INDIRECT_SIGNAL',
-  'SPECULATIVE',
-]);
-export type EvidenceLevel = z.infer<typeof EvidenceLevel>;
-
-export const Confidence = z.enum(['LOW', 'MEDIUM', 'HIGH']);
-export type Confidence = z.infer<typeof Confidence>;
 
 export const Availability = z.enum(['NOT_CHECKED', 'AVAILABLE', 'UNAVAILABLE']);
 export type Availability = z.infer<typeof Availability>;
@@ -126,9 +109,41 @@ export const AnalysisSummary = z
     evidenceLevel: EvidenceLevel.nullable(),
     score: z.number().int().min(0).max(100).nullable(),
     confidence: Confidence.nullable(),
+    /** True when the result comes from the mock: every view labels it DEMO / MOCK (FR-08 AC6). */
+    demo: z.boolean(),
   })
   .strict();
 export type AnalysisSummary = z.infer<typeof AnalysisSummary>;
+
+/** D-12: null until the pre-filter has run. */
+export const PrefilterOutcome = z
+  .object({
+    rule: PrefilterRule.nullable(),
+    matches: z.number().int().min(0),
+    language: z.enum(['pl', 'en']).nullable(),
+  })
+  .strict();
+export type PrefilterOutcome = z.infer<typeof PrefilterOutcome>;
+
+/** D-12: the current (latest) analysis attempt; everything in `result` is model output. */
+export const LatestAnalysis = z
+  .object({
+    status: z.enum(['COMPLETE', 'FAILED']),
+    provider: z.string(),
+    model: z.string(),
+    promptVersion: z.string(),
+    schemaVersion: z.number().int(),
+    demo: z.boolean(),
+    createdAt: isoInstant,
+    inputTokens: z.number().int().nullable(),
+    outputTokens: z.number().int().nullable(),
+    result: OpportunityAnalysis.nullable(),
+    breakdown: ScoreBreakdown.nullable(),
+    guardNotes: z.array(z.string()),
+    error: z.string().nullable(),
+  })
+  .strict();
+export type LatestAnalysis = z.infer<typeof LatestAnalysis>;
 
 const opportunityBase = {
   id: z.number().int(),
@@ -137,6 +152,7 @@ const opportunityBase = {
   createdAt: isoInstant,
   updatedAt: isoInstant,
   analysis: AnalysisSummary.nullable(),
+  prefilter: PrefilterOutcome.nullable(),
 };
 
 export const OpportunitySummary = z
@@ -164,6 +180,7 @@ export const OpportunityDetail = z
     ...opportunityBase,
     source: SourceFacts.extend({ snippet: z.string() }).strict(),
     evidence: z.array(Evidence),
+    latestAnalysis: LatestAnalysis.nullable(),
   })
   .strict();
 export type OpportunityDetail = z.infer<typeof OpportunityDetail>;
@@ -184,8 +201,38 @@ export const OpportunityListQuery = z
     status: BusinessStatus.optional(),
     from: isoInstant.optional(),
     to: isoInstant.optional(),
+    /** D-13: a row is excluded only when its value is known and fails the filter. */
+    maxAgeDays: emptyAsAbsent(z.coerce.number().int().min(1).max(3650).optional()),
+    /** Integer minor units of `currency`, compared with the amount the source stated. */
+    minAmount: emptyAsAbsent(z.coerce.number().int().min(0).optional()),
+    currency: emptyAsAbsent(Currency.optional()),
+    language: emptyAsAbsent(z.enum(['pl', 'en']).optional()),
+    workMode: emptyAsAbsent(z.enum(['REMOTE', 'HYBRID', 'ONSITE']).optional()),
+    country: emptyAsAbsent(
+      z
+        .string()
+        .regex(/^[A-Z]{2}$/)
+        .optional(),
+    ),
+    excludeIndustries: emptyAsAbsent(
+      z
+        .string()
+        .max(1000)
+        .transform((value) =>
+          value
+            .split(',')
+            .map((part) => part.trim())
+            .filter((part) => part.length > 0),
+        )
+        .pipe(z.array(z.string().max(100)).max(20))
+        .optional(),
+    ),
   })
-  .strict();
+  .strict()
+  .refine((query) => (query.minAmount === undefined) === (query.currency === undefined), {
+    path: ['minAmount'],
+    message: 'podaj kwotę minimalną razem z walutą',
+  });
 export type OpportunityListQuery = z.infer<typeof OpportunityListQuery>;
 
 export const SourceError = z

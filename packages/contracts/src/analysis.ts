@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { Category, Confidence, EvidenceLevel } from './opportunities.js';
+import { Category, Confidence, EvidenceLevel } from './classification.js';
 import { Currency } from './profile.js';
 
 export const ANALYSIS_SCHEMA_VERSION = 1;

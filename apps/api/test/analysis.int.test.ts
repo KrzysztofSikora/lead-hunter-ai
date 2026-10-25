@@ -390,3 +390,46 @@ describe('prompt injection and leakage (TR-02)', () => {
     expect(profileAfter.body).toBe(profileBefore.body);
   });
 });
+
+describe('GET /api/analysis/status (D-11)', () => {
+  it('counts what waits and says when the daily limit is reached', async () => {
+    const t = await setup({ env: { ...MOCK, ANALYSIS_DAILY_LIMIT: '1' } });
+    await t.post('DEMO: Szukamy programisty TypeScript do narzędzia, zapłacimy za wykonanie.');
+    await t.post('DEMO: Szukamy programisty TypeScript i React do aplikacji, zapłacimy.');
+    await t.post(
+      'DEMO: Szukamy programisty TypeScript, Node.js oraz React, zapłacimy za wykonanie.',
+    );
+    await t.runner.drain();
+    const res = await t.app.inject({
+      method: 'GET',
+      url: '/api/analysis/status',
+      headers: { cookie: t.cookie },
+    });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({
+      configured: true,
+      provider: 'mock',
+      demo: true,
+      dailyLimit: 1,
+      analysedToday: 1,
+      waiting: 2,
+      limitReached: true,
+    });
+  });
+
+  it('says analysis is not configured without LLM_PROVIDER', async () => {
+    const t = await setup();
+    const res = await t.app.inject({
+      method: 'GET',
+      url: '/api/analysis/status',
+      headers: { cookie: t.cookie },
+    });
+    expect(res.json()).toMatchObject({
+      configured: false,
+      provider: null,
+      demo: false,
+      analysedToday: 0,
+      limitReached: false,
+    });
+  });
+});

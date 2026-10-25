@@ -79,7 +79,12 @@ async function main(): Promise<void> {
     profile: profileDeps,
     signals: { repository: createSignalRepository(db), clock },
     onSignalCreated: () => runner.kick(),
-    opportunities: { repository: createOpportunityRepository(db), sourceStatus: noSourcesYet },
+    opportunities: {
+      repository: createOpportunityRepository(db),
+      sourceStatus: noSourcesYet,
+      clock,
+    },
+    analysis: runner,
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });

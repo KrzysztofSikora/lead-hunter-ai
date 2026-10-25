@@ -379,7 +379,7 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 - [x] Phase 1: Analysis contracts and the scoring rubric
 - [x] Phase 2: Pre-filter, output guard and mock provider
 - [x] Phase 3: Storage, runner and configuration
-- [ ] Phase 4: Status route, DTOs and list filters
+- [x] Phase 4: Status route, DTOs and list filters
 - [ ] Phase 5: Web views, e2e and README
 
 ## Human checks
@@ -399,6 +399,9 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 - [minor] (Phase 3) plan-review #3/#4: `drain()` and `kick()` share one in-flight promise (a call during a drain makes it run once more); any error after the provider answered is stored as `FAILED` with `internal_error: …`, and if that also throws the drain stops and `onError` logs it. `buildTestApp` kicks only with `autoKick: true`; tests call `runner.drain()`.
 - [minor] (Phase 3) `AnalysisRepository.savePrefilter` takes a fourth argument `moveTo` (business status applied only while `NEW`), so the status mapping (D-5) stays in the service, not in SQL. Amount columns hold `sourceBudget` only (plan-review #8); `workMode UNKNOWN` is stored as null so the filters treat it as unknown.
 - [minor] (Phase 3) `pnpm docker:build` fails in this sandbox before reaching the code: corepack cannot download pnpm inside the build ("self-signed certificate in certificate chain", the agent proxy's CA is not trusted in the container). Not caused by this phase; `/review` runs it again.
+- [minor] (Phase 4) Plan says `opportunities.ts` imports the analysis schemas; `analysis.ts` already imported `Category`/`Confidence`/`EvidenceLevel` from `opportunities.ts`, which would be an import cycle. Moved those three enums to `classification.ts` (re-exported from `opportunities.ts`, public imports unchanged).
+- [minor] (Phase 4) `OpportunityDeps` gained `clock` (for `maxAgeDays`), `AppDeps` gained `analysis` (the runner's `status()`), and `AnalysisRunner` gained `status()`; `GET /api/analysis/status` has no service of its own. `maxAgeDays` uses `coalesce(published_at, fetched_at)`; a currency different from the stored amount's is treated as unknown (plan-review #8). `minAmount` is in minor units of `currency`. `PrefilterOutcome` and `LatestAnalysis` are exported from contracts.
+- [minor] (Phase 4) `analysis.demo` is derived from `analysis_provider === 'mock'`; a row whose analysis columns were set without a provider (test fixtures) reads `demo: false`.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

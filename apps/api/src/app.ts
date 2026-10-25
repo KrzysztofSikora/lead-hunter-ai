@@ -8,6 +8,7 @@ import {
   validatorCompiler,
 } from 'fastify-type-provider-zod';
 import { registerValidationErrorHandler } from './http-errors.js';
+import { registerAnalysisRoutes, type AnalysisRouteDeps } from './modules/analysis/routes.js';
 import { registerAuth } from './modules/auth/routes.js';
 import type { AuthDeps } from './modules/auth/service.js';
 import { registerHealthRoutes } from './modules/health/routes.js';
@@ -26,6 +27,7 @@ export interface AppDeps {
   profile: ProfileDeps;
   signals: SignalDeps;
   opportunities: OpportunityDeps;
+  analysis: AnalysisRouteDeps;
   /** Called after an import created a new opportunity; the analysis runner is kicked here (D-4). */
   onSignalCreated?: () => void;
   version: string;
@@ -70,6 +72,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   });
 
   registerOpportunityRoutes(app, deps.opportunities);
+  registerAnalysisRoutes(app, deps.analysis);
 
   if (deps.config.nodeEnv !== 'production') {
     app.get('/api/openapi.json', { schema: { hide: true } }, async () => app.swagger());

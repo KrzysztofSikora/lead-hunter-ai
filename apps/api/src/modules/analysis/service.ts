@@ -1,5 +1,6 @@
 import {
   ANALYSIS_SCHEMA_VERSION,
+  type AnalysisServiceStatus,
   OpportunityAnalysis,
   type BusinessStatus,
   type PrefilterRule,
@@ -36,6 +37,8 @@ export interface AnalysisRunner {
   drain(): Promise<void>;
   /** Fire and forget: errors go to `onError`. */
   kick(): void;
+  /** D-11: what the UI and the brief need to say how much analysis is done and waiting. */
+  status(): AnalysisServiceStatus;
   /** Resolves when no drain is in flight. */
   idle(): Promise<void>;
 }
@@ -190,6 +193,18 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     drain,
     kick() {
       drain().catch(deps.onError);
+    },
+    status() {
+      const analysedToday = repository.countSince(startOfWarsawDay(clock.now()).getTime());
+      return {
+        configured: provider !== undefined,
+        provider: provider?.name ?? null,
+        demo: provider?.demo ?? false,
+        dailyLimit: deps.dailyLimit,
+        analysedToday,
+        waiting: repository.waitingCount(),
+        limitReached: analysedToday >= deps.dailyLimit,
+      };
     },
     idle: () => inFlight ?? Promise.resolve(),
   };

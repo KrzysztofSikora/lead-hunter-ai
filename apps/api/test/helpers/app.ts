@@ -110,7 +110,12 @@ export async function buildTestApp(
     profile: profileDeps,
     signals: { repository: createSignalRepository(db), clock },
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),
-    opportunities: { repository: createOpportunityRepository(db), sourceStatus: noSourcesYet },
+    opportunities: {
+      repository: createOpportunityRepository(db),
+      sourceStatus: noSourcesYet,
+      clock,
+    },
+    analysis: runner,
     ...options.overrides,
   });
   cleanups.push(() => app.close());

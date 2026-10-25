@@ -1,10 +1,14 @@
-import type {
-  OpportunityDetail,
-  OpportunityList,
-  OpportunityListQuery,
-  OpportunitySummary,
+import {
+  OpportunityAnalysis,
+  ScoreBreakdown,
+  type OpportunityDetail,
+  type OpportunityList,
+  type OpportunityListQuery,
+  type OpportunitySummary,
 } from '@lead-hunter/contracts';
+import type { Clock } from '../shared/clock.js';
 import type {
+  AnalysisAttemptRow,
   EvidenceRow,
   OpportunityRepository,
   OpportunityRow,
@@ -14,6 +18,7 @@ import type {
 export interface OpportunityDeps {
   repository: OpportunityRepository;
   sourceStatus: SourceStatusReader;
+  clock: Clock;
 }
 
 export interface OpportunityService {
@@ -39,13 +44,16 @@ function sourceFacts(row: OpportunityRow) {
   };
 }
 
+/** Only the mock produces DEMO / MOCK results in this item (D-12). */
+const isDemo = (provider: string | null): boolean => provider === 'mock';
+
 /** D-8: null while every analysis column is empty (before S-04). */
 function analysisOf(row: OpportunityRow): OpportunitySummary['analysis'] {
   const { category, evidenceLevel, score, confidence } = row;
   if (category === null && evidenceLevel === null && score === null && confidence === null) {
     return null;
   }
-  return { category, evidenceLevel, score, confidence };
+  return { category, evidenceLevel, score, confidence, demo: isDemo(row.analysisProvider) };
 }
 
 function base(row: OpportunityRow) {
@@ -56,6 +64,10 @@ function base(row: OpportunityRow) {
     createdAt: iso(row.createdAt),
     updatedAt: iso(row.updatedAt),
     analysis: analysisOf(row),
+    prefilter:
+      row.prefilterAt === null
+        ? null
+        : { rule: row.prefilterRule, matches: row.prefilterMatches ?? 0, language: row.language },
   };
 }
 
@@ -75,14 +87,61 @@ const toEvidence = (row: EvidenceRow): OpportunityDetail['evidence'][number] => 
   extractedAt: iso(row.extractedAt),
 });
 
+/** Stored JSON was written by this service's own schema; a row that no longer parses reads as absent. */
+function parseStored<T>(
+  schema: { safeParse(value: unknown): { success: true; data: T } | { success: false } },
+  json: string | null,
+): T | null {
+  if (json === null) return null;
+  try {
+    const parsed = schema.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+function toLatestAnalysis(row: AnalysisAttemptRow): OpportunityDetail['latestAnalysis'] {
+  return {
+    status: row.status,
+    provider: row.provider,
+    model: row.model,
+    promptVersion: row.promptVersion,
+    schemaVersion: row.schemaVersion,
+    demo: isDemo(row.provider),
+    createdAt: iso(row.createdAt),
+    inputTokens: row.inputTokens,
+    outputTokens: row.outputTokens,
+    result: parseStored(OpportunityAnalysis, row.resultJson),
+    breakdown: parseStored(ScoreBreakdown, row.breakdownJson),
+    guardNotes: row.guardNotesJson === null ? [] : parseNotes(row.guardNotesJson),
+    error: row.error,
+  };
+}
+
+function parseNotes(json: string): string[] {
+  try {
+    const value: unknown = JSON.parse(json);
+    return Array.isArray(value) ? value.filter((n): n is string => typeof n === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+const DAY_MS = 86_400_000;
+
 export function createOpportunityService({
   repository,
   sourceStatus,
+  clock,
 }: OpportunityDeps): OpportunityService {
   return {
-    list({ from, to, ...rest }) {
+    list({ from, to, maxAgeDays, ...rest }) {
       const { rows, total } = repository.list({
         ...rest,
+        ...(maxAgeDays !== undefined
+          ? { notOlderThan: clock.now().getTime() - maxAgeDays * DAY_MS }
+          : {}),
         ...(from !== undefined ? { from: Date.parse(from) } : {}),
         ...(to !== undefined ? { to: Date.parse(to) } : {}),
       });
@@ -101,6 +160,7 @@ export function createOpportunityService({
         ...base(found.row),
         source: { ...sourceFacts(found.row), snippet: found.row.snippet },
         evidence: found.evidence.map(toEvidence),
+        latestAnalysis: found.latestAnalysis ? toLatestAnalysis(found.latestAnalysis) : null,
       };
     },
   };
