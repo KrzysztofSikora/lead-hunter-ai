@@ -105,7 +105,7 @@ Round 1 (previous verdict CHANGES REQUESTED, 497 tests) findings R1–R4 are re-
 - Fix: add `guard` to the `invalid_output` row (e.g. "wynik po usunięciu wymyślonych adresów nie spełnia schematu").
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (bcc117c)
 
 ### R6: Polish plural is wrong in the capped link note
 - Severity: minor
@@ -114,4 +114,4 @@ Round 1 (previous verdict CHANGES REQUESTED, 497 tests) findings R1–R4 are re-
 - Fix: use a neutral wording that avoids the plural ("Usunięto więcej adresów spoza tekstu źródła; łącznie: N.") or a small `one/few/many` choice.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (bcc117c)
