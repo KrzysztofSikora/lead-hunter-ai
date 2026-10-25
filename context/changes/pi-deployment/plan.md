@@ -248,7 +248,7 @@ the README alone, and it keeps running there.
   - The scheduled 08:00 or 18:00 run appears in the run history without anyone touching it.
   - `deploy/pi-check.sh rss` after a discovery cycle: VmHWM ≤ 500 MB (NFR-01).
   - `deploy/pi-check.sh perf 10000`: max ≤ 500 ms for each endpoint (NFR-02).
-  - Offline: unplug the network or `sudo ip link set wlan0 down`; the panel over LAN or the
+  - Offline: unplug the network or `sudo ip link set wlan0 down`; the panel on the Pi (local browser or ssh -L) or the
     console, a text import, a status change and a payment work, and *Uruchom teraz* shows each
     source as an error, not as "no results" (FR-23 AC3).
   - `tailscale serve --bg 8080` from the README: the panel opens on the phone at

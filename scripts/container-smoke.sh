@@ -14,7 +14,7 @@ HASH='scrypt:15:8:3:Dam3HcJsb4VKnruNqmuSyw:ie09VRIaKtgyT6wgpFvWByCSnuwayZaZy8whx
 JAR="$(mktemp)"
 
 cleanup() {
-  docker rm -f "$NAME" >/dev/null 2>&1 || true
+  docker rm -f "$NAME" "$NAME-nohash" >/dev/null 2>&1 || true
   docker volume rm "$VOLUME" >/dev/null 2>&1 || true
   rm -f "$JAR"
 }
@@ -38,7 +38,9 @@ start() {
 }
 
 echo "1/4 refuses to start without a password hash on a non-loopback HOST"
-if out="$(docker run --rm -e HOST=0.0.0.0 -e OPERATOR_PASSWORD_HASH= "$IMAGE" 2>&1)"; then
+rc=0
+out="$(timeout 60 docker run --rm --name "$NAME-nohash" -e HOST=0.0.0.0 -e OPERATOR_PASSWORD_HASH= "$IMAGE" 2>&1)" || rc=$?
+if [ "$rc" = 0 ] || [ "$rc" = 124 ]; then
   echo "$out" >&2
   fail "container started without OPERATOR_PASSWORD_HASH"
 fi

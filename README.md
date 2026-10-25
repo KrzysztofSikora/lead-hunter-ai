@@ -105,7 +105,7 @@ zastąpi tę sekcję.
 
 ### Bez internetu
 
-Panel (LAN lub konsola), import tekstu, zmiany statusu, notatki, płatności i lejek działają bez
+Panel (na Pi w lokalnej przeglądarce albo przez `ssh -L 8080:127.0.0.1:8080 pi`; port nasłuchuje tylko na loopbacku), import tekstu, zmiany statusu, notatki, płatności i lejek działają bez
 internetu. Źródła RSS i import z adresu URL nie: w widoku *Źródła* i w przebiegu pokazują błąd z
 powodem, nigdy „brak wyników"; wcześniej zapisane okazje zostają. Bez `LLM_PROVIDER` analiza
 czeka. Przebieg przerwany awarią zostaje w historii jako nieudany i nie jest nadrabiany.

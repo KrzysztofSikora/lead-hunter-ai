@@ -21,10 +21,11 @@ rss() {
     for (const pid of fs.readdirSync("/proc").filter((n) => /^\d+$/.test(n))) {
       let cmd = "";
       try { cmd = fs.readFileSync(`/proc/${pid}/cmdline`, "utf8"); } catch { continue; }
-      if (!cmd.includes("server.js")) continue;
+      const args = cmd.split("\0");
+      if (Number(pid) === process.pid || !args[0].endsWith("node") || args[1] !== "apps/api/dist/server.js") continue;
       const status = fs.readFileSync(`/proc/${pid}/status`, "utf8");
       const mb = (key) => Math.round(Number(new RegExp(key + ":\\s+(\\d+) kB").exec(status)[1]) / 1024);
-      console.log(`VmRSS ${mb("VmRSS")} MB, VmHWM (szczyt od startu) ${mb("VmHWM")} MB; cel NFR-01: VmHWM <= 500 MB`);
+      console.log(`pid ${pid}: VmRSS ${mb("VmRSS")} MB, VmHWM (szczyt od startu) ${mb("VmHWM")} MB; cel NFR-01: VmHWM <= 500 MB`);
       process.exit(0);
     }
     console.error("nie znaleziono procesu server.js");
@@ -49,12 +50,11 @@ median_max() {
 perf() {
   local count="${1:-10000}"
   local base="http://127.0.0.1:${PERF_PORT}"
-  local jar
-  jar="$(mktemp)"
+  JAR="$(mktemp)"
   cleanup() {
     docker rm -f "$PERF_NAME" >/dev/null 2>&1 || true
     docker volume rm "$PERF_NAME" >/dev/null 2>&1 || true
-    rm -f "$jar"
+    rm -f "$JAR"
   }
   trap cleanup EXIT
   cleanup
@@ -73,7 +73,7 @@ perf() {
     sleep 1
   done
   curl -fsS "$base/api/health" >/dev/null || die "serwer testowy nie odpowiada"
-  curl -fsS -c "$jar" -H 'content-type: application/json' \
+  curl -fsS -c "$JAR" -H 'content-type: application/json' \
     -d "{\"password\":\"${DEMO_PASSWORD}\"}" "$base/api/auth/login" >/dev/null ||
     die "logowanie do serwera testowego nie powiodło się"
 
@@ -82,7 +82,7 @@ perf() {
   for path in '/api/opportunities' '/api/opportunities?minScore=65' '/api/digest/today'; do
     local times=""
     for _ in 1 2 3 4 5; do
-      times+="$(curl -fsS -b "$jar" -o /dev/null -w '%{time_total}' "${base}${path}")"$'\n'
+      times+="$(curl -fsS -b "$JAR" -o /dev/null -w '%{time_total}' "${base}${path}")"$'\n'
     done
     printf '%-36s %s\n' "$path" "$(printf '%s' "$times" | median_max)"
   done
