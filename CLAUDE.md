@@ -69,6 +69,7 @@ fast ones per phase; `/review` runs all of them.
 | lint | `pnpm lint` | - |
 | unit tests | `pnpm test` | - |
 | image | `pnpm docker:build` | Docker |
+| image smoke | `pnpm docker:smoke` | Docker, after `pnpm docker:build` |
 | e2e | `pnpm e2e` | Playwright Chromium (`pnpm exec playwright install chromium`) |
 | mutation (one module) | `pnpm mutation --mutate <file>` | - |
 
@@ -91,3 +92,4 @@ Run the app: `docker compose up --build` (D-14); needs `mkdir -p data` and `.env
 | `pnpm seed:demo [--count N]` | fill an **empty** database with `DEMO` signals (default 10 000) for the Pi measurements; refuses a non-empty one |
 | `pnpm fixtures:record <source-id>` | record an anonymised feed fixture into `apps/api/test/fixtures/feeds/` (needs internet) |
 | `pnpm docker:build` | build the image `lead-hunter-ai:local` |
+| `pnpm docker:smoke` | run the built image: non-root, migrations, health, refusal without a hash, data kept on recreate (removes what it creates) |

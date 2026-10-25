@@ -24,3 +24,15 @@ services:
       timeout: 5s
       retries: 3
       start_period: 20s
+
+  # Optional (README: Ollama). Started only with `docker compose --profile ollama up -d`.
+  # The app cannot use it before the LLM providers slice (S-05); it will reach it as http://ollama:11434/v1.
+  ollama:
+    profiles: [ollama]
+    image: ollama/ollama:0.40.2
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+
+volumes:
+  ollama: {}

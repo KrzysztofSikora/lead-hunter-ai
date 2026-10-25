@@ -276,7 +276,7 @@ the README alone, and it keeps running there.
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Durability, DEMO seed and Pi measurement script
-- [ ] Phase 2: Ollama profile and container smoke in CI
+- [x] Phase 2: Ollama profile and container smoke in CI
 - [ ] Phase 3: Raspberry Pi install and operator docs
 
 ## Human checks
@@ -303,6 +303,8 @@ the README alone, and it keeps running there.
 - [minor] plan-review #6, #7: FR-23 AC1 "backups" belongs to S-15; the interim copy goes under
   `data/backups/` (Phase 3 checks `.gitignore` covers `data/`), and Phase 3 adds a per-adapter
   table to the README.
+
+- [minor] Phase 2: the Docker daemon is not running in the sandbox, so `pnpm docker:build && pnpm docker:smoke` did not run. Instead the HTTP steps (health with migrations > 0, login, text import, listing) ran against the built app, the refusal without a hash exited 1 naming `OPERATOR_PASSWORD_HASH`, and `docker compose config -q` passed with and without `--profile ollama`. The first real run of the container steps is the CI `image` job.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

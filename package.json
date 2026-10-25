@@ -20,6 +20,7 @@
     "fixtures:record": "pnpm --filter @lead-hunter/api fixtures:record",
     "e2e": "pnpm build && playwright test",
     "docker:build": "docker build -t lead-hunter-ai:local .",
+    "docker:smoke": "bash scripts/container-smoke.sh",
     "mutation": "stryker run"
   },
   "devDependencies": {
