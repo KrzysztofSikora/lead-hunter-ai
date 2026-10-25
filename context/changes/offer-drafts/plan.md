@@ -347,7 +347,7 @@ conditional UPDATE (`WHERE id = ? AND status = ?`) of the text and/or status, an
 - [x] Phase 1: Contracts, table and spend
 - [x] Phase 2: Offer prompt and adapters
 - [x] Phase 3: Generate a draft
-- [ ] Phase 4: Draft actions and the no-send proof
+- [x] Phase 4: Draft actions and the no-send proof
 - [ ] Phase 5: Draft panel and the e2e draft step
 
 ## Human checks

@@ -4,8 +4,11 @@ import {
   OfferDraftContent,
   OpportunityAnalysis,
   checkMove,
+  nextDraftStatus,
   upgradeStoredAnalysis,
   type BusinessStatus,
+  type OfferDraftConflict,
+  type OfferDraftPatch,
   type OfferDraftRefused,
   type OpportunityDetail,
 } from '@lead-hunter/contracts';
@@ -49,8 +52,15 @@ export type GenerateResult =
   | { result: 'refused'; code: OfferDraftRefused['error'] }
   | { result: 'failed'; reason: string };
 
+export type ActResult =
+  | { result: 'ok'; detail: OpportunityDetail }
+  | { result: 'not_found' }
+  | { result: 'conflict'; code: OfferDraftConflict['error'] };
+
 export interface OfferService {
   generate(opportunityId: number): Promise<GenerateResult>;
+  /** An operator action on the current draft (FR-13 AC3). Nothing is sent anywhere. */
+  act(draftId: number, patch: OfferDraftPatch): ActResult;
 }
 
 const REASON_MAX = 120;
@@ -245,5 +255,39 @@ export function createOfferService(deps: OfferDeps): OfferService {
     return detail ? { result: 'ok', detail } : { result: 'not_found' };
   }
 
-  return { generate };
+  /** D-3, D-16: one conditional UPDATE, so a stale click cannot skip a step. */
+  function act(draftId: number, patch: OfferDraftPatch): ActResult {
+    const draft = repository.get(draftId);
+    if (!draft || draft.status === 'FAILED') return { result: 'not_found' };
+    if (repository.current(draft.opportunityId)?.id !== draft.id) {
+      return { result: 'conflict', code: 'not_current' };
+    }
+    const changed =
+      patch.action === 'save' &&
+      (patch.subject !== draft.subject ||
+        patch.message !== draft.messageMarkdown ||
+        patch.proposal !== draft.proposalMarkdown);
+    const next = nextDraftStatus(draft.status, patch.action, changed);
+    if (!next) return { result: 'conflict', code: 'action_not_allowed' };
+
+    const applied = repository.update(
+      draft.id,
+      draft.status,
+      patch.action === 'save'
+        ? {
+            status: next,
+            subject: patch.subject,
+            messageMarkdown: patch.message,
+            proposalMarkdown: patch.proposal,
+          }
+        : { status: next },
+      clock.now().getTime(),
+    );
+    if (!applied) return { result: 'conflict', code: 'action_not_allowed' };
+    if (patch.action === 'sent') moveForward(draft.opportunityId, 'CONTACTED');
+    const detail = deps.detail(draft.opportunityId);
+    return detail ? { result: 'ok', detail } : { result: 'not_found' };
+  }
+
+  return { generate, act };
 }

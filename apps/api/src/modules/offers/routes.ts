@@ -1,6 +1,8 @@
 import {
   ApiError,
+  OfferDraftConflict,
   OfferDraftFailed,
+  OfferDraftPatch,
   OfferDraftRefused,
   OpportunityDetail,
   ValidationError,
@@ -39,6 +41,34 @@ export function registerOfferRoutes(app: FastifyInstance, service: OfferService)
           return reply.code(409).send({ error: outcome.code });
         case 'failed':
           return reply.code(502).send({ error: 'provider_failed', reason: outcome.reason });
+      }
+    },
+  );
+
+  // The operator's own steps: approve, copy, export, mark as sent (S-07 D-3, D-16).
+  typed.patch(
+    '/api/offer-drafts/:id',
+    {
+      schema: {
+        params: z.object({ id: z.coerce.number().int().min(1) }),
+        body: OfferDraftPatch,
+        response: {
+          200: OpportunityDetail,
+          400: ValidationError,
+          404: ApiError,
+          409: OfferDraftConflict,
+        },
+      },
+    },
+    async (request, reply) => {
+      const outcome = service.act(request.params.id, request.body);
+      switch (outcome.result) {
+        case 'ok':
+          return reply.code(200).send(outcome.detail);
+        case 'not_found':
+          return reply.code(404).send({ error: 'not_found' });
+        case 'conflict':
+          return reply.code(409).send({ error: outcome.code });
       }
     },
   );

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { Dispatcher, getGlobalDispatcher, setGlobalDispatcher } from 'undici';
 import { describe, expect, it } from 'vitest';
 import { OfferDraftContent, type OpportunityDetail } from '@lead-hunter/contracts';
 import { createOfferDraftRepository } from '../src/infrastructure/db/offer-draft-repository.js';
@@ -259,5 +262,198 @@ describe('refusals and failures (FR-09 AC2-AC3)', () => {
     expect(res.statusCode).toBe(502);
     expect(res.json()).toEqual({ error: 'provider_failed', reason: 'invalid_output: questions' });
     expect(t.db().select().from(offerDrafts).all()).toMatchObject([{ status: 'FAILED' }]);
+  });
+});
+
+describe('operator actions on a draft (FR-13 AC3)', () => {
+  const patch = (t: Awaited<ReturnType<typeof setup>>, id: number, body: unknown) =>
+    t.app.inject({
+      method: 'PATCH',
+      url: `/api/offer-drafts/${id}`,
+      headers: { cookie: t.cookie },
+      payload: body as object,
+    });
+  const edit = (
+    draft: NonNullable<OpportunityDetail['offerDraft']>,
+    message = 'Poprawiona treść.',
+  ) => ({
+    action: 'save',
+    subject: draft.subject,
+    message,
+    proposal: draft.proposal,
+  });
+  const made = async () => {
+    const t = await setup();
+    const id = await t.importText();
+    const draft = (await t.generate(id)).json<OpportunityDetail>().offerDraft!;
+    return { t, id, draft };
+  };
+
+  it('walks DRAFT → REVIEWED → COPIED_OR_EXPORTED → SENT_MANUALLY and contacts the lead', async () => {
+    const { t, id, draft } = await made();
+
+    const saved = await patch(t, draft.id, edit(draft));
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json<OpportunityDetail>().offerDraft).toMatchObject({
+      status: 'REVIEWED',
+      message: 'Poprawiona treść.',
+    });
+    expect(
+      (await patch(t, draft.id, { action: 'copied' })).json<OpportunityDetail>().offerDraft,
+    ).toMatchObject({ status: 'COPIED_OR_EXPORTED' });
+    expect(
+      (await patch(t, draft.id, { action: 'exported' })).json<OpportunityDetail>().offerDraft,
+    ).toMatchObject({ status: 'COPIED_OR_EXPORTED' });
+
+    const sent = (await patch(t, draft.id, { action: 'sent' })).json<OpportunityDetail>();
+    expect(sent.offerDraft).toMatchObject({
+      status: 'SENT_MANUALLY',
+      message: 'Poprawiona treść.',
+    });
+    expect(sent.businessStatus).toBe('CONTACTED');
+    expect(
+      t
+        .db()
+        .select()
+        .from(activityEvents)
+        .all()
+        .filter((e) => e.toStatus === 'CONTACTED'),
+    ).toMatchObject([{ actor: 'operator', opportunityId: id }]);
+  });
+
+  it('refuses steps out of order with 409 action_not_allowed', async () => {
+    const { t, draft } = await made();
+    for (const action of ['sent', 'copied', 'exported']) {
+      const res = await patch(t, draft.id, { action });
+      expect(res.statusCode).toBe(409);
+      expect(res.json()).toEqual({ error: 'action_not_allowed' });
+    }
+    expect((await t.detail(draft.opportunityId)).offerDraft).toMatchObject({ status: 'DRAFT' });
+  });
+
+  it('refuses saving after SENT_MANUALLY, so the sent text stays as it was', async () => {
+    const { t, draft } = await made();
+    await patch(t, draft.id, edit(draft));
+    await patch(t, draft.id, { action: 'copied' });
+    await patch(t, draft.id, { action: 'sent' });
+
+    const res = await patch(t, draft.id, edit(draft, 'Zmiana po wysłaniu.'));
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'action_not_allowed' });
+    expect((await t.detail(draft.opportunityId)).offerDraft?.message).toBe('Poprawiona treść.');
+  });
+
+  it('needs another copy after the text changed, so the sent text is the copied one (D-16)', async () => {
+    const { t, draft } = await made();
+    await patch(t, draft.id, edit(draft));
+    await patch(t, draft.id, { action: 'copied' });
+
+    const unchanged = await patch(t, draft.id, edit(draft, 'Poprawiona treść.'));
+    expect(unchanged.json<OpportunityDetail>().offerDraft).toMatchObject({
+      status: 'COPIED_OR_EXPORTED',
+    });
+    const changed = await patch(t, draft.id, edit(draft, 'Jeszcze raz poprawiona.'));
+    expect(changed.json<OpportunityDetail>().offerDraft).toMatchObject({ status: 'REVIEWED' });
+    expect((await patch(t, draft.id, { action: 'sent' })).statusCode).toBe(409);
+  });
+
+  it('refuses an action on an older draft with 409 not_current', async () => {
+    const { t, id, draft } = await made();
+    await t.generate(id);
+
+    const res = await patch(t, draft.id, edit(draft));
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toEqual({ error: 'not_current' });
+  });
+
+  it('keeps a sent draft unchanged in history when a new one is made', async () => {
+    const { t, id, draft } = await made();
+    await patch(t, draft.id, edit(draft));
+    await patch(t, draft.id, { action: 'exported' });
+    await patch(t, draft.id, { action: 'sent' });
+
+    const view = (await t.generate(id)).json<OpportunityDetail>();
+    expect(view.offerDraft).toMatchObject({ status: 'DRAFT' });
+    expect(view.offerDraft!.id).not.toBe(draft.id);
+    expect(view.offerDraftHistory).toMatchObject([
+      { id: draft.id, status: 'SENT_MANUALLY', message: 'Poprawiona treść.' },
+    ]);
+  });
+
+  it('answers 404 for an unknown or failed draft and 400 for a bad body', async () => {
+    const { t, draft } = await made();
+    expect((await patch(t, 9999, { action: 'copied' })).statusCode).toBe(404);
+    expect((await patch(t, draft.id, { action: 'send_email' })).statusCode).toBe(400);
+    expect(
+      (await patch(t, draft.id, { action: 'save', subject: '', message: 'x', proposal: 'y' }))
+        .statusCode,
+    ).toBe(400);
+  });
+});
+
+describe('nothing leaves the machine but the LLM call (FR-13 AC4)', () => {
+  it('records exactly one request, to the LLM origin, over generate, save, copy, export and send', async () => {
+    const llm = 'https://llm-offer.anthropic.test';
+    const mocks = getGlobalDispatcher();
+    const origins: string[] = [];
+    class Recorder extends Dispatcher {
+      override dispatch(
+        options: Dispatcher.DispatchOptions,
+        handler: Dispatcher.DispatchHandler,
+      ): boolean {
+        origins.push(String(options.origin));
+        return mocks.dispatch(options, handler);
+      }
+    }
+    const agent = mocks as unknown as {
+      get(origin: string): {
+        intercept(o: object): { reply(code: number, body: string, opts: object): void };
+      };
+    };
+    agent
+      .get(llm)
+      .intercept({ path: '/v1/messages', method: 'POST' })
+      .reply(
+        200,
+        readFileSync(
+          fileURLToPath(new URL('./fixtures/llm/anthropic-offer-valid.json', import.meta.url)),
+          'utf8',
+        ),
+        { headers: { 'content-type': 'application/json' } },
+      );
+
+    setGlobalDispatcher(new Recorder());
+    try {
+      const t = await setup({
+        env: {
+          LLM_PROVIDER: 'anthropic',
+          LLM_API_KEY: 'sk-LEAK-CANARY',
+          LLM_BASE_URL: llm,
+          LLM_MONTHLY_BUDGET_USD: '10',
+        },
+      });
+      const id = await t.importText();
+      const created = await t.generate(id);
+      expect(created.statusCode).toBe(201);
+      const draft = created.json<OpportunityDetail>().offerDraft!;
+      const act = (body: object) =>
+        t.app.inject({
+          method: 'PATCH',
+          url: `/api/offer-drafts/${draft.id}`,
+          headers: { cookie: t.cookie },
+          payload: body,
+        });
+      const steps = [
+        { action: 'save', subject: draft.subject, message: 'Gotowe.', proposal: draft.proposal },
+        { action: 'copied' },
+        { action: 'exported' },
+        { action: 'sent' },
+      ];
+      for (const step of steps) expect((await act(step)).statusCode).toBe(200);
+
+      expect(origins).toEqual([llm]);
+    } finally {
+      setGlobalDispatcher(mocks);
+    }
   });
 });
