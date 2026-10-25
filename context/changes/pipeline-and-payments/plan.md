@@ -257,11 +257,12 @@ Observably true when done:
 - [x] Phase 2: Follow-ups and payments
 - [x] Phase 3: Pipeline summary API
 - [x] Phase 4: Card: status panel, contact, follow-up, payments
-- [ ] Phase 5: Pipeline view, "Na dziś" and the main-path e2e
+- [x] Phase 5: Pipeline view, "Na dziś" and the main-path e2e
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 4) Card at 360 px and on a laptop: "Zmień status" wording, required-note hint on a back move, WON contract fields, follow-up and payment forms; typing "1234,50" PLN shows "1 234,50 PLN" — run: `docker compose up --build`, import a DEMO post, open its card at /okazje/<id>, Zapisz → Oznacz jako kontakt → Zmień status → Wygrana — evidence: none (the main-path e2e in Phase 5 adds screenshots)
+- [ ] (Phase 5) Pipeline view (`/lejek`) and the "Na dziś" list on the start view at 360 px and on a laptop: wording "Kontakt (wysłane)", per-currency sums, counts-only rows linking to the filtered list — run: `docker compose up --build`, import a DEMO post, Zapisz → Oznacz jako kontakt → follow-up → payment, then open / and /lejek — evidence: context/changes/pipeline-and-payments/evidence/{card-contacted,today,pipeline}-360.jpg
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -307,6 +308,9 @@ Observably true when done:
 - [minor] Phase 4: plan-review finding 9 applied: `formatMinor(minor, currency)` in `strings.pl.ts` (U+00A0 groups, decimal comma), pinned in `strings.pl.test.ts`; web reuses the contracts `calendarDate` (finding 10).
 - [minor] Phase 4: labels "Notatka do zmiany statusu" and "Notatka do płatności" keep `getByLabel('Notatka', { exact: true })` in the smoke spec unambiguous. Added `warsawToday` / `formatCalendarDate` to `warsawTime.ts` and `eventDetails` to `opportunityCard.ts` (history lines for skipped stages, contract, follow-up).
 - [minor] Phase 4: the "Przygotuj ofertę, Oznacz jako kontakt: dostępne w kolejnej wersji" note now covers only the offer button (`offerLater`).
+- [minor] Phase 5: the spec is `e2e/vertical-main-path.spec.ts`, not `main-path.spec.ts`, and `playwright.config.ts` sets `workers: 1`. Plan says one server and database for all specs; code showed two workers running the files in parallel, so the main path imported a row before the smoke spec's empty-list assertion. Consequence: files run serially in name order (smoke first); the name keeps the main path after it.
+- [minor] Phase 5: `DueFollowUps` and `PipelinePage` share one `PipelinePage.tsx`; the start view fetches `/api/pipeline` for the "Na dziś" list (D-8).
+- [minor] Phase 5: the history line for the skipped stage reads "pominięto: Szkic oferty" (the stage label), asserted in the spec instead of "Oferta przygotowana".
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
