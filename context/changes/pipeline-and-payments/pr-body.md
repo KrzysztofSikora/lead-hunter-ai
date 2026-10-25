@@ -74,4 +74,3 @@ b4361d8 docs(pipeline-and-payments): plan
 Ship run S-08, base `main`, no stops. Steps (all attempt 1, all success): plan (opus, $1.52) → plan-review (opus, $0.92, READY WITH NOTES) → implement ×5 phases (sonnet, $0.54 + $0.57 + $0.44 + $0.57 + $0.45) → review round 1 (opus, $1.45, APPROVE WITH FOLLOW-UPS, 5 open) → fix-review (sonnet, $0.50) → review round 2 (opus, $0.71, 2 open) → fix-review (sonnet, $0.20) → pr-body. Phases ticked 5/5; open findings 0. Total about $7.87 before pr-body.
 </details>
 
-https://claude.ai/code/session_01L7xnPWXcnFkaxbXFZSCLFq
