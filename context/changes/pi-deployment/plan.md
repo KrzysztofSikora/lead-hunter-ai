@@ -275,7 +275,7 @@ the README alone, and it keeps running there.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Durability, DEMO seed and Pi measurement script
+- [x] Phase 1: Durability, DEMO seed and Pi measurement script
 - [ ] Phase 2: Ollama profile and container smoke in CI
 - [ ] Phase 3: Raspberry Pi install and operator docs
 
@@ -284,6 +284,25 @@ the README alone, and it keeps running there.
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [REVIEW] plan-review #1 (major): `docker kill` counts as a manual stop, so `unless-stopped` would
+  not restart the container. The Phase 3 crash check kills the server process inside the
+  container instead (`docker compose exec app sh -c 'kill -9 $(pgrep -f dist/server.js)'`, or
+  `sudo kill -9` of the host pid from `docker top`); tini then exits non-zero and the restart
+  policy applies. The Phase 3 human check and README wording use this.
+- [REVIEW] plan-review #2 (major): the seed CLI calls `createProfileService(...).ensureExample()`
+  before the runner and reads the profile with `profile: { get: () => service.get().profile }`
+  (as `server.ts` does). It exits 1 if any analysis ended `FAILED` or not every signal was
+  analysed, so the evidence never measures unscored rows.
+- [minor] plan-review #3: `perf` seeds with `docker run --rm -v lead-hunter-perf:/data ...` before
+  the perf server starts, so no second runner competes (Phase 1 script).
+- [minor] plan-review #5: seeded rows use `sourceType: 'manual_text'` with `publishedAt: null`
+  (the plan's `'manual'` is not a `SourceType`), shaped like real manual imports.
+- [minor] plan-review #4: the container smoke's recreate step is worded in Phase 2 and the README
+  as "data kept, start on a migrated DB"; new migrations on upgrade stay covered by the migration
+  integration test and the human `git pull` check.
+- [minor] plan-review #6, #7: FR-23 AC1 "backups" belongs to S-15; the interim copy goes under
+  `data/backups/` (Phase 3 checks `.gitignore` covers `data/`), and Phase 3 adds a per-adapter
+  table to the README.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

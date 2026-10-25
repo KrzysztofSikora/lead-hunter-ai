@@ -1,0 +1,6 @@
+sandbox amd64, not the Pi: 10000 DEMO signals (seed:demo), mock provider, 5 calls each
+/api/opportunities                   median 6 ms, max 13 ms
+/api/opportunities?minScore=65       median 6 ms, max 23 ms
+/api/digest/today                    median 34 ms, max 54 ms
+minScore=65 total: "total":1667
+seed: zapisano 10000 sygnałów DEMO, przeanalizowano 10000, błędy 0 (51.0 s)

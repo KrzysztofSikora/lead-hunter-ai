@@ -12,6 +12,7 @@
     "db:generate": "drizzle-kit generate",
     "auth:hash": "node --conditions=source --import tsx src/cli/auth-hash.ts",
     "discover": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/discover.ts",
+    "seed:demo": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/seed-demo.ts",
     "fixtures:record": "node --env-file-if-exists=../../.env --conditions=source --import tsx src/cli/fixtures-record.ts"
   },
   "dependencies": {
