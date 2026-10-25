@@ -24,7 +24,7 @@ Jedno żądanie na analizę, dokładnie:
    adresów URL, e-maili, osób ani firm; przy braku danych `INSUFFICIENT_DATA`; odpowiedź tylko w
    JSON).
 2. **Blok `<source_data>`** – JSON z polami `title`, `text`, `sourceType` okazji; każdy znak `<`
-   jest zapisany jako `<`, więc treść źródła nie może zamknąć bloku.
+   jest zapisany jako `\u003c`, więc treść źródła nie może zamknąć bloku.
 3. **Blok `<profile>`** – tylko fragment profilu użyty do oceny: `skills`, `serviceTypes`,
    `preferredTechnologies`, `excludedTechnologies`, `languages`, `rateRanges`.
 
@@ -61,7 +61,8 @@ Ponowienie ręczne: przycisk „Ponów analizę" na karcie (`POST /api/opportuni
 
 Limity czasu: 120 s na żądanie, SDK ponawia do 2 razy (408/409/429/5xx i błędy połączenia).
 Wywołanie, które przekroczyło czas albo było ponowione przez SDK, nie jest wyceniane, bo dostawca
-nie zwrócił zużycia; tak samo odpowiedź, której nie dało się sparsować jako JSON.
+nie zwrócił zużycia. Odmowa, odpowiedź ucięta limitem tokenów i odpowiedź, której nie dało się
+sparsować jako JSON, były wycenione (dostawca zwrócił zużycie) i liczą się do limitu.
 
 ## Koszt i limit miesięczny
 
