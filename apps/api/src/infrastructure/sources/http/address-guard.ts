@@ -14,11 +14,16 @@ export class BlockedAddressError extends Error {
   }
 }
 
+const GLOBAL_UNICAST_V6 = ipaddr.IPv6.parseCIDR('2000::/3');
+
 /** Only globally routable unicast addresses pass; every other range is blocked (D-4). */
 export function isAllowedAddress(ip: string): boolean {
   if (!ipaddr.isValid(ip)) return false;
   try {
-    return ipaddr.process(ip).range() === 'unicast';
+    const address = ipaddr.process(ip);
+    if (address.range() !== 'unicast') return false;
+    // ipaddr.js calls every IPv6 block it has no name for `unicast`, e.g. ::/96.
+    return address.kind() === 'ipv4' || address.match(GLOBAL_UNICAST_V6);
   } catch {
     return false;
   }
