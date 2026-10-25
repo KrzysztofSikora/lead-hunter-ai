@@ -286,6 +286,19 @@ describe('sources (FR-04, FR-18 AC3)', () => {
     clock.advance(HOUR);
     serve(WWR, WWR_PROGRAMMING, { status: 200, body: WWR_FEED });
     expect((await call('POST', `/api/sources/${wwr}/run`)).json()).toMatchObject({ status: 'ok' });
+
+    // A far-future Retry-After date is capped, so the run and the Sources view still answer.
+    clock.advance(HOUR);
+    serve(WWR, WWR_PROGRAMMING, {
+      status: 429,
+      headers: { 'retry-after': 'Sat, 01 Jan 12026 00:00:00 GMT' },
+    });
+    const capped = await call('POST', `/api/sources/${wwr}/run`);
+    expect(capped.statusCode).toBe(200);
+    expect(capped.json().nextAllowedAt).toBe(
+      new Date(clock.now().getTime() + 7 * 24 * HOUR).toISOString(),
+    );
+    expect((await call('GET', '/api/sources')).statusCode).toBe(200);
   });
 
   it('checks health without storing signals, and a disabled source refuses runs (FR-18 AC3, D-15)', async () => {

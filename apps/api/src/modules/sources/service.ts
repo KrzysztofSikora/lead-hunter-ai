@@ -23,6 +23,9 @@ export const CURSOR_MAX_KEYS = 500;
 /** D-21: the shortest gap between two checks of one source. */
 export const CHECK_COOLDOWN_MS = 60_000;
 
+/** A source's own wait is capped here, so a hostile `Retry-After` cannot lock it for years. */
+export const MAX_SOURCE_BACKOFF_MS = 7 * 24 * 3_600_000;
+
 export interface SourceDeps {
   repository: SourceRepository;
   signals: SignalRepository;
@@ -141,7 +144,7 @@ export function createSourceService({
     const nextAllowedAt =
       outcome.retryAfterMs === undefined
         ? undefined
-        : at + Math.max(outcome.retryAfterMs, minIntervalMs);
+        : at + Math.min(Math.max(outcome.retryAfterMs, minIntervalMs), MAX_SOURCE_BACKOFF_MS);
     repository.finishAttempt(id, attempt, at, nextAllowedAt);
     return { attempt, nextAllowedAt };
   };
