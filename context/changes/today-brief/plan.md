@@ -240,6 +240,7 @@ and errors.
 - [minor] Phase 2: `Item` of `PipelinePage.tsx` is exported and reused for the due follow-ups (smaller diff than a copy); the strings `dueTitle` / `dueNone` moved to the `today` group, `dueLoadFailed` was dropped (the digest has one load-failure text). The health line loads independently of the digest, so a failing digest keeps it visible.
 - [minor] Phase 2: with a non-empty TOP the "Błędy źródeł" section follows the follow-ups; with an empty TOP the errors are part of the FR-12 empty-state block, so they are not repeated.
 - [minor] Phase 2: the e2e `evidence()` of the main path takes an optional directory; the Today screenshot goes to `today-brief/evidence/`, and the S-08 `today-360.jpg` stays as committed (now stale, showing the old Start view). The evidence run rewrote other changes' screenshots, which were restored with `git restore`.
+- [minor] Review R3: `llm.reported` (analyses that reported tokens) added to `DigestToday`, additive on the D-1 contract; the UI shows "tokeny (n z m analiz)" when the sums are partial.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

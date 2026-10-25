@@ -47,7 +47,7 @@ Gates: typecheck ok, lint ok, unit tests ok, e2e ok (5 passed), image not run (n
 - Fix: in the `minScore` test (or a new short case), assert `bestNextStep` equals `{ kind: 'opportunity', opportunityId: <top[0].id>, title, nextAction: 'DEMO krok' }`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (76d0d51)
 
 ### R2: Source-error mapping and the DEMO rule are duplicated
 - Severity: minor
@@ -56,7 +56,7 @@ Gates: typecheck ok, lint ok, unit tests ok, e2e ok (5 passed), image not run (n
 - Fix: move the row→`SourceError` mapping into a shared helper in `infrastructure/db` and use it in both readers. Export `isDemo` from one shared module (for example `modules/shared`) and use it in both services.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (ee03279, 76d0d51)
 
 ### R3: A partial token sum is shown as today's token count
 - Severity: minor
@@ -65,4 +65,4 @@ Gates: typecheck ok, lint ok, unit tests ok, e2e ok (5 passed), image not run (n
 - Fix: return the number of analyses that reported tokens (for example `llm.reported`, `count(input_tokens)`) and show "tokeny (n z m analiz): …" when they differ. This is an additive contract field.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (76d0d51)
