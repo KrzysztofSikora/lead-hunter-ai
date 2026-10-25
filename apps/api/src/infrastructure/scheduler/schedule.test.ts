@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { startScheduler, type Scheduler } from './schedule.js';
+import { retryWhileBusy, startScheduler, type Scheduler } from './schedule.js';
 
 const clock = { now: () => new Date() };
 const HOUR = 3_600_000;
@@ -123,5 +123,29 @@ describe('startScheduler', () => {
       clock,
     });
     expect(scheduler.nextRunAt()?.toISOString()).toBe('2026-11-02T17:00:00.000Z');
+  });
+});
+
+describe('retryWhileBusy', () => {
+  it('tries again until the lock is free, then stops', async () => {
+    vi.useFakeTimers();
+    let busyFor = 2;
+    const attempt = vi.fn(() => (busyFor-- > 0 ? ('busy' as const) : ('done' as const)));
+    retryWhileBusy(attempt, { retryMs: 30_000, windowMs: 30 * 60_000 });
+    expect(attempt).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(attempt).toHaveBeenCalledTimes(3);
+    await vi.advanceTimersByTimeAsync(10 * 60_000);
+    expect(attempt).toHaveBeenCalledTimes(3);
+  });
+
+  it('gives up when the window ends', async () => {
+    vi.useFakeTimers();
+    const onGiveUp = vi.fn();
+    const attempt = vi.fn(() => 'busy' as const);
+    retryWhileBusy(attempt, { retryMs: 30_000, windowMs: 60_000, onGiveUp });
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    expect(attempt).toHaveBeenCalledTimes(3);
+    expect(onGiveUp).toHaveBeenCalledTimes(1);
   });
 });

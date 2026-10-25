@@ -17,6 +17,33 @@ export interface SchedulerOptions {
   clock?: Clock;
 }
 
+/**
+ * A slot that finds the lock busy is tried again until the window ends (plan-review round 2 #1);
+ * the slot index (D-5) makes a repeat after a success harmless. Returns the cancel function.
+ */
+export function retryWhileBusy(
+  attempt: () => 'busy' | 'done',
+  { retryMs = 30_000, windowMs = 30 * MINUTE_MS, onGiveUp }: RetryOptions = {},
+): () => void {
+  if (attempt() === 'done') return () => undefined;
+  const deadline = Date.now() + windowMs;
+  const timer = setInterval(() => {
+    if (attempt() === 'done') clearInterval(timer);
+    else if (Date.now() >= deadline) {
+      clearInterval(timer);
+      onGiveUp?.();
+    }
+  }, retryMs);
+  timer.unref();
+  return () => clearInterval(timer);
+}
+
+export interface RetryOptions {
+  retryMs?: number;
+  windowMs?: number;
+  onGiveUp?(): void;
+}
+
 export interface Scheduler {
   nextRunAt(): Date | null;
   /** Permanent: a stopped scheduler is replaced by a new `startScheduler`. */

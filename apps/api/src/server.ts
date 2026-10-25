@@ -23,7 +23,11 @@ import { createHttpClient } from './infrastructure/sources/http/client.js';
 import { createPageFetcher } from './infrastructure/sources/manual/page-fetcher.js';
 import { createRobotsCheck } from './infrastructure/sources/manual/robots.js';
 import { createSourceRuntime } from './infrastructure/sources/compose.js';
-import { startScheduler, type Scheduler } from './infrastructure/scheduler/schedule.js';
+import {
+  retryWhileBusy,
+  startScheduler,
+  type Scheduler,
+} from './infrastructure/scheduler/schedule.js';
 import { createLoggerOptions } from './infrastructure/logging/logger.js';
 import { VERSION } from './version.js';
 
@@ -136,19 +140,30 @@ async function main(): Promise<void> {
   // D-2: a lock left by a dead process is freed before this one schedules anything.
   if (sourceRuntime.lock.releaseStale())
     logWarn('released a stale discovery lock (interrupted run)');
+  const retries = new Set<() => void>();
   const scheduler = startScheduler({
     times: config.discoveryTimes,
     onSlot: (slot) => {
-      const started = sourceRuntime.jobs.startCycle('schedule', slot);
       const at = new Date(slot).toISOString();
-      if (started.kind === 'busy') logWarn(`scheduled slot ${at} skipped: a run is in progress`);
-      else if (started.kind === 'slot_taken') logInfo(`slot ${at} already ran`);
-      else
-        started.done.catch((error: unknown) =>
-          logger.error(
-            `scheduled cycle failed: ${error instanceof Error ? error.message : 'error'}`,
-          ),
-        );
+      const cancel = retryWhileBusy(
+        () => {
+          const started = sourceRuntime.jobs.startCycle('schedule', slot);
+          if (started.kind === 'busy') {
+            logWarn(`scheduled slot ${at}: a run is in progress, trying again`);
+            return 'busy';
+          }
+          if (started.kind === 'slot_taken') logInfo(`slot ${at} already ran`);
+          else
+            started.done.catch((error: unknown) =>
+              logger.error(
+                `scheduled cycle failed: ${error instanceof Error ? error.message : 'error'}`,
+              ),
+            );
+          return 'done';
+        },
+        { onGiveUp: () => logWarn(`scheduled slot ${at} skipped: a run stayed in progress`) },
+      );
+      retries.add(cancel);
     },
     // D-4: work held back by the daily limit resumes on a later tick.
     analysisTick: () => runner.kick(),
@@ -160,6 +175,7 @@ async function main(): Promise<void> {
 
   const shutdown = async (): Promise<void> => {
     scheduler.stop();
+    for (const cancel of retries) cancel();
     await app.close();
     // D-3: only a lock this process holds is released; a running cycle is not awaited.
     sourceRuntime.jobs.shutdown(Date.now());
