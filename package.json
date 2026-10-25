@@ -9,7 +9,12 @@
   "scripts": {
     "typecheck": "pnpm -r typecheck && tsc -p scripts/tsconfig.json",
     "lint": "eslint . && prettier --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "dev": "pnpm --parallel --filter @lead-hunter/api --filter @lead-hunter/web dev",
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @lead-hunter/api start",
+    "db:migrate": "pnpm --filter @lead-hunter/api db:migrate",
+    "discover": "pnpm --filter @lead-hunter/api discover"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

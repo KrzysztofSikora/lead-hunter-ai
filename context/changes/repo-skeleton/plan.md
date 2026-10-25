@@ -437,7 +437,7 @@ pnpm@12.15.0` in the root `package.json`.
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Workspace, tooling and layer rules
 - [x] Phase 2: Env config and logger with redaction
-- [ ] Phase 3: API server, database, health, OpenAPI and CLIs
+- [x] Phase 3: API server, database, health, OpenAPI and CLIs
 - [ ] Phase 4: Web shell, static serving and e2e smoke
 - [ ] Phase 5: Docker image, compose, CI and docs
 
@@ -453,6 +453,10 @@ pnpm@12.15.0` in the root `package.json`.
 - [minor] (Phase 2) The `source` condition now works for api → config/contracts under tsc and Vitest (api test imports `@lead-hunter/config`). tsx and plain node resolution are still unverified until Phase 3.
 - [minor] (Phase 2) `.env.example` keeps `NODE_ENV`, `HOST`, `PORT`, `DATA_DIR` and `LOG_LEVEL` commented out (plan-review finding 1), so a copied `.env` cannot override the container's values; `OPERATOR_PASSWORD_HASH=` is live and empty. The `ENV_VARIABLES` test accepts commented lines. Unknown variables such as a typo `LOG_LEVL` are ignored (finding 9 reading: invalid value of a known variable fails).
 - [minor] (Phase 1) The `source` export condition is wired in tsconfig (`customConditions`) and in the package Vitest configs, but no cross-package import exists yet, so tsx and Vitest resolution through `source` is still unverified. Phase 2 (api imports config/contracts) is the first real test of it.
+- [minor] (Phase 3) The `source` condition works for tsx (`node --conditions=source --import tsx`, exercised by `cli.int.test.ts`) and plain `node` runs the built `dist` of config/contracts (evidence/health.txt). The Phase 1/2 open question is closed.
+- [minor] (Phase 3) Plan-review finding 6 applied: `buildApp` takes `deps.onRoute`; the OpenAPI test normalises `:param` to `{param}`. `buildApp` is async and calls `app.ready()`.
+- [REVIEW] (Phase 3) D-6 moves the dev DB to `apps/api/data/lead-hunter.db` while tech-stack *Local development* says `./data/dev.db`; tech-stack needs updating at the PR.
+- [minor] (Phase 3) Added `src/version.ts` (reads the package version for health) and `src/cli/config.ts` (shared Polish exit-on-ConfigError helper) beyond the plan's file list.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
