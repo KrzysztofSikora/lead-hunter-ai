@@ -380,10 +380,15 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 - [x] Phase 2: Pre-filter, output guard and mock provider
 - [x] Phase 3: Storage, runner and configuration
 - [x] Phase 4: Status route, DTOs and list filters
-- [ ] Phase 5: Web views, e2e and README
+- [x] Phase 5: Web views, e2e and README
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 5) With `LLM_PROVIDER=mock`, import `apps/api/test/fixtures/llm/synthetic-direct-pl.txt` and open it at 360 px: `DEMO / MOCK` in the list and on the detail, five components add up to the score, Polish justifications read sensibly, price says "szacunek (hipoteza)" — run: `LLM_PROVIDER=mock pnpm build && pnpm start`, Import view — evidence: context/changes/analysis-and-scoring/evidence/detail-360.png, list-360.png
+- [ ] (Phase 5) Without `LLM_PROVIDER` (restart): *Okazje* says analysis is not configured; import still works and the item stays "Analiza: oczekuje" — run: `pnpm start` without the variable, import any post — evidence: none
+- [ ] (Phase 5) Import `synthetic-seeking-work.txt`: list shows "Analiza: pominięta — oferta wykonawcy, nie zlecenie" and status *Odrzucona* — run: Import view with the fixture — evidence: none
+- [ ] (Phase 5) Try each new filter and "Tylko ≥ 65" on 3+ imports: results match, an item without a budget stays under a minimum amount; no horizontal scroll; Polish labels read well — run: *Okazje* at 360 px — evidence: none
+- [ ] (Phase 5) Read `docs/scoring.md`: rubric understandable and numbers match the detail — run: open the file — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -402,6 +407,8 @@ Every label in `strings.pl.ts`; source text and model text rendered as text.
 - [minor] (Phase 4) Plan says `opportunities.ts` imports the analysis schemas; `analysis.ts` already imported `Category`/`Confidence`/`EvidenceLevel` from `opportunities.ts`, which would be an import cycle. Moved those three enums to `classification.ts` (re-exported from `opportunities.ts`, public imports unchanged).
 - [minor] (Phase 4) `OpportunityDeps` gained `clock` (for `maxAgeDays`), `AppDeps` gained `analysis` (the runner's `status()`), and `AnalysisRunner` gained `status()`; `GET /api/analysis/status` has no service of its own. `maxAgeDays` uses `coalesce(published_at, fetched_at)`; a currency different from the stored amount's is treated as unknown (plan-review #8). `minAmount` is in minor units of `currency`. `PrefilterOutcome` and `LatestAnalysis` are exported from contracts.
 - [minor] (Phase 4) `analysis.demo` is derived from `analysis_provider === 'mock'`; a row whose analysis columns were set without a provider (test fixtures) reads `demo: false`.
+- [minor] (Phase 5) `pnpm e2e` ran green with the local Chromium (4 tests). The import test's analysed-state screenshots go to the S-04 evidence dir; its old `manual-text-import/.../list-360.png` is no longer written (plan-review #12). The e2e run rewrites other items' evidence PNGs; those were restored with `git checkout`, not committed.
+- [minor] (Phase 5) The filter form sends `minAmount` in major units and the web converts to minor units (x100); `excludeIndustries` is a comma-separated text field; `country` a 2-letter field.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

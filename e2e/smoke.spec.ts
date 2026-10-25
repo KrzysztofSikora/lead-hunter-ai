@@ -76,6 +76,11 @@ test('the operator edits the example profile and it survives a reload', async ({
 });
 
 const IMPORT_EVIDENCE = 'context/changes/manual-text-import/evidence';
+const ANALYSIS_EVIDENCE = 'context/changes/analysis-and-scoring/evidence';
+const POST_TITLE =
+  'DEMO: Szukamy programisty TypeScript do zbudowania integracji API z systemem magazynowym.';
+const POST_TEXT = `${POST_TITLE}
+Praca zdalna, budżet 8000-12000 PLN, start od następnego tygodnia. Zapłacimy za wykonanie prototypu.`;
 
 // Fourth of five logins of the run: the throttle allows 5 attempts per 15 minutes, the tests above
 // use 3.
@@ -95,7 +100,7 @@ test('the operator imports a pasted post, sees it in the list and the repeat is 
 
   await page.getByRole('link', { name: 'Import' }).click();
   await assertNoOverflow(page);
-  await page.getByLabel('Treść ogłoszenia').fill('DEMO: Szukam programisty do sterownika IoT.');
+  await page.getByLabel('Treść ogłoszenia').fill(POST_TEXT);
   await page
     .getByLabel('Adres URL (opcjonalnie)')
     .fill('https://example.com/oferta/1?utm_source=x#frag');
@@ -103,16 +108,33 @@ test('the operator imports a pasted post, sees it in the list and the repeat is 
   await expect(page.getByText(/Zaimportowano/)).toBeVisible();
 
   await page.getByRole('link', { name: 'Okazje' }).click();
-  await expect(
-    page.getByRole('link', { name: 'DEMO: Szukam programisty do sterownika IoT.' }),
-  ).toBeVisible();
-  // The mock analyses right after the import (S-04); Phase 5 asserts the analysed content.
+  await expect(page.getByRole('link', { name: POST_TITLE })).toBeVisible();
+  // The mock analyses right after the import, in the background: reload until it is done.
   await expect(async () => {
     await page.reload();
-    await expect(page.getByText(/Analiza: (oczekuje|gotowa)/)).toBeVisible({ timeout: 1_000 });
+    await expect(page.getByText('Analiza: gotowa')).toBeVisible({ timeout: 1_000 });
   }).toPass();
+  await expect(page.getByText('DEMO / MOCK').first()).toBeVisible();
+  await expect(page.getByText(/Ocena: \d+/)).toBeVisible();
   await assertNoOverflow(page);
-  await page.screenshot({ path: `${IMPORT_EVIDENCE}/list-360.png` });
+  await page.screenshot({ path: `${ANALYSIS_EVIDENCE}/list-360.png` });
+
+  await page.getByRole('link', { name: POST_TITLE }).click();
+  await expect(page.getByText('DEMO / MOCK — wynik reguł, nie analiza AI')).toBeVisible();
+  for (const component of [
+    'Popyt',
+    'Dopasowanie kompetencji',
+    'Szybkość realizacji',
+    'Opłacalność',
+    'Powtarzalność',
+  ]) {
+    await expect(page.getByText(component, { exact: true })).toBeVisible();
+  }
+  await expect(page.getByText('szacunek (hipoteza)').first()).toBeVisible();
+  await expect(page.getByText(/ze źródła: „.*8000-12000 PLN.*”/)).toBeVisible();
+  await assertNoOverflow(page);
+  await page.screenshot({ path: `${ANALYSIS_EVIDENCE}/detail-360.png`, fullPage: true });
+  await page.getByRole('link', { name: 'Wróć do listy' }).click();
 
   await page.getByRole('link', { name: 'Import' }).click();
   await page.getByLabel('Adres URL (opcjonalnie)').fill('https://EXAMPLE.com/oferta/1/');

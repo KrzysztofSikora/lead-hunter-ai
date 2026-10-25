@@ -47,8 +47,17 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   `POST /api/signals/import`: wklejony tekst i/lub adres URL, który jest tylko zapisywany, nie
   pobierany; powtórka rozpoznawana po adresie lub treści; limit długości w
   `IMPORT_MAX_TEXT_CHARS`, domyślnie 20000), lista *Okazje* z filtrami, sortowaniem i stronami oraz
-  podgląd okazji; analiza i ocena dojdą ze slice'em S-04 (do tego czasu „brak analizy — w kolejce").
-- **Co wymaga kluczy:** nic w tej chwili; klucze LLM i skrzynka IMAP dojdą ze slice'ami S-04 i S-11.
+  podgląd okazji; filtr wstępny (reguły nazwane, np. `seeking_work` → „oferta wykonawcy, nie
+  zlecenie"), analiza dostawcą `mock` (`LLM_PROVIDER=mock`; wynik reguł, w UI zawsze z etykietą
+  `DEMO / MOCK`, nie analiza AI), deterministyczna ocena 0–100 z rozbiciem na pięć składników i
+  osobną pewnością (reguły w [`docs/scoring.md`](docs/scoring.md)), dzienny limit analiz
+  (`ANALYSIS_DAILY_LIMIT`, domyślnie 20; reszta czeka do następnego dnia czasu Europe/Warsaw),
+  `GET /api/analysis/status`, filtry listy (min. ocena z linkiem „Tylko ≥ 65", wiek, kwota,
+  język, tryb pracy, kraj, wykluczone branże). Bez `LLM_PROVIDER` UI mówi, że analiza nie jest
+  skonfigurowana, a okazje czekają jako „Analiza: oczekuje".
+- **Co wymaga kluczy:** prawdziwy dostawca LLM (Anthropic, OpenAI-compatible) dojdzie ze slice'em
+  S-05; skrzynka IMAP ze slice'em S-11. Zmienne analizy: `LLM_PROVIDER`, `ANALYSIS_DAILY_LIMIT`,
+  `PREFILTER_MAX_AGE_DAYS` (patrz `.env.example`).
 - **Co wymaga ręcznej weryfikacji:** uruchomienie `docker compose up` na Raspberry Pi
   (czas budowania better-sqlite3 na ARM64), wygląd powłoki i formularza logowania na telefonie, widok *Profil* na telefonie i komunikaty
   błędów przy polach,
