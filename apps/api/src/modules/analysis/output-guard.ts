@@ -170,7 +170,7 @@ export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): 
     notes.push(`Usunięto adres, którego nie ma w tekście źródła: „${link}”.`);
   }
   if (removed.length > MAX_LINK_NOTES) {
-    notes.push(`Usunięto jeszcze ${removed.length - MAX_LINK_NOTES} adresów spoza tekstu źródła.`);
+    notes.push(`Usunięto więcej adresów spoza tekstu źródła; łącznie: ${removed.length}.`);
   }
 
   if (guarded.verdict === 'ANALYSED' && guarded.buyerConfirmed) {

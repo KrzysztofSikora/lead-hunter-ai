@@ -54,7 +54,7 @@ Nieudana analiza ma status `FAILED` i powód bez sekretów i bez tekstu źródł
 | `provider_error: unavailable …`, `timeout` | 5xx, brak połączenia, przekroczony czas | tak |
 | `provider_error: bad_request …` | inny błąd 4xx | nie |
 | `provider_error: refusal`, `truncated`, `empty` | odmowa, ucięta lub pusta odpowiedź | nie |
-| `invalid_output: not_json`, `<pola>`, `secret_echo` | odpowiedź niezgodna ze schematem | nie |
+| `invalid_output: not_json`, `<pola>`, `secret_echo`, `guard` | odpowiedź niezgodna ze schematem (`guard`: wynik po usunięciu wymyślonych adresów nie spełnia schematu) | nie |
 
 Kolejka zatrzymana po błędzie dostawcy rusza przy następnym imporcie albo po 10 minutach.
 Ponowienie ręczne: przycisk „Ponów analizę" na karcie (`POST /api/opportunities/:id/analysis`).
