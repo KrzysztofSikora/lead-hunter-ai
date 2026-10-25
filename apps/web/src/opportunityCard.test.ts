@@ -92,6 +92,8 @@ const detail = (overrides: Partial<OpportunityDetail>): OpportunityDetail => ({
   evidence: [],
   latestAnalysis: null,
   activity: [],
+  followUpOn: null,
+  payments: [],
   ...overrides,
 });
 

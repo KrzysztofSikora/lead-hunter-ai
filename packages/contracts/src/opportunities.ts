@@ -217,12 +217,29 @@ export const ActivityEvent = z
   .strict();
 export type ActivityEvent = z.infer<typeof ActivityEvent>;
 
+export const Payment = z
+  .object({
+    id: z.number().int(),
+    amountMinor: z.number().int().min(1),
+    currency: Currency,
+    /** A Europe/Warsaw calendar day. */
+    paidOn: calendarDate,
+    note: z.string().nullable(),
+    createdAt: isoInstant,
+  })
+  .strict();
+export type Payment = z.infer<typeof Payment>;
+
 export const OpportunityDetail = z
   .object({
     ...opportunityBase,
     source: SourceFacts.extend({ snippet: z.string() }).strict(),
     evidence: z.array(Evidence),
     latestAnalysis: LatestAnalysis.nullable(),
+    /** The one current follow-up, a Europe/Warsaw calendar day (S-08 D-7). */
+    followUpOn: calendarDate.nullable(),
+    /** Newest paid first (S-08 D-10). */
+    payments: z.array(Payment),
     /** Newest first. */
     activity: z.array(ActivityEvent),
   })

@@ -22,12 +22,14 @@ import type {
   EvidenceRow,
   OpportunityRepository,
   OpportunityRow,
+  PaymentRow,
 } from '../../modules/opportunities/ports.js';
 import {
   activityEvents,
   analyses,
   opportunities,
   opportunityEvidence,
+  payments,
   rawSignals,
 } from './schema.js';
 
@@ -193,7 +195,26 @@ export function createOpportunityRepository(db: BetterSQLite3Database): Opportun
         .where(eq(activityEvents.opportunityId, id))
         .orderBy(desc(activityEvents.occurredAt), desc(activityEvents.id))
         .all() as ActivityRow[];
-      return { row, evidence, latestAnalysis, activity };
+      const followUpAt =
+        db
+          .select({ value: opportunities.followUpAt })
+          .from(opportunities)
+          .where(eq(opportunities.id, id))
+          .get()?.value ?? null;
+      const paid = db
+        .select({
+          id: payments.id,
+          amountMinor: payments.amountMinor,
+          currency: payments.currency,
+          paidAt: payments.paidAt,
+          note: payments.note,
+          createdAt: payments.createdAt,
+        })
+        .from(payments)
+        .where(eq(payments.opportunityId, id))
+        .orderBy(desc(payments.paidAt), desc(payments.id))
+        .all() as PaymentRow[];
+      return { row, evidence, latestAnalysis, activity, followUpAt, payments: paid };
     },
   };
 }

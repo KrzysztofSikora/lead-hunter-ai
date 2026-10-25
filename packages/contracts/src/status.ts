@@ -38,6 +38,12 @@ const MAIN_PATH: readonly BusinessStatus[] = [
 const ASIDE: readonly BusinessStatus[] = ['REJECTED', 'EXPIRED', 'NEEDS_VERIFICATION'];
 const AFTER_CONTACT: readonly BusinessStatus[] = ['CONTACTED', 'REPLIED', 'MEETING'];
 
+/**
+ * S-08 D-7 and plan-review 4: the only statuses that may hold a follow-up date; a move to any
+ * other status clears it.
+ */
+export const FOLLOW_UP_STATUSES: readonly BusinessStatus[] = AFTER_CONTACT;
+
 /** Every status the operator may move to: all but the system start state. */
 export const OPERATOR_TARGETS: readonly BusinessStatus[] = [
   'QUALIFIED',
@@ -153,6 +159,23 @@ export const StatusChangeRequest = z.union([
   z.object({ status: z.enum(plainTargets), note: note.optional() }).strict(),
 ]);
 export type StatusChangeRequest = z.infer<typeof StatusChangeRequest>;
+
+/** S-08 D-7: `null` clears the follow-up. A past date is refused by the service (clock). */
+export const FollowUpRequest = z.object({ on: calendarDate.nullable() }).strict();
+export type FollowUpRequest = z.infer<typeof FollowUpRequest>;
+
+export const PAYMENT_MAX_MINOR = 100_000_000_000;
+
+/** S-08 D-10: a payment is its own record, whatever the status. A future date is refused by the service. */
+export const PaymentRequest = z
+  .object({
+    amountMinor: z.number().int().min(1).max(PAYMENT_MAX_MINOR),
+    currency: Currency,
+    paidOn: calendarDate,
+    note: note.optional(),
+  })
+  .strict();
+export type PaymentRequest = z.infer<typeof PaymentRequest>;
 
 export const NoteRequest = z.object({ text: note }).strict();
 export type NoteRequest = z.infer<typeof NoteRequest>;

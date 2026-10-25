@@ -254,7 +254,7 @@ Observably true when done:
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Transition rules and the widened status API
-- [ ] Phase 2: Follow-ups and payments
+- [x] Phase 2: Follow-ups and payments
 - [ ] Phase 3: Pipeline summary API
 - [ ] Phase 4: Card: status panel, contact, follow-up, payments
 - [ ] Phase 5: Pipeline view, "Na dziś" and the main-path e2e
@@ -289,6 +289,17 @@ Observably true when done:
   outside CONTACTED/REPLIED/MEETING, and define `followUpsDue` with that same set. Findings 5
   (D-8, D-9, D-11 treated as `costly`: public `GET /api/pipeline` shape) and 6 (the S-08 roadmap
   acceptance is met minus the draft step, because S-08 depends on S-06 only; D-13) stand for the PR.
+- [minor] Phase 2: plan-review finding 4 applied: `changeStatus` clears `follow_up_at` on every move to
+  a status outside `FOLLOW_UP_STATUSES` (CONTACTED, REPLIED, MEETING, exported from contracts);
+  Phase 3 defines `followUpsDue` with that same set. `PUT …/follow-up { on: null }` keeps the plan's
+  409 outside those statuses (nothing can be set there, so there is nothing to clear).
+- [minor] Phase 2: plan-review finding 10 applied: clock-dependent 400s (past follow-up, future
+  payment date) are returned by the service as `invalid` and the route sends the `ValidationError`
+  shape; covered in `pipeline-status.int.test.ts`. The `calendarDate` schema from Phase 1 is reused.
+- [minor] Phase 2: `apps/web/src/opportunityCard.test.ts` fixture gained `followUpOn: null` and
+  `payments: []` (new required `OpportunityDetail` fields); no assertion changed.
+- [minor] Phase 2: a payment writes no `activity_events` row (plan lists none); the payments list on
+  the detail is its only history.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

@@ -4,6 +4,7 @@ import type {
   BusinessStatus,
   Category,
   Confidence,
+  Currency,
   EvidenceLevel,
   MoveCheck,
   OpportunityListQuery,
@@ -78,6 +79,16 @@ export interface ActivityRow {
   occurredAt: number;
 }
 
+/** One `payments` row; `paidAt` is the Warsaw midnight of the day paid (S-08 D-5). */
+export interface PaymentRow {
+  id: number;
+  amountMinor: number;
+  currency: Currency;
+  paidAt: number;
+  note: string | null;
+  createdAt: number;
+}
+
 export interface OpportunityFilter extends Omit<
   OpportunityListQuery,
   'from' | 'to' | 'maxAgeDays'
@@ -99,6 +110,10 @@ export interface OpportunityRepository {
         latestAnalysis: AnalysisAttemptRow | undefined;
         /** Newest first. */
         activity: ActivityRow[];
+        /** Warsaw midnight of the current follow-up day (D-7). */
+        followUpAt: number | null;
+        /** Newest paid first. */
+        payments: PaymentRow[];
       }
     | undefined;
 }
@@ -127,6 +142,24 @@ export interface ActivityRepository {
       at: number;
     },
   ): StatusChangeOutcome;
+  /**
+   * Sets (`followUpAt` an instant) or clears (null) the follow-up and records a `FOLLOW_UP` event,
+   * in one transaction. Only while the status may hold one (D-7).
+   */
+  setFollowUp(
+    id: number,
+    followUpAt: number | null,
+    event: { metadata: string; at: number },
+  ): 'changed' | 'not_found' | 'not_allowed';
   /** False when the opportunity does not exist. */
   addNote(id: number, text: string, at: number): boolean;
+}
+
+export interface PaymentRepository {
+  /** False when the opportunity does not exist. Touches no status (D-10). */
+  add(
+    id: number,
+    payment: { amountMinor: number; currency: Currency; paidAt: number; note: string | null },
+    at: number,
+  ): boolean;
 }
