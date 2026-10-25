@@ -23,7 +23,8 @@ import { getGlobalDispatcher } from 'undici';
 import { createHttpClient } from '../../src/infrastructure/sources/http/client.js';
 import { createPageFetcher } from '../../src/infrastructure/sources/manual/page-fetcher.js';
 import { createRobotsCheck } from '../../src/infrastructure/sources/manual/robots.js';
-import { noSourcesYet } from '../../src/infrastructure/sources/source-status.js';
+import { createSourceRuntime } from '../../src/infrastructure/sources/compose.js';
+import type { SourceService } from '../../src/modules/sources/service.js';
 import type { Clock } from '../../src/modules/auth/ports.js';
 import { openDb, type OpenDb } from '../../src/infrastructure/db/client.js';
 import { createHealthProbe } from '../../src/infrastructure/db/health-probe.js';
@@ -82,7 +83,13 @@ export async function buildTestApp(
     /** Kick the runner after every created import, as the server does. Tests drain by hand otherwise. */
     autoKick?: boolean;
   } = {},
-): Promise<{ app: FastifyInstance; config: Config; dir: string; runner: AnalysisRunner }> {
+): Promise<{
+  app: FastifyInstance;
+  config: Config;
+  dir: string;
+  runner: AnalysisRunner;
+  sources: SourceService;
+}> {
   const { dir, sqlite, db } = openTestDb(options.dir);
   const config = loadConfig({ DATA_DIR: dir, ...options.env });
   const hash = await getTestHash();
@@ -117,6 +124,15 @@ export async function buildTestApp(
     maxTextChars: config.importMaxTextChars,
     clock,
   });
+  // Feeds go through the same mocked network; the backoff sleep is a no-op so tests do not wait.
+  const sourceRuntime = createSourceRuntime({
+    db,
+    config,
+    http,
+    clock,
+    sleep: async () => undefined,
+    ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),
+  });
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
@@ -134,15 +150,16 @@ export async function buildTestApp(
       repository: createOpportunityRepository(db),
       activity: createActivityRepository(db),
       payments: createPaymentRepository(db),
-      sourceStatus: noSourcesYet,
+      sourceStatus: sourceRuntime.statusReader,
       clock,
     },
     pipeline: { repository: createPipelineRepository(db), clock },
     analysis: runner,
+    sources: sourceRuntime.service,
     ...options.overrides,
   });
   cleanups.push(() => app.close());
-  return { app, config, dir, runner };
+  return { app, config, dir, runner, sources: sourceRuntime.service };
 }
 
 /** Logs in with TEST_PASSWORD and returns the value for a `cookie` request header. */

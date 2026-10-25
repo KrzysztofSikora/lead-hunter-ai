@@ -108,6 +108,7 @@ first entries). `pnpm discover` runs every enabled source once.
 | D-18 | Author/organisation of an entry | Not stored in this slice | B: `raw_signals.author` (brief §5.2 lists it optional; HN usernames are personal data with no current use) | Store only what is needed (§5.4); additive later | cheap | agent |
 | D-19 | How the list and card name the source (AC1, AC6) | `SourceFacts` gains `name: string \| null` (the source's name for feed signals, null for manual ones); list line and card show it next to the type label; `SourceType` gains `rss` | B: derive "We Work Remotely" from the URL host in the web (no contract change, but only works for presets) | Additive, nullable field; one place for the name | costly (public API) | agent |
 | D-20 | Recording real fixtures safely (test-plan cookbook) | `pnpm fixtures:record <source-id>` fetches the source's feed through the guarded client and writes `apps/api/test/fixtures/feeds/<preset-or-id>.xml` with the first 5 entries, e-mail addresses replaced by `demo@example.com` and `dc:creator`/`author` values by `DEMO`; the person reviews the file before committing | B: raw copy (exact, but commits strangers' e-mail addresses; against PRD §16.1) | Anonymous fixtures by default | cheap | agent |
+| D-21 | Does **Sprawdź** use up the discovery slot? (plan-review #1, supersedes the claim part of D-9) | No. A check waits for a pending `next_allowed_at` and for a 60 s cooldown since the last attempt, sets only `last_attempt_at` and the health outcome, and writes no `job_runs` row (plan-review #9). A failing check with `Retry-After` still pushes `next_allowed_at`. A run still sets `next_allowed_at = now + interval` | B: check = a run that also ingests (one request does both, but "check" would then change data); C: no network check, health from the last run (no extra request ever, weaker AC3) | Check-then-run works at once (tested); a double tap is limited by the 60 s cooldown, and a run is never closer than the interval | cheap | agent |
 
 ## Design
 
@@ -318,12 +319,14 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Feed parser and retry rules
 - [x] Phase 2: Contracts, schema and shared ingest
-- [ ] Phase 3: Sources service, RSS adapter, routes and CLI (checkpoint)
+- [x] Phase 3: Sources service, RSS adapter, routes and CLI (checkpoint)
 - [ ] Phase 4: Sources view
 - [ ] Phase 5: Fixture recorder and documentation
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 3) Real feeds answer and map as assumed — run (machine with internet): `pnpm dev`, log in, then `curl -b <cookie> -X POST localhost:8080/api/sources -H 'content-type: application/json' -d '{"preset":"hn-freelance"}'`, the same for `wwr-programming`, then `POST /api/sources/<id>/run` for both (or `pnpm discover`); record counts and one sample signal (title, URL, date) in `evidence/real-run.md` — evidence: none yet (agent sandbox cannot reach hnrss.org or weworkremotely.com)
+- [ ] (Phase 3) Preset URLs and terms links in `apps/api/src/modules/sources/presets.ts` are right (hnrss `whoishiring/freelancer` and `jobs?q=contract`; WWR `remote-programming-jobs`, `remote-full-stack-programming-jobs`, `remote-back-end-programming-jobs`, `remote-devops-sysadmin-jobs`; WWR/hnrss terms pages), and the hnrss title pattern `New comment by …` of D-12 holds — run: open each URL, `curl -sI <url>` expects 200 — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -334,6 +337,12 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 - [minor] (Phase 2) `SourceFailureReason` also has `internal` (plan-review #4: an unexpected exception in a run is recorded, not left `running`); it lives in `opportunities.ts` next to `FetchFailureReason` (re-exported from `sources.ts`) to avoid a circular import. `ImportResult.matchedBy` gains `external_id` (additive; manual import never returns it).
 - [minor] (Phase 2) `SourceAdapter`/`AdapterOutcome`/`SourceRepository` port types move to Phase 3 where they are first used; Phase 2 only adds `RssConfig` to contracts. `ingest` candidate shape per plan-review #7 (`IngestCandidate` in `modules/signals/ingest.ts`; claims `canonical_url`, `external_id` and `content_hash` on both paths).
 - [minor] (Phase 2) The card's *origin* section shows a "Źródło" row with the source name when the signal has one (D-19, AC6); `OpportunityPage.tsx` needed no change.
+
+- [REVIEW] (Phase 3) Plan-review #1: D-9 as written made **Sprawdź** block **Uruchom teraz** for an hour. Chose D-21 (a check never sets `next_allowed_at` unless the source asked for a wait). Alternative: check = run.
+- [minor] (Phase 3) Plan-review #3/#4/#9 applied: `runEnabled()` lives in the service (the CLI calls it; test (d) asserts three failed and two ok `job_runs` rows); an exception in a run is recorded as `internal` and returned as a failed result (200), never left `running`; `skipped` entries count into `failed`/`fetched`; checks write no `job_runs`. A process crash mid-run leaves a `running` row (S-12, FR-17 AC3).
+- [minor] (Phase 3) Plan-review #12: D-6 worst case is 3 × 20 s + 2 × 30 s of waiting (plus a robots.txt fetch), about 2 minutes, not 70 s; kept, because `MAX_WAIT_MS` already bounds each wait to 30 s.
+- [minor] (Phase 3) Presets: WWR slugs for full-stack, back-end and devops differ from the plan's `remote-<slug>-jobs` pattern (`remote-full-stack-programming-jobs`, `remote-back-end-programming-jobs`, `remote-devops-sysadmin-jobs`), and the HN freelance feed is `hnrss.org/whoishiring/freelancer`. All `UNVERIFIED` (sandbox cannot reach the hosts); human check above.
+- [minor] (Phase 3) `createSourceRuntime` (`infrastructure/sources/compose.ts`) is the single wiring point for server, CLI and tests; `SourceFailureReason` has no change. Integration case (e) covers an HTTP-date `Retry-After` (plan-review #5).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

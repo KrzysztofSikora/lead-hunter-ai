@@ -19,6 +19,8 @@ import { registerPipelineRoutes } from './modules/pipeline/routes.js';
 import type { PipelineDeps } from './modules/pipeline/service.js';
 import { registerProfileRoutes } from './modules/profile/routes.js';
 import type { ProfileDeps } from './modules/profile/service.js';
+import { registerSourceRoutes } from './modules/sources/routes.js';
+import type { SourceService } from './modules/sources/service.js';
 import { registerSignalRoutes } from './modules/signals/routes.js';
 import type { SignalDeps } from './modules/signals/service.js';
 
@@ -31,6 +33,7 @@ export interface AppDeps {
   opportunities: OpportunityDeps;
   pipeline: PipelineDeps;
   analysis: AnalysisRouteDeps;
+  sources: SourceService;
   /** Called after an import created a new opportunity; the analysis runner is kicked here (D-4). */
   onSignalCreated?: () => void;
   version: string;
@@ -77,6 +80,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerOpportunityRoutes(app, deps.opportunities);
   registerPipelineRoutes(app, deps.pipeline);
   registerAnalysisRoutes(app, deps.analysis);
+  registerSourceRoutes(app, deps.sources);
 
   if (deps.config.nodeEnv !== 'production') {
     app.get('/api/openapi.json', { schema: { hide: true } }, async () => app.swagger());
