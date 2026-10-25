@@ -316,7 +316,7 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Feed parser and retry rules
+- [x] Phase 1: Feed parser and retry rules
 - [ ] Phase 2: Contracts, schema and shared ingest
 - [ ] Phase 3: Sources service, RSS adapter, routes and CLI (checkpoint)
 - [ ] Phase 4: Sources view
@@ -327,6 +327,10 @@ first, as `{ sourceId, source: name, reason, httpStatus?, at }`.
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] (Phase 1) Plan: `retry.test.ts` (D-17). Plan-review #5: TR-10 has budget `none`, so the file is dropped; `retryDelay`/`parseRetryAfter` are proved by integration case (e) in Phase 3 (add one HTTP-date `Retry-After` line there).
+- [minor] (Phase 1) Plan: `ports.ts` holds the port types of *Design*. Plan-review #6: only `FeedItem` goes in now; `SourceAdapter`/`AdapterOutcome`/`RssConfig` arrive with Phase 2/3 (`RssConfig` in contracts `sources.ts`).
+- [minor] (Phase 1) Plan-review #11 applied: `cdataPropName` keeps CDATA out of the XML-level decode (fixture `synthetic-edge.xml`); the parser decodes bytes as UTF-8 whatever the XML declaration says — to be noted in `docs/source-policy.md` (Phase 5).
+- [minor] (Phase 1) Parser also drops `<script>`/`<style>` content (linear `indexOf` scan, no regex backtracking) and merges consecutive block tags into one line break; not named in D-13 but within its intent.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

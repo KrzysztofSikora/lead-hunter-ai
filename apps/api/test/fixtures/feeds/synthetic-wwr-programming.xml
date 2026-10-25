@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+  <channel>
+    <title>DEMO We Work Remotely - Programming Jobs (synthetic)</title>
+    <link>https://weworkremotely.com/categories/remote-programming-jobs</link>
+    <description>DEMO synthetic fixture, not a recording</description>
+    <item>
+      <title>DEMO Studio: Senior Back-End Developer (Node.js)</title>
+      <description><![CDATA[<h2>About the role</h2><p>DEMO Studio looks for a contractor to build an <strong>integration service</strong>.</p><ul><li>Node.js</li><li>PostgreSQL</li></ul><p>Apply at https://example.com/demo-apply</p>]]></description>
+      <pubDate>Tue, 06 Oct 2026 08:00:00 +0000</pubDate>
+      <link>https://weworkremotely.com/remote-jobs/demo-studio-senior-back-end-developer</link>
+      <guid>https://weworkremotely.com/remote-jobs/demo-studio-senior-back-end-developer</guid>
+    </item>
+    <item>
+      <title>DEMO Shop &amp; Co: Full-Stack Engineer</title>
+      <description><![CDATA[<p>Build a storefront admin panel in React &amp; TypeScript.</p>]]></description>
+      <pubDate>Tue, 06 Oct 2026 12:45:00 +0000</pubDate>
+      <link>https://weworkremotely.com/remote-jobs/demo-shop-full-stack-engineer</link>
+      <guid>https://weworkremotely.com/remote-jobs/demo-shop-full-stack-engineer</guid>
+    </item>
+  </channel>
+</rss>

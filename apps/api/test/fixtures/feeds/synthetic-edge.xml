@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+  <channel>
+    <title>DEMO edge cases</title>
+    <link>https://feeds.example.com/</link>
+    <item>
+      <title>DEMO relative link, no date</title>
+      <link>/jobs/relative-1</link>
+      <guid isPermaLink="false">demo-edge-1</guid>
+      <description>Plain text only</description>
+    </item>
+    <item>
+      <title>DEMO cdata with entity text</title>
+      <link>https://example.com/jobs/cdata</link>
+      <description><![CDATA[Fish &amp;amp; chips &lt;b&gt;literal&lt;/b&gt; <i>real</i>]]></description>
+      <pubDate>not a date</pubDate>
+    </item>
+    <item>
+      <title>12345</title>
+      <link>javascript:alert(1)</link>
+      <guid>demo-edge-3</guid>
+      <content:encoded><![CDATA[<p>Numeric title &#8211; kept as text&nbsp;here.</p><script>alert('DEMO')</script>]]></content:encoded>
+    </item>
+    <item>
+      <link></link>
+    </item>
+  </channel>
+</rss>

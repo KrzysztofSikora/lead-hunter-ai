@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>DEMO Atom feed</title>
+  <link rel="self" href="https://feeds.example.com/atom.xml"/>
+  <updated>2026-10-07T10:00:00Z</updated>
+  <id>tag:example.com,2026:demo</id>
+  <entry>
+    <title>DEMO Zlecenie: skrypt do raportów</title>
+    <link rel="alternate" type="text/html" href="https://example.com/zlecenia/1"/>
+    <link rel="enclosure" href="https://example.com/files/1.pdf"/>
+    <id>tag:example.com,2026:demo-1</id>
+    <published>2026-10-07T08:00:00Z</published>
+    <updated>2026-10-07T09:00:00Z</updated>
+    <summary type="html">&lt;p&gt;Potrzebny skrypt generujący raporty z CSV.&lt;/p&gt;</summary>
+  </entry>
+  <entry>
+    <title>DEMO Zlecenie bez daty publikacji</title>
+    <link href="/zlecenia/2"/>
+    <id>tag:example.com,2026:demo-2</id>
+    <updated>2026-10-07T09:30:00Z</updated>
+    <content type="text">Tekst zwykły &amp; prosty.</content>
+  </entry>
+</feed>
