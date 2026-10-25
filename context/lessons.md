@@ -19,3 +19,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: analysis-and-scoring, R2
 - Scope: `apps/api/src/modules/analysis/output-guard.ts` and any provider-output check
 - Status: proposed in the PR for analysis-and-scoring
+
+## A gate run must not rewrite committed files
+- Why: `pnpm e2e` saved evidence screenshots of earlier changes on every run, so each later run left a dirty tree and fix-review got stuck on files it must not touch.
+- Seen in: analysis-and-scoring, fix-review
+- Scope: `e2e/**`, `scripts/**`, any gate command
+- Status: accepted (user rule: fast MVP; fixed in the analysis-and-scoring PR)
