@@ -2,8 +2,8 @@
 
 Sources: `context/prd.md`, `context/tech-stack.md`. Order follows the brief (B-52): first the
 vertical slice from a manually imported signal to a recorded payment (S-01…S-08), then automatic
-sources (S-09, then S-11 Useme e-mail before S-10 RSS, user 2026-10-25: Polish direct gigs
-first), then the routine (S-12, S-13) and deployment (S-16); insights (S-14) and data safety
+sources (S-09, S-10 RSS, then S-11 Useme e-mail: planned first, swapped back on 2026-10-25
+because S-11 waits for the operator's `.eml` samples), then the routine (S-12, S-13) and deployment (S-16); insights (S-14) and data safety
 (S-15) come last. The Overview table is in execution order.
 Security that every route depends on (login) comes first, because retrofitting it is costlier
 than building on it.
@@ -21,8 +21,8 @@ than building on it.
 | S-07 | #8 | offer-drafts | slice | FR-13 | S-05, S-06 | M | todo |
 | S-08 | #9 | pipeline-and-payments | slice | FR-14, FR-15 | S-06 | M | done |
 | S-09 | #10 | url-import-guard | slice | FR-03 | S-03 | M | todo |
-| S-11 | #12 | email-alerts | slice | FR-05 | S-04 | L | todo |
-| S-10 | #11 | rss-sources | slice | FR-04, FR-18 AC3 | S-04, S-09, S-11 | L | todo |
+| S-10 | #11 | rss-sources | slice | FR-04, FR-18 AC3 | S-04, S-09 | L | todo |
+| S-11 | #12 | email-alerts | slice | FR-05 | S-10 | L | todo |
 | S-12 | #13 | scheduler-and-jobs | slice | FR-17, FR-18 AC1–AC2 | S-10 | M | todo |
 | S-13 | #14 | today-brief | slice | FR-16 | S-08, S-12 | M | todo |
 | S-16 | #17 | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13 | M | todo |
@@ -198,7 +198,8 @@ than building on it.
 - Goal: configured feeds (HN freelance, WWR presets, any URL) become signals, safely and without
   duplicates, with visible errors.
 - Covers: FR-04 AC1–AC7, FR-18 AC3; `docs/source-policy.md` (FR-26 AC2, first entries).
-- Depends on: S-04, S-09, S-11 (reuses its `SourceAdapter` contract and Sources view)
+- Depends on: S-04, S-09 (introduces the `SourceAdapter` contract, the sources table and the
+  Sources view with manual run)
 - Acceptance: PRD FR-04 AC1–AC7, FR-18 AC3; Sources view (§11.5) with enable/disable, presets
   and manual run; parser tests on recorded fixtures of both feeds. Human check: a real run on
   both presets from a machine with internet, evidence (counts, a sample signal) in the PR; the
@@ -213,8 +214,7 @@ than building on it.
 ### S-11 E-mail alerts over IMAP (`email-alerts`)
 - Goal: Useme job alerts in a dedicated IMAP folder become signals.
 - Covers: FR-05 AC1–AC6.
-- Depends on: S-04 (runs before S-10: it introduces the `SourceAdapter` contract, the sources
-  table and the Sources view with manual run; S-10 then adds the RSS adapter to them)
+- Depends on: S-10 (reuses its `SourceAdapter` contract, sources table and Sources view)
 - Acceptance: PRD FR-05 AC1–AC6; parser tests on anonymised real samples in
   `apps/api/test/fixtures/email/`. Human check: one run against the operator's mailbox.
 - Unknowns: Useme alert format (Q-02); Oferia format.
