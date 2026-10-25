@@ -96,4 +96,19 @@ describe('extractPage (S-09 D-9, D-10)', () => {
     ).toBe('no_text');
     expect(extractPage(enc('   \n '), 'text/plain', URL_, 100)).toBe('no_text');
   });
+
+  it('reports no text for an empty or tag-only HTML body', () => {
+    for (const html of ['', '   \n', '<']) {
+      expect(extractPage(enc(html), 'text/html', URL_, 20_000)).toBe('no_text');
+    }
+  });
+
+  it('finishes quickly on deeply nested markup and still returns its text', () => {
+    const depth = 2000;
+    const html = `${'<div>'.repeat(depth)}Fikcyjne zlecenie${'</div>'.repeat(depth)}`;
+    const started = performance.now();
+    const page = extractPage(enc(html), 'text/html', URL_, 20_000);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect((page as { text: string }).text).toContain('Fikcyjne zlecenie');
+  });
 });

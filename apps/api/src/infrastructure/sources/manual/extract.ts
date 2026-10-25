@@ -5,6 +5,9 @@ import { deriveTitle } from '../../../modules/signals/identity.js';
 const TITLE_MAX_CHARS = 200;
 const SNIFF_BYTES = 1024;
 const HTML_TYPES = new Set(['text/html', 'application/xhtml+xml']);
+// Readability is superlinear in nesting depth and cannot be interrupted by the fetch deadline.
+const READABILITY_MAX_DEPTH = 64;
+const READABILITY_MAX_ELEMENTS = 5_000;
 
 export interface ExtractedPage {
   title: string;
@@ -12,6 +15,24 @@ export interface ExtractedPage {
 }
 
 const cut = (value: string, max: number): string => Array.from(value).slice(0, max).join('');
+
+/** One iterative walk: true while the tree stays within what Readability handles quickly. */
+interface TreeNode {
+  children: Iterable<TreeNode>;
+}
+
+function withinReadabilityLimits(root: TreeNode | null): boolean {
+  if (!root) return false;
+  let elements = 0;
+  const stack: Array<[TreeNode, number]> = [[root, 1]];
+  for (let item = stack.pop(); item; item = stack.pop()) {
+    const [node, depth] = item;
+    elements += 1;
+    if (depth > READABILITY_MAX_DEPTH || elements > READABILITY_MAX_ELEMENTS) return false;
+    for (const child of node.children) stack.push([child, depth + 1]);
+  }
+  return true;
+}
 
 /** D-10: trim lines, collapse blanks, at most one empty line in a row. */
 function normaliseText(raw: string): string {
@@ -65,11 +86,21 @@ export function extractPage(
     return { title: deriveTitle(text, url), text };
   }
 
+  if (source.trim() === '') return 'no_text';
+
   // Readability rewrites the document it is given, so the fallback reads a second parse.
-  const article = new Readability(parseHTML(source).document).parse();
+  const parsed = parseHTML(source).document;
+  let article: ReturnType<Readability['parse']> = null;
+  if (withinReadabilityLimits(parsed.documentElement)) {
+    try {
+      article = new Readability(parsed, { maxElemsToParse: READABILITY_MAX_ELEMENTS }).parse();
+    } catch {
+      // A page Readability cannot take falls back to the body text below.
+    }
+  }
   const { document } = parseHTML(source);
   let text = normaliseText(article?.textContent ?? '');
-  if (text === '') {
+  if (text === '' && document.documentElement) {
     for (const node of document.querySelectorAll('script, style, noscript')) node.remove();
     text = normaliseText(document.body?.textContent ?? '');
     // linkedom leaves <body> empty for a fragment without <html>.

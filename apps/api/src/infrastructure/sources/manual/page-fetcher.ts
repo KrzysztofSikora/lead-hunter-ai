@@ -11,7 +11,7 @@ interface PageFetcherDeps {
   maxTextChars: number;
   clock: Clock;
   /** Host and reason only, never the body. */
-  logger?: { info(message: string): void };
+  logger?: { info(message: string): void; warn?(message: string): void };
 }
 
 const ACCEPT = 'text/html,application/xhtml+xml,text/plain;q=0.8';
@@ -54,6 +54,10 @@ export function createPageFetcher({
         return { ok: true, ...extracted, fetchedAt: clock.now().getTime() };
       } catch (error) {
         const failure = error instanceof HttpFetchError ? error : new HttpFetchError('network');
+        if (!(error instanceof HttpFetchError)) {
+          const detail = error instanceof Error ? error.message : 'unknown error';
+          logger?.warn?.(`page fetch unexpected error: ${detail}`);
+        }
         log(url, failure.reason);
         return {
           ok: false,

@@ -63,6 +63,7 @@ async function main(): Promise<void> {
   const profileService = createProfileService(profileDeps);
   let logger: { error: (message: string) => void } = { error: () => undefined };
   let logInfo: (message: string) => void = () => undefined;
+  let logWarn: (message: string) => void = () => undefined;
   const runner = createAnalysisRunner({
     repository: createAnalysisRepository(db),
     provider: config.llmProvider === 'mock' ? new MockProvider() : undefined,
@@ -84,7 +85,7 @@ async function main(): Promise<void> {
     timeoutMs: config.fetchTimeoutMs,
     maxTextChars: config.importMaxTextChars,
     clock,
-    logger: { info: (message) => logInfo(message) },
+    logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
   });
   const app = await buildApp({
     config,
@@ -114,6 +115,7 @@ async function main(): Promise<void> {
 
   logger = app.log;
   logInfo = (message) => app.log.info(message);
+  logWarn = (message) => app.log.warn(message);
   const ANALYSIS_INTERVAL_MS = 10 * 60_000;
   // D-4: work held back by the daily limit resumes on a later tick; S-12 replaces this timer.
   const timer = setInterval(() => runner.kick(), ANALYSIS_INTERVAL_MS);
