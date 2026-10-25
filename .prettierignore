@@ -1,0 +1,15 @@
+node_modules
+dist
+coverage
+reports
+playwright-report
+test-results
+data
+pnpm-lock.yaml
+apps/api/migrations
+*.md
+context
+docs
+.claude
+.workflow
+lead-hunter-ai-PRD.md

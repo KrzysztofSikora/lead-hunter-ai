@@ -1,0 +1,17 @@
+.page {
+  box-sizing: border-box;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem 1rem;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.status {
+  color: #1b5e20;
+}
+
+.error {
+  color: #b71c1c;
+}

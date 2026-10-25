@@ -1,0 +1,36 @@
+{
+  "name": "lead-hunter-ai",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": "^24"
+  },
+  "scripts": {
+    "typecheck": "pnpm -r typecheck && tsc -p scripts/tsconfig.json && tsc -p e2e/tsconfig.json",
+    "lint": "eslint . && prettier --check .",
+    "test": "vitest run",
+    "dev": "pnpm --parallel --filter @lead-hunter/api --filter @lead-hunter/web dev",
+    "build": "pnpm -r build",
+    "start": "pnpm --filter @lead-hunter/api start",
+    "db:migrate": "pnpm --filter @lead-hunter/api db:migrate",
+    "discover": "pnpm --filter @lead-hunter/api discover",
+    "e2e": "pnpm build && playwright test",
+    "docker:build": "docker build -t lead-hunter-ai:local .",
+    "mutation": "stryker run"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.64.1",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
+    "@types/node": "24.19.2",
+    "eslint": "10.13.0",
+    "eslint-config-prettier": "10.1.8",
+    "prettier": "3.9.10",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.0",
+    "vitest": "5.0.5"
+  }
+}

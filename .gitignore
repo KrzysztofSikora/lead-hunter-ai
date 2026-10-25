@@ -20,3 +20,6 @@ backups/
 logs/
 *.log
 config/profile.local.*
+
+# Local database files
+data/

@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/dist
+.git
+.workflow
+data
+.env*
+!.env.example
+reports
+context
+playwright-report
+test-results
+.stryker-tmp

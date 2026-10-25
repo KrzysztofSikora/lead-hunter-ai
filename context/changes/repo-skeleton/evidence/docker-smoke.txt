@@ -1,0 +1,13 @@
+# Docker smoke (Phase 5)
+NOT RUN: pnpm docker:build failed in the sandbox, apt-get cannot resolve deb.debian.org.
+
+54:#8 7.251   Could not resolve 'deb.debian.org'
+56:#8 7.251   Could not resolve 'deb.debian.org'
+58:#8 7.251   Could not resolve 'deb.debian.org'
+60:#8 7.269 W: Failed to fetch http://deb.debian.org/debian/dists/bookworm/InRelease  Could not resolve 'deb.debian.org'
+61:#8 7.269 W: Failed to fetch http://deb.debian.org/debian/dists/bookworm-updates/InRelease  Could not resolve 'deb.debian.org'
+62:#8 7.269 W: Failed to fetch http://deb.debian.org/debian-security/dists/bookworm-security/InRelease  Could not resolve 'deb.debian.org'
+67:#8 7.289 E: Unable to locate package python3
+68:#8 7.289 E: Unable to locate package make
+
+docker compose config -q (copy of compose + throwaway env): exit 0

@@ -72,12 +72,20 @@ fast ones per phase; `/review` runs all of them.
 | e2e | `pnpm e2e` | Playwright Chromium (`pnpm exec playwright install chromium`) |
 | mutation (one module) | `pnpm mutation --mutate <file>` | - |
 
-Scripts are created by the first roadmap item (project scaffold). Until then the gates fail.
 Test strategy, recipes and mutation targets: `context/test-plan.md`.
 Checks on the real Raspberry Pi and against real sources/LLM APIs are human checks with
 evidence, never a gate.
 
 ## Commands
 
-Filled in by the scaffold item. Run the app: `docker compose up --build` (D-14). The PRD expects: `pnpm install`, `pnpm dev`, `pnpm test`,
-`pnpm typecheck`, `pnpm build`, `pnpm db:migrate`, `pnpm discover`.
+Run the app: `docker compose up --build` (D-14); needs `mkdir -p data` and `.env`.
+
+| Command | Does |
+|---------|------|
+| `pnpm install` | install the workspace (pnpm 12, Node 24) |
+| `pnpm dev` | API with watch + Vite dev server (`/api` proxied to 8080) |
+| `pnpm build` | build packages, API and web |
+| `pnpm start` | run the built API (serves the built web) |
+| `pnpm db:migrate` | apply migrations to `${DATA_DIR}/lead-hunter.db` (dev: `apps/api/data/lead-hunter.db`) |
+| `pnpm discover` | source discovery CLI (prints `brak skonfigurowanych źródeł` until sources exist) |
+| `pnpm docker:build` | build the image `lead-hunter-ai:local` |
