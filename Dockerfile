@@ -4,10 +4,6 @@ WORKDIR /app
 RUN corepack enable
 
 FROM base AS build
-# Fallback toolchain in case the better-sqlite3 prebuilt binary is unavailable
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
@@ -18,9 +14,6 @@ COPY . .
 RUN pnpm build
 
 FROM base AS prod-deps
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY apps/api/package.json apps/api/
 COPY apps/web/package.json apps/web/
