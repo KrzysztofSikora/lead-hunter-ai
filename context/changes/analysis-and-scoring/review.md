@@ -58,7 +58,7 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 - Fix: limit the generated justifications so they fit (for example, list at most the first N matched names plus "i N innych", and use the trimmed profile term instead of the raw model string), and validate with `ScoreBreakdown.parse` in the runner before `saveComplete`, so a violation becomes `internal_error` instead of unreadable stored data. Add a rubric test with 20 long matched terms.
 - Effort: small
 - Lesson candidate: Validate every value against its contract schema before storing it, not only when reading it back.
-- Decision: open
+- Decision: fixed (54c05d7) + lesson proposed
 
 ### R2: The output guard keeps any budget amount as long as the quote text occurs somewhere
 - Severity: major
@@ -67,7 +67,7 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 - Fix: require the quote to contain both amounts. For example, extract the digit groups of the quote (separators normalised) and require `minMinor/100` and `maxMinor/100` among them, otherwise drop the budget and add a note. Reject empty or whitespace-only facts and quotes (`.min(1)` on the fact items or a guard check). Add both cases to `output-guard.test.ts`.
 - Effort: small
 - Lesson candidate: A guard that verifies a quote must also verify the values derived from it.
-- Decision: open
+- Decision: fixed (1ea746a) + lesson proposed
 
 ### R3: Mock budget regex misreads decimal separators and neighbouring numbers
 - Severity: minor
@@ -76,7 +76,7 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 - Fix: parse a decimal part (`[.,]\d{1,2}` at the end) as minor units and treat space/dot only as thousands separators in groups of three (`\d{1,3}(?:[ .]\d{3})*`), so "2026 500" no longer joins. Add the two strings to `mock.test.ts`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (d4180a8)
 
 ### R4: An INSUFFICIENT_DATA mock result is shown in the list without the DEMO / MOCK label
 - Severity: minor
@@ -85,7 +85,7 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 - Fix: return a summary (with `demo`) whenever `analysis_provider` is set and the status is `COMPLETE`, or show the badge from a top-level `demo` derived from `analysis_provider`. Assert the badge for the 50-character case in the DTO test.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (fb775ed)
 
 ### R5: Filter form silently drops or breaks on some inputs
 - Severity: minor
@@ -94,7 +94,7 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 - Fix: uppercase the country before checking it, accept decimals for the amount (or set `step=1` and say so), cap `maxAgeDays` at the contract's 3650 (`max` on the input and in `readQuery`), and when a minimum amount has no currency, show a field message (or make currency `required` once an amount is entered).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (21aab4a)
 
 ### R6: `docs/scoring.md` lacks the pre-filter rules and the evidence guard the plan puts there
 - Severity: minor
@@ -103,4 +103,4 @@ Gates: typecheck ok, lint ok, unit tests ok (31 files, 364 tests), e2e ok (4 tes
 - Fix: add two short sections: the D-6 rule order with the Polish UI texts, and the D-14 guard (quote check, dropped facts, `DIRECT_REQUEST`/paid-category downgrade without a hiring/payment cue, notes).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (01de258)
