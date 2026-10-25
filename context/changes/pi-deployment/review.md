@@ -1,7 +1,21 @@
 # Review: pi-deployment
 
-Verdict: CHANGES REQUESTED
-Gates: typecheck ok, lint ok, unit tests ok, e2e ok, image not run (no Docker daemon in the sandbox), image smoke not run (no Docker daemon) · Round: 1
+Verdict: APPROVE
+Gates: typecheck ok, lint ok, unit tests ok, e2e ok, image not run (no Docker daemon in the sandbox), image smoke not run (no Docker daemon) · Round: 2
+
+## Round 2 (re-review after `/fix-review`, commit 3ff6a9e)
+
+| Finding | Check | Result |
+|---------|-------|--------|
+| R1 | `deploy/pi-check.sh:24-25` now splits the cmdline on NUL and requires `args[0]` ending in `node` and `args[1] === "apps/api/dist/server.js"`; skips its own pid; prints the measured pid. Ran the predicate: `docker-init -- node apps/api/dist/server.js` false, `node apps/api/dist/server.js` true, `node -e ...server.js` false. Matches the Dockerfile `CMD ["node", "apps/api/dist/server.js"]` with `WORKDIR /app` | fixed |
+| R2 | `JAR` is now a global set before `trap cleanup EXIT`; the same pattern under `set -euo pipefail` exits 0 | fixed |
+| R3 | `scripts/container-smoke.sh:41-46` wraps the no-hash run in `timeout 60`, treats exit 0 and 124 as "started", and `cleanup` removes `$NAME-nohash`. The server handles SIGTERM (`apps/api/src/server.ts:202`), so the signal the docker CLI proxies stops it; `timeout` returns 124 | fixed |
+| R4 | README offline paragraph and the Phase 3 human check now say "on the Pi (local browser or `ssh -L`)", port loopback-only | fixed |
+
+No new findings in the fix commit. `bash -n` passes for both scripts. The image and image-smoke gates
+still have not run here (no Docker daemon); CI runs them, and the Pi checks remain human checks.
+
+## Round 1
 
 ## Plan vs diff
 | File | Status | Note |
@@ -21,7 +35,7 @@ Gates: typecheck ok, lint ok, unit tests ok, e2e ok, image not run (no Docker da
 | `context/roadmap.md` | unplanned | workflow status (in-progress, now review) |
 | `context/changes/pi-deployment/{plan,plan-review}.md` | unplanned | workflow artifacts |
 
-## Areas
+## Areas (round 1; round 2: all ok)
 | Area | Result (ok / concern / fail) | One-line reason |
 |------|------------------------------|-----------------|
 | Correctness | fail | `pi-check.sh rss` measures `docker-init` instead of the server under compose `init: true` (R1); `perf` exits 1 on success (R2) |
