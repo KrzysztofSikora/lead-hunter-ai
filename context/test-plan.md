@@ -59,7 +59,7 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 | TR-24 (human) | Facts and estimates indistinguishable in the UI; status by colour only; unusable at 360 px | M | M | unit + e2e | component tests assert the "ze źródła" / "wniosek modelu" / "szacunek (hipoteza)" labels; e2e at 360 px viewport asserts no horizontal scroll on the main views | planned (S-06, S-13) |
 | TR-25 (none) | Pre-filter lets "SEEKING WORK" posts or excluded categories reach the LLM; daily limits ignored | M | M | unit | pre-filter rule table; limit counters with fake clock | planned (S-04, S-05) |
 | TR-26 (human) | Image does not build or the container cannot start (native better-sqlite3, non-root permissions, volume) | M | M | image + human | CI `docker build` and `docker:smoke` on every PR; S-16 human check on the Pi with evidence | covered (S-16: container-smoke; Pi build human) |
-| TR-27 (human) | Footprint too large for the Pi 4 (NFR-01, NFR-02) | M | L | human | S-16 measurements with seeded 10 000 signals | planned (S-16) |
+| TR-27 (human) | Footprint too large for the Pi 4 (NFR-01, NFR-02) | M | L | human | S-16 measurements with seeded 10 000 signals | planned (S-16 human checks, evidence in changes/pi-deployment/evidence/) |
 
 ## Not tested (and why)
 - **Real third-party services in automated tests** (hnrss.org, WWR, Useme mail, Anthropic,

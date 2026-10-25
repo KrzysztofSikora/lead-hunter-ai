@@ -277,10 +277,21 @@ the README alone, and it keeps running there.
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Durability, DEMO seed and Pi measurement script
 - [x] Phase 2: Ollama profile and container smoke in CI
-- [ ] Phase 3: Raspberry Pi install and operator docs
+- [x] Phase 3: Raspberry Pi install and operator docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 3) Install from the README on a clean 64-bit Raspberry Pi OS; record the build time of `docker compose up -d --build` and whether better-sqlite3 needed a source build — run: README steps 1-5, `docker compose ps` — evidence: none (Pi) -> `evidence/pi-install.txt`
+- [ ] (Phase 3) Reboot: healthy within 2 minutes, panel opens — run: `sudo reboot`, then `docker compose ps` — evidence: none
+- [ ] (Phase 3) Crash during *Uruchom teraz*: container returns, run shown as failed, integrity ok (NFR-04) — run: `sudo kill -9 $(docker compose top app | awk '/dist\/server.js/ {print $2}')`, then `deploy/pi-check.sh integrity` — evidence: none
+- [ ] (Phase 3) Only `127.0.0.1:8080` is listening — run: `ss -tlnp | grep 8080` — evidence: none
+- [ ] (Phase 3) A scheduled 08:00/18:00 run appears in run history untouched — run: open the panel next day — evidence: none
+- [ ] (Phase 3) NFR-01: VmHWM <= 500 MB after a discovery cycle — run: `deploy/pi-check.sh rss` — evidence: none
+- [ ] (Phase 3) NFR-02: each endpoint max <= 500 ms with 10 000 signals — run: `deploy/pi-check.sh perf 10000` — evidence: none
+- [ ] (Phase 3) Offline behaviour (FR-23 AC3): import, status change, payment work; *Uruchom teraz* shows errors — run: `sudo ip link set wlan0 down` — evidence: none
+- [ ] (Phase 3) Tailscale: panel opens on the phone and login works — run: `tailscale serve --bg 8080` — evidence: none
+- [ ] (Phase 3) Update keeps data (FR-23 AC5) — run: `git pull && docker compose up -d --build` — evidence: none
+- [ ] (Phase 3) Read the README install as the operator: complete, ordered, three-part section accurate (FR-26 AC1) — run: read `README.md` — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
