@@ -60,7 +60,6 @@
   font-size: 0.8125rem;
 }
 
-.components,
 .plain {
   display: flex;
   flex-direction: column;
@@ -70,6 +69,136 @@
   overflow-wrap: anywhere;
 }
 
-.components li {
+.card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
+  max-width: 1200px;
+}
+
+.element {
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ccc;
+  border-radius: 0.25rem;
+}
+
+.element h3 {
+  margin-top: 0;
+}
+
+.emptyReason {
+  margin: 0 0 0.5rem;
+  color: #444;
+}
+
+.tag {
+  display: inline-block;
+  padding: 0 0.375rem;
+  border: 1px solid #444;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+
+.tagSource {
+  border-style: solid;
+}
+
+.tagInference {
+  border-style: dashed;
+}
+
+.tagEstimate {
+  border-style: dotted;
+  border-width: 2px;
+}
+
+.tagRules {
+  border-style: double;
+  border-width: 3px;
+}
+
+.tagUnknown {
+  border-color: transparent;
+  font-style: italic;
+}
+
+.none {
+  color: #444;
+  font-style: italic;
+}
+
+.url {
   overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.actions .meta {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 100%;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.form select,
+.form textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  font: inherit;
+}
+
+.formButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.actionError {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+@media (min-width: 960px) {
+  .card {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .element,
+  .el_overview,
+  .el_origin,
+  .el_excerpt,
+  .el_score,
+  .el_nextStep,
+  .el_actions,
+  .el_history {
+    grid-column: 1 / -1;
+  }
+
+  .el_problem,
+  .el_offer,
+  .el_skills,
+  .el_pricing,
+  .el_risks {
+    grid-column: auto;
+  }
 }

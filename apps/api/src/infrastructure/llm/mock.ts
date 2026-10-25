@@ -12,6 +12,27 @@ const PREFIX = 'DEMO / MOCK: ';
 const MIN_CHARS = 80;
 const FACT_MAX = 300;
 
+const MVP_SCOPE: Record<Category, string[]> = {
+  DIRECT_GIG: [
+    `${PREFIX}jedna działająca funkcja z opisu zlecenia`,
+    `${PREFIX}instrukcja uruchomienia`,
+  ],
+  B2B_SUBCONTRACT: [`${PREFIX}wydzielony moduł dla głównego wykonawcy`, `${PREFIX}testy odbiorowe`],
+  HARDWARE_IOT: [
+    `${PREFIX}prototyp urządzenia z jednym czujnikiem`,
+    `${PREFIX}firmware i dokumentacja podłączenia`,
+  ],
+  UNMET_NEED: [`${PREFIX}prototyp rozwiązania zgłoszonego problemu`],
+  PRODUCT_HYPOTHESIS: [`${PREFIX}strona z opisem oferty do sprawdzenia zainteresowania`],
+};
+const EXCLUSIONS: Record<Category, string[]> = {
+  DIRECT_GIG: [`${PREFIX}utrzymanie po odbiorze`, `${PREFIX}zakup licencji i sprzętu`],
+  B2B_SUBCONTRACT: [`${PREFIX}praca poza uzgodnionym modułem`],
+  HARDWARE_IOT: [`${PREFIX}produkcja seryjna`, `${PREFIX}certyfikacja urządzenia`],
+  UNMET_NEED: [`${PREFIX}wdrożenie produkcyjne`],
+  PRODUCT_HYPOTHESIS: [`${PREFIX}budowa pełnego produktu`],
+};
+
 const HOURS: Record<Category, { min: number; max: number }> = {
   DIRECT_GIG: { min: 20, max: 60 },
   B2B_SUBCONTRACT: { min: 40, max: 120 },
@@ -113,6 +134,8 @@ export class MockProvider implements LlmProvider {
       relevantSkills: skills,
       solutionApproach: `${PREFIX}propozycja podejścia wymaga oceny operatora.`,
       suggestedDeliverable: `${PREFIX}ustalić z klientem zakres dostawy.`,
+      mvpScope: MVP_SCOPE[category],
+      exclusions: EXCLUSIONS[category],
       monetizationModel: sourceBudget ? 'FIXED_PRICE' : 'UNKNOWN',
       estimatedHours: hours,
       proposedPrice: rate

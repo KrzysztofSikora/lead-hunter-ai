@@ -6,6 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
+import { createActivityRepository } from '../../src/infrastructure/db/activity-repository.js';
 import { createAnalysisRepository } from '../../src/infrastructure/db/analysis-repository.js';
 import { MockProvider } from '../../src/infrastructure/llm/mock.js';
 import { createAnalysisRunner, type AnalysisRunner } from '../../src/modules/analysis/service.js';
@@ -112,6 +113,7 @@ export async function buildTestApp(
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),
     opportunities: {
       repository: createOpportunityRepository(db),
+      activity: createActivityRepository(db),
       sourceStatus: noSourcesYet,
       clock,
     },

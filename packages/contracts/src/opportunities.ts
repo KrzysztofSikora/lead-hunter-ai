@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { OpportunityAnalysis, PrefilterRule, ScoreBreakdown } from './analysis.js';
 import { Category, Confidence, EvidenceLevel } from './classification.js';
 import { Currency } from './profile.js';
+import { RejectionReason } from './status.js';
 
 export { Category, Confidence, EvidenceLevel };
 
@@ -175,12 +176,36 @@ export const Evidence = z
   .strict();
 export type Evidence = z.infer<typeof Evidence>;
 
+/** S-06 D-4, D-8: why a system status move happened. */
+export const ActivityCause = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('prefilter'), rule: PrefilterRule }).strict(),
+  z.object({ kind: z.literal('insufficient_data') }).strict(),
+]);
+export type ActivityCause = z.infer<typeof ActivityCause>;
+
+export const ActivityEvent = z
+  .object({
+    id: z.number().int(),
+    type: z.enum(['STATUS_CHANGE', 'NOTE']),
+    actor: z.enum(['operator', 'system']),
+    fromStatus: BusinessStatus.nullable(),
+    toStatus: BusinessStatus.nullable(),
+    reason: RejectionReason.nullable(),
+    note: z.string().nullable(),
+    cause: ActivityCause.nullable(),
+    occurredAt: isoInstant,
+  })
+  .strict();
+export type ActivityEvent = z.infer<typeof ActivityEvent>;
+
 export const OpportunityDetail = z
   .object({
     ...opportunityBase,
     source: SourceFacts.extend({ snippet: z.string() }).strict(),
     evidence: z.array(Evidence),
     latestAnalysis: LatestAnalysis.nullable(),
+    /** Newest first. */
+    activity: z.array(ActivityEvent),
   })
   .strict();
 export type OpportunityDetail = z.infer<typeof OpportunityDetail>;

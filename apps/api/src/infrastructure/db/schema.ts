@@ -129,6 +129,28 @@ export const opportunityEvidence = sqliteTable(
   (table) => [index('opportunity_evidence_opportunity_idx').on(table.opportunityId)],
 );
 
+/** S-06 D-4: status changes and notes of one opportunity; S-08 adds event types. */
+export const activityEvents = sqliteTable(
+  'activity_events',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    opportunityId: integer('opportunity_id')
+      .notNull()
+      .references(() => opportunities.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(),
+    actor: text('actor').notNull(),
+    fromStatus: text('from_status'),
+    toStatus: text('to_status'),
+    reason: text('reason'),
+    /** Operator text; never logged. */
+    note: text('note'),
+    /** The cause of a system move (D-8). */
+    metadataJson: text('metadata_json'),
+    occurredAt: integer('occurred_at').notNull(),
+  },
+  (table) => [index('activity_events_opportunity_idx').on(table.opportunityId, table.occurredAt)],
+);
+
 /** D-14: one value belongs to one opportunity; the first to see it owns it. */
 export const signalIdentities = sqliteTable(
   'signal_identities',
