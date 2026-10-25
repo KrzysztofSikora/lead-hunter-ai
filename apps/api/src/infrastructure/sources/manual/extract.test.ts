@@ -111,4 +111,31 @@ describe('extractPage (S-09 D-9, D-10)', () => {
     expect(performance.now() - started).toBeLessThan(2000);
     expect((page as { text: string }).text).toContain('Fikcyjne zlecenie');
   });
+
+  it('finishes quickly on a maximum-size body of unclosed tags and keeps its text', () => {
+    const html = `${'<b>'.repeat(340_000)}Fikcyjne zlecenie`;
+    const started = performance.now();
+    const page = extractPage(enc(html), 'text/html', URL_, 20_000);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect((page as { text: string }).text).toBe('Fikcyjne zlecenie');
+  });
+
+  it('drops script and style content on the tag-heavy path, also when unclosed', () => {
+    const filler = '<i>'.repeat(25_000);
+    const closed = `${filler}<script>sekret()</script><style>p{}</style>Tekst`;
+    expect((extractPage(enc(closed), 'text/html', URL_, 100) as { text: string }).text).toBe(
+      'Tekst',
+    );
+    const unclosed = `${filler}Tekst<SCRIPT>sekret()`;
+    expect((extractPage(enc(unclosed), 'text/html', URL_, 100) as { text: string }).text).toBe(
+      'Tekst',
+    );
+  });
+
+  it('finishes quickly on many unclosed script tags', () => {
+    const started = performance.now();
+    const result = extractPage(enc('<script>'.repeat(130_000)), 'text/html', URL_, 100);
+    expect(performance.now() - started).toBeLessThan(2000);
+    expect(result).toBe('no_text');
+  });
 });

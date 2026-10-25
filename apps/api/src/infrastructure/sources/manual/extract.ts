@@ -8,6 +8,9 @@ const HTML_TYPES = new Set(['text/html', 'application/xhtml+xml']);
 // Readability is superlinear in nesting depth and cannot be interrupted by the fetch deadline.
 const READABILITY_MAX_DEPTH = 64;
 const READABILITY_MAX_ELEMENTS = 5_000;
+// linkedom's parse is superlinear too; above this many tags the DOM is skipped altogether.
+const DOM_MAX_TAGS = 20_000;
+const RAW_TEXT_TAGS = new Set(['script', 'style', 'noscript']);
 
 export interface ExtractedPage {
   title: string;
@@ -32,6 +35,44 @@ function withinReadabilityLimits(root: TreeNode | null): boolean {
     for (const child of node.children) stack.push([child, depth + 1]);
   }
   return true;
+}
+
+/** Linear pre-scan: the number of `<` that open or close a tag. */
+function countTags(source: string): number {
+  let count = 0;
+  for (let at = source.indexOf('<'); at !== -1; at = source.indexOf('<', at + 1)) {
+    const code = source.charCodeAt(at + 1);
+    if ((code >= 65 && code <= 90) || (code >= 97 && code <= 122) || code === 47) count += 1;
+  }
+  return count;
+}
+
+/** Text of a page too tag-heavy for a DOM: one linear pass, script/style/noscript content dropped. */
+function plainText(source: string): string {
+  const lower = source.toLowerCase();
+  const parts: string[] = [];
+  let at = 0;
+  while (at < source.length) {
+    const open = source.indexOf('<', at);
+    if (open === -1) {
+      parts.push(source.slice(at));
+      break;
+    }
+    parts.push(source.slice(at, open));
+    const close = source.indexOf('>', open);
+    if (close === -1) break;
+    parts.push(' ');
+    at = close + 1;
+    const name = /^<([a-z][a-z0-9]*)/.exec(lower.slice(open, Math.min(close, open + 32)))?.[1];
+    if (name && RAW_TEXT_TAGS.has(name)) {
+      const end = lower.indexOf(`</${name}`, at);
+      if (end === -1) break;
+      const endClose = source.indexOf('>', end);
+      if (endClose === -1) break;
+      at = endClose + 1;
+    }
+  }
+  return parts.join('').replace(/&nbsp;/gi, ' ');
 }
 
 /** D-10: trim lines, collapse blanks, at most one empty line in a row. */
@@ -87,6 +128,12 @@ export function extractPage(
   }
 
   if (source.trim() === '') return 'no_text';
+
+  if (countTags(source) > DOM_MAX_TAGS) {
+    const text = cut(normaliseText(plainText(source)), maxTextChars).trim();
+    if (text === '') return 'no_text';
+    return { title: deriveTitle(text, url), text };
+  }
 
   // Readability rewrites the document it is given, so the fallback reads a second parse.
   const parsed = parseHTML(source).document;
