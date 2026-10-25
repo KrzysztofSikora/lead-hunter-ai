@@ -1,9 +1,12 @@
 import type { Availability, FetchFailureReason, SourceType } from '@lead-hunter/contracts';
 
-export type IdentityKind = 'canonical_url' | 'content_hash';
+export type IdentityKind = 'canonical_url' | 'external_id' | 'content_hash';
 
 export interface NewSignal {
   sourceType: SourceType;
+  /** Null for manual imports (S-10 D-1). */
+  sourceId: number | null;
+  externalId: string | null;
   sourceUrl: string | null;
   canonicalUrl: string | null;
   title: string;

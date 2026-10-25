@@ -25,10 +25,61 @@ export const operatorProfile = sqliteTable(
   (table) => [check('single_row', sql`${table.id} = 1`)],
 );
 
-/** D-3: the source is a text column until `sources` exists (S-10). */
+/** S-10 D-1: one row per configured source; `configJson` is owned by its adapter. */
+export const sources = sqliteTable(
+  'sources',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    type: text('type').notNull(),
+    name: text('name').notNull(),
+    configJson: text('config_json').notNull(),
+    /** The adapter's identity of a config (RSS: canonical feed URL); one source per key. */
+    configKey: text('config_key').notNull().unique(),
+    presetId: text('preset_id'),
+    enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /** D-3: adapter-owned JSON, e.g. `{ seen: [...] }`. */
+    cursorJson: text('cursor_json'),
+    /** D-5: the earliest time the next attempt may start (UTC epoch ms). */
+    nextAllowedAt: integer('next_allowed_at'),
+    lastAttemptAt: integer('last_attempt_at'),
+    lastSuccessAt: integer('last_success_at'),
+    lastErrorReason: text('last_error_reason'),
+    lastErrorStatus: integer('last_error_status'),
+    lastErrorAt: integer('last_error_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (table) => [index('sources_enabled_idx').on(table.enabled)],
+);
+
+/** S-10 D-2: one row per source run; S-12 adds the remaining FR-18 counters. */
+export const jobRuns = sqliteTable(
+  'job_runs',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    jobType: text('job_type').notNull(),
+    sourceId: integer('source_id').references(() => sources.id),
+    status: text('status').notNull(),
+    startedAt: integer('started_at').notNull(),
+    finishedAt: integer('finished_at'),
+    fetched: integer('fetched').notNull().default(0),
+    new: integer('new').notNull().default(0),
+    duplicates: integer('duplicates').notNull().default(0),
+    failed: integer('failed').notNull().default(0),
+    errorReason: text('error_reason'),
+    errorStatus: integer('error_status'),
+  },
+  (table) => [index('job_runs_source_idx').on(table.sourceId, table.startedAt)],
+);
+
+/** D-3: the source is a text column on signals created before `sources` (S-10). */
 export const rawSignals = sqliteTable('raw_signals', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   sourceType: text('source_type').notNull(),
+  /** S-10 D-1: null for manual imports. */
+  sourceId: integer('source_id').references(() => sources.id),
+  /** S-10 D-4: the feed entry's own key (`guid`, else `link`); null for manual imports. */
+  externalId: text('external_id'),
   /** The URL as the operator pasted it (trimmed). */
   sourceUrl: text('source_url'),
   /** Identity form of the URL (D-2); never shown as the source. */

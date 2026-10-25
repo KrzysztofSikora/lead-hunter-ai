@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>DEMO Ask HN: Freelancer? Seeking freelancer? (synthetic)</title>
+    <link>https://hnrss.org/whoishiring/freelance</link>
+    <description>DEMO synthetic fixture, not a recording</description>
+    <item>
+      <title>New comment by DEMO-user-1 in "Ask HN: Freelancer? Seeking freelancer? (DEMO month)"</title>
+      <description><![CDATA[<p>SEEKING FREELANCER | DEMO Logistics | Remote</p><p>We need a contractor for a route planning dashboard (TypeScript, Node.js). Budget &amp; timeline negotiable.</p><p>Contact: demo@example.com</p>]]></description>
+      <pubDate>Mon, 05 Oct 2026 09:30:00 +0000</pubDate>
+      <link>https://news.ycombinator.com/item?id=900000001</link>
+      <dc:creator>DEMO-user-1</dc:creator>
+      <comments>https://news.ycombinator.com/item?id=900000001</comments>
+      <guid isPermaLink="false">https://news.ycombinator.com/item?id=900000001</guid>
+    </item>
+    <item>
+      <title>New comment by DEMO-user-2 in "Ask HN: Freelancer? Seeking freelancer? (DEMO month)"</title>
+      <description>&lt;p&gt;SEEKING WORK | DEMO-user-2 | Remote&lt;/p&gt;&lt;p&gt;Full-stack developer, 10 years of experience.&lt;/p&gt;</description>
+      <pubDate>Mon, 05 Oct 2026 10:15:00 +0000</pubDate>
+      <link>https://news.ycombinator.com/item?id=900000002</link>
+      <dc:creator>DEMO-user-2</dc:creator>
+      <guid isPermaLink="false">https://news.ycombinator.com/item?id=900000002</guid>
+    </item>
+  </channel>
+</rss>

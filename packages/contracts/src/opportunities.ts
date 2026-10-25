@@ -8,8 +8,8 @@ export { Category, Confidence, EvidenceLevel };
 
 export const DEFAULT_IMPORT_MAX_TEXT_CHARS = 20_000;
 
-/** S-10/S-11 add `rss` and `imap`. `manual_fetch`: the text came from a one-off page fetch. */
-export const SourceType = z.enum(['manual_text', 'manual_url', 'manual_fetch']);
+/** S-11 adds `imap`. `manual_fetch`: the text came from a one-off page fetch. */
+export const SourceType = z.enum(['manual_text', 'manual_url', 'manual_fetch', 'rss']);
 export type SourceType = z.infer<typeof SourceType>;
 
 /** Brief §10.1. */
@@ -81,6 +81,15 @@ export const FetchFailureReason = z.enum([
 ]);
 export type FetchFailureReason = z.infer<typeof FetchFailureReason>;
 
+/** S-10 D-10: why a source run or check failed; a fetch reason or a feed-level one. */
+export const SourceFailureReason = z.enum([
+  ...FetchFailureReason.options,
+  'invalid_feed',
+  'rate_limited',
+  'internal',
+]);
+export type SourceFailureReason = z.infer<typeof SourceFailureReason>;
+
 export const ImportResult = z.discriminatedUnion('result', [
   z
     .object({
@@ -93,7 +102,7 @@ export const ImportResult = z.discriminatedUnion('result', [
     .object({
       result: z.literal('duplicate'),
       opportunityId: z.number().int(),
-      matchedBy: z.enum(['canonical_url', 'content_hash']),
+      matchedBy: z.enum(['canonical_url', 'external_id', 'content_hash']),
       evidenceAdded: z.boolean(),
     })
     .strict(),
@@ -114,6 +123,8 @@ const isoInstant = z.iso.datetime();
 export const SourceFacts = z
   .object({
     type: SourceType,
+    /** S-10 D-19: the configured source's name for feed signals; null for manual ones. */
+    name: z.string().nullable(),
     /** The URL exactly as the operator pasted it. */
     url: z.string().nullable(),
     /** Identity form of the URL, for display of what was matched. */
@@ -325,10 +336,16 @@ export const OpportunityListQuery = z
 export type OpportunityListQuery = z.infer<typeof OpportunityListQuery>;
 
 export const SourceError = z
-  .object({ source: z.string(), message: z.string(), at: isoInstant })
+  .object({
+    sourceId: z.number().int(),
+    source: z.string(),
+    reason: SourceFailureReason,
+    httpStatus: z.number().int().min(100).max(599).optional(),
+    at: isoInstant,
+  })
   .strict();
 
-/** D-10: counts for the empty state; `checked` is 0 until automatic sources exist. */
+/** D-10: counts for the empty state; `checked` counts enabled sources that were attempted. */
 export const SourcesStatus = z
   .object({ checked: z.number().int().min(0), errors: z.array(SourceError) })
   .strict();

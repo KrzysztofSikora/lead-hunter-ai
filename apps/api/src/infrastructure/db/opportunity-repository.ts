@@ -31,6 +31,7 @@ import {
   opportunityEvidence,
   payments,
   rawSignals,
+  sources,
 } from './schema.js';
 
 const columns = {
@@ -44,6 +45,7 @@ const columns = {
   createdAt: opportunities.createdAt,
   updatedAt: opportunities.updatedAt,
   sourceType: rawSignals.sourceType,
+  sourceName: sources.name,
   sourceUrl: rawSignals.sourceUrl,
   canonicalUrl: rawSignals.canonicalUrl,
   title: rawSignals.title,
@@ -65,7 +67,8 @@ export function createOpportunityRepository(db: BetterSQLite3Database): Opportun
     db
       .select(columns)
       .from(opportunities)
-      .innerJoin(rawSignals, eq(opportunities.primarySignalId, rawSignals.id));
+      .innerJoin(rawSignals, eq(opportunities.primarySignalId, rawSignals.id))
+      .leftJoin(sources, eq(rawSignals.sourceId, sources.id));
 
   return {
     list(filter) {

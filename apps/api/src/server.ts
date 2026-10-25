@@ -22,7 +22,7 @@ import { createSessionRepository } from './infrastructure/db/session-repository.
 import { createHttpClient } from './infrastructure/sources/http/client.js';
 import { createPageFetcher } from './infrastructure/sources/manual/page-fetcher.js';
 import { createRobotsCheck } from './infrastructure/sources/manual/robots.js';
-import { noSourcesYet } from './infrastructure/sources/source-status.js';
+import { createSourceRuntime } from './infrastructure/sources/compose.js';
 import { createLoggerOptions } from './infrastructure/logging/logger.js';
 import { VERSION } from './version.js';
 
@@ -87,6 +87,14 @@ async function main(): Promise<void> {
     clock,
     logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
   });
+  const sourceRuntime = createSourceRuntime({
+    db,
+    config,
+    http,
+    clock,
+    onSignalCreated: () => runner.kick(),
+    logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
+  });
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
@@ -104,11 +112,12 @@ async function main(): Promise<void> {
       repository: createOpportunityRepository(db),
       activity: createActivityRepository(db),
       payments: createPaymentRepository(db),
-      sourceStatus: noSourcesYet,
+      sourceStatus: sourceRuntime.statusReader,
       clock,
     },
     pipeline: { repository: createPipelineRepository(db), clock },
     analysis: runner,
+    sources: sourceRuntime.service,
     ...(existsSync(WEB_DIST_DIR) ? { webDistDir: WEB_DIST_DIR } : {}),
     logger: createLoggerOptions(config),
   });
