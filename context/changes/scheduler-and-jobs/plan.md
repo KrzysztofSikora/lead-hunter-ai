@@ -337,10 +337,16 @@ per time, plus the 10-minute analysis interval (D-7). It returns `{ nextRunAt(),
 - [x] Phase 1: Job lock, run history columns and a locked CLI
 - [x] Phase 2: Schedule (croner) and server wiring
 - [x] Phase 3: Jobs API, locked source runs and analysis retry
-- [ ] Phase 4: Sources view runs and card retry
+- [x] Phase 4: Sources view runs and card retry
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 4) `docker compose up --build`, log in, **Źródła**, add `hn-freelance`, press **Uruchom teraz** above the list: the run shows "w toku" and turns `ok`/`częściowy` with counters within a minute without reloading; pressing again during the run shows "Przebieg w toku." — run: `docker compose up --build` — evidence: `context/changes/scheduler-and-jobs/evidence/jobs-sample.json` (API shape only)
+- [ ] (Phase 4) At 360 px the **Przebiegi** list is readable without horizontal scrolling and status reads without colour — run: DevTools 360 px on `/zrodla` — evidence: none
+- [ ] (Phase 4) During a run, `docker compose restart`: afterwards the run shows "przerwany (restart)" and a new **Uruchom teraz** works at once — run: `docker compose restart` — evidence: none
+- [ ] (Phase 4) While a UI run is in progress, `docker compose exec app pnpm discover` prints `przebieg w toku` — run: that command — evidence: `context/changes/scheduler-and-jobs/evidence/cli-busy.txt` (local, synthetic lock)
+- [ ] (Phase 4) The schedule line shows the next run as 08:00 or 18:00 Warsaw time — run: open **Źródła** — evidence: none
+- [ ] (Phase 4) Cycle button **Uruchom teraz** and row button **Uruchom źródło** read clearly side by side (D-13); **Ponów analizę** appears next to "Analiza: nieudana" on a failed card — run: **Źródła** and a failed opportunity — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -352,6 +358,8 @@ per time, plus the 10-minute analysis interval (D-7). It returns `{ nextRunAt(),
 - [minor] (Phase 2) `DISCOVERY_TIMES` is stored sorted; the DST tests cover one 24 h window around each change day (Sunday slots) because a multi-day fake-timer run with croner's re-arming is slow; Saturday/Monday are not asserted.
 - [minor] (Phase 3) Plan puts the `ScheduleInfo` into the jobs service; it lives in the route deps (`registerJobRoutes({ jobs, schedule })`) because the scheduler starts after the app and the service is built earlier in `compose.ts`. `JobRunQuery` gained an optional `id` so `POST /api/jobs/discover` answers with exactly the new cycle (a child run can share its `started_at`).
 - [minor] (Phase 3) `AnalysisRunner.retry(id)` (repository + kick) is the route's dependency; `kick` stays the same function.
+- [minor] (Phase 4) Plan names `useJobs()`/`useDiscoverNow()` hooks; the web app has no query library, so `api/jobs.ts` exports plain `listJobs`/`discoverNow` and `SourcesPage` polls with `setInterval` every 3 s while `running`. The **Przebiegi** list is stacked cards (one per run), not a `<table>`, for 360 px.
+- [minor] (Phase 4) Nothing automated proves the web part (D-15: no web tests); the `evidence/jobs-sample.json` is a `GET /api/jobs` from the integration fixture (partial cycle, mock LLM).
 - [FOLLOW-UP] S-05: add the money value of cost to `JobRun.cost` once the price table exists
   (D-9).
 - [FOLLOW-UP] S-15: register the 03:30 backup in `startScheduler` and decide its lock name.

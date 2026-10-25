@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import type { Source, SourceList, SourcePreset } from '@lead-hunter/contracts';
+import type { JobList, JobRun, Source, SourceList, SourcePreset } from '@lead-hunter/contracts';
 import styles from './SourcesPage.module.css';
 import {
   checkSource,
@@ -10,10 +10,12 @@ import {
   type CreateOutcome,
   type Outcome,
 } from './api/sources.js';
+import { discoverNow, listJobs } from './api/jobs.js';
 import { strings } from './strings.pl.js';
 import { formatWarsaw } from './warsawTime.js';
 
 const t = strings.sources;
+const j = strings.jobs;
 const failureText = strings.opportunities.sourceFailure;
 
 type Message = { kind: 'ok' | 'error'; text: string };
@@ -37,6 +39,8 @@ function refusalText(outcome: Exclude<Outcome<unknown>, { ok: true }>): string {
       return t.notFound;
     case 'exists':
       return t.exists;
+    case 'busy':
+      return t.busy;
   }
 }
 
@@ -159,6 +163,120 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
   );
 }
 
+function jobError(run: JobRun): string {
+  if (!run.error) return j.none;
+  if (run.error.reason === 'interrupted') return j.interrupted;
+  return withStatus(run.error.reason, run.error.httpStatus);
+}
+
+function jobCost(run: JobRun): string {
+  return run.cost ? j.tokens(run.cost.inputTokens, run.cost.outputTokens) : j.noData;
+}
+
+/** D-13: the schedule, the cycle button and the last runs; refetches every 3 s while one runs. */
+function Jobs({ onFinished }: { onFinished: () => void }) {
+  const [jobs, setJobs] = useState<JobList | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  const load = useCallback(() => {
+    listJobs().then(
+      (list) => {
+        setJobs(list);
+        setLoadFailed(false);
+      },
+      () => setLoadFailed(true),
+    );
+  }, []);
+  useEffect(load, [load]);
+
+  const running = jobs?.running ?? false;
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(load, 3000);
+    return () => {
+      clearInterval(timer);
+      onFinished();
+    };
+  }, [running, load, onFinished]);
+
+  async function start() {
+    setStarting(true);
+    setMessage(null);
+    try {
+      const outcome = await discoverNow();
+      if (!outcome.ok) setMessage({ kind: 'error', text: j.busy });
+    } catch {
+      setMessage({ kind: 'error', text: j.startFailed });
+    }
+    setStarting(false);
+    load();
+  }
+
+  const schedule = jobs
+    ? j.schedule(
+        jobs.schedule.times.join(j.and),
+        jobs.schedule.nextRunAt ? formatWarsaw(jobs.schedule.nextRunAt) : null,
+      )
+    : null;
+
+  return (
+    <div className={styles.jobs}>
+      {schedule && <p>{schedule}</p>}
+      <button type="button" disabled={starting || running} onClick={start}>
+        {starting ? j.starting : j.runNow}
+      </button>
+      {running && !message && <p role="status">{j.busy}</p>}
+      {message && (
+        <p role="status" className={message.kind === 'ok' ? styles.ok : styles.error}>
+          {message.text}
+        </p>
+      )}
+      <h3>{j.title}</h3>
+      {loadFailed && (
+        <p role="alert" className={styles.error}>
+          {j.loadFailed}
+        </p>
+      )}
+      {jobs && jobs.items.length === 0 && <p>{j.empty}</p>}
+      {jobs && jobs.items.length > 0 && (
+        <ul className={styles.runs}>
+          {jobs.items.map((run) => (
+            <li key={run.id} className={styles.run}>
+              <p className={styles.runHead}>
+                <strong>{formatWarsaw(run.startedAt)}</strong> · {j.types[run.type]}
+                {run.trigger && ` (${j.triggers[run.trigger]})`}
+                {run.source && ` · ${run.source.name}`}
+              </p>
+              <dl className={styles.facts}>
+                <dt>{j.statusCol}</dt>
+                <dd>{j.status[run.status]}</dd>
+                {(Object.keys(run.counters) as (keyof JobRun['counters'])[]).map((key) => (
+                  <Counter key={key} label={j.counters[key]} value={run.counters[key]} />
+                ))}
+                <dt>{j.errorCol}</dt>
+                <dd>{jobError(run)}</dd>
+                <dt>{j.costCol}</dt>
+                <dd>{jobCost(run)}</dd>
+              </dl>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function Counter({ label, value }: { label: string; value: number }) {
+  return (
+    <>
+      <dt>{label}</dt>
+      <dd>{value}</dd>
+    </>
+  );
+}
+
 export function SourcesPage() {
   const [data, setData] = useState<SourceList | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -221,6 +339,7 @@ export function SourcesPage() {
   return (
     <section>
       <h2>{t.title}</h2>
+      <Jobs onFinished={load} />
       {data.items.length === 0 ? (
         <p>{t.empty}</p>
       ) : (

@@ -4,6 +4,7 @@ import type { ActivityEvent, OpportunityDetail } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
 import { CardActions } from './CardActions.js';
 import { CardPipeline } from './CardPipeline.js';
+import { retryAnalysis } from './api/analysis.js';
 import { getOpportunity } from './api/opportunities.js';
 import { buildCard, eventDetails, type CardItem, type CardSection } from './opportunityCard.js';
 import { strings } from './strings.pl.js';
@@ -75,9 +76,39 @@ function Detail({
   onChange: (data: OpportunityDetail) => void;
 }) {
   const analysis = data.latestAnalysis;
+  const [retrying, setRetrying] = useState(false);
+  const [retryError, setRetryError] = useState(false);
+
+  async function retry() {
+    setRetrying(true);
+    setRetryError(false);
+    try {
+      await retryAnalysis(data.id);
+      const fresh = await getOpportunity(data.id);
+      if (fresh) onChange(fresh);
+    } catch {
+      setRetryError(true);
+    }
+    setRetrying(false);
+  }
+
   return (
     <>
       <h2>{data.source.title}</h2>
+      {data.analysisStatus === 'FAILED' && (
+        <p>
+          {list.analysisFailed}{' '}
+          <button type="button" disabled={retrying} onClick={retry}>
+            {retrying ? t.retryingAnalysis : t.retryAnalysis}
+          </button>
+          {retryError && (
+            <span role="alert" className={styles.error}>
+              {' '}
+              {t.retryAnalysisFailed}
+            </span>
+          )}
+        </p>
+      )}
       {analysis?.demo && !data.prefilter?.rule && (
         <p role="note" className={styles.demo}>
           <strong>{t.demoBanner}</strong>
