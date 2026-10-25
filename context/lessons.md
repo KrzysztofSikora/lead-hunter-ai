@@ -43,3 +43,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: rss-sources, R1, R2
 - Scope: parsers and services that store source-supplied dates, delays or counts (`apps/api/src/infrastructure/sources/**`, `apps/api/src/modules/sources/**`)
 - Status: proposed in the PR for rss-sources
+
+## Answer every plan-review finding of major or above with a Decisions row or a Deviations line before implementing
+- Why: a major plan-review finding left unanswered reached the review as a correctness defect (a dropped scheduled slot).
+- Seen in: scheduler-and-jobs, R1
+- Scope: `context/changes/*/plan.md`, `/plan` revise mode and `/implement`
+- Status: proposed in the PR for scheduler-and-jobs
