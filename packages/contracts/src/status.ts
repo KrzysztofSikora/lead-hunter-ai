@@ -91,10 +91,12 @@ export function checkMove(from: BusinessStatus, to: BusinessStatus): MoveCheck {
     return from === 'WON' || from === 'LOST' ? back : { allowed: false };
   }
   if (from === 'REJECTED' || from === 'EXPIRED') return back;
-  if (from === 'NEEDS_VERIFICATION') return forward();
-  const fromRank = MAIN_RANK[from];
+  // R1: leaving NEEDS_VERIFICATION counts as a forward move from the start of the main path, and
+  // never past CONTACTED, so a later stage always passes through a recorded contact.
+  const fromRank = from === 'NEEDS_VERIFICATION' ? 0 : MAIN_RANK[from];
   const toRank = MAIN_RANK[to];
   if (fromRank === undefined || toRank === undefined) return { allowed: false };
+  if (from === 'NEEDS_VERIFICATION' && toRank > (MAIN_RANK.CONTACTED ?? 0)) return { allowed: false };
   if (toRank < fromRank || from === 'WON' || from === 'LOST') return back;
   return forward(
     MAIN_PATH.filter(

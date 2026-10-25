@@ -56,8 +56,11 @@ describe('pipeline status moves (FR-14 AC1–AC3)', () => {
       skipped: ['OFFER_DRAFTED'],
       contract: null,
     });
-    // Leaving the status the analysis left (NEEDS_VERIFICATION for the mock) is a forward move.
-    expect(detail.activity[2]).toMatchObject({ fromStatus: before.businessStatus, skipped: [] });
+    // Leaving the status the analysis left (NEEDS_VERIFICATION for the mock) is a forward move from the start.
+    expect(detail.activity[2]).toMatchObject({
+      fromStatus: before.businessStatus,
+      skipped: ['QUALIFIED'],
+    });
   });
 
   it('records QUALIFIED as skipped when the operator saves a NEW row', async () => {
@@ -294,14 +297,18 @@ describe('pipeline summary (FR-15 AC2, FR-14 AC4)', () => {
     expect(body.otherCounts).toContainEqual({ status: 'NEW', count: 0 });
   });
 
-  it('counts a row that reached a later contact stage from an off-path status as contacted', async () => {
+  it('R1: a later stage cannot be reached from an off-path status without a recorded contact', async () => {
     const t = await setup();
     const id = await t.importText(POST);
     const move = (payload: object) => t.call('POST', `/api/opportunities/${id}/status`, payload);
     await move({ status: 'NEEDS_VERIFICATION' });
-    await move({ status: 'MEETING' });
-    const { totals } = (await t.call('GET', '/api/pipeline')).json();
-    expect(totals).toMatchObject({ contacted: 1, won: 0, paid: 0, paidSums: [] });
+    expect((await move({ status: 'MEETING' })).statusCode).toBe(409);
+    expect((await move({ status: 'WON' })).statusCode).toBe(409);
+    let totals = (await t.call('GET', '/api/pipeline')).json().totals;
+    expect(totals).toMatchObject({ contacted: 0, won: 0, paid: 0, paidSums: [] });
+    expect((await move({ status: 'CONTACTED' })).statusCode).toBe(200);
+    totals = (await t.call('GET', '/api/pipeline')).json().totals;
+    expect(totals).toMatchObject({ contacted: 1, won: 0 });
   });
 
   it('lists only follow-ups due today or overdue, overdue first, in contact stages', async () => {

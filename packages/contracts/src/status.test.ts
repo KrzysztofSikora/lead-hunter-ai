@@ -47,10 +47,22 @@ describe('checkMove (TR-14, S-08 D-1)', () => {
     }
     expect(checkMove('NEEDS_VERIFICATION', 'SAVED')).toMatchObject({
       kind: 'forward',
-      skipped: [],
+      skipped: ['QUALIFIED'],
       noteRequired: false,
     });
+    expect(checkMove('NEEDS_VERIFICATION', 'CONTACTED')).toMatchObject({
+      kind: 'forward',
+      skipped: ['QUALIFIED', 'SAVED', 'OFFER_DRAFTED'],
+    });
     expect(checkMove('NEEDS_VERIFICATION', 'WON').allowed).toBe(false);
+  });
+
+  it('R1: from NEEDS_VERIFICATION no stage after CONTACTED is reachable, so WON needs a recorded contact', () => {
+    for (const to of ['REPLIED', 'MEETING', 'WON', 'LOST'] as const) {
+      expect(checkMove('NEEDS_VERIFICATION', to).allowed).toBe(false);
+    }
+    // two-step path: WON -> NEEDS_VERIFICATION -> MEETING is no longer a note-free back move
+    expect(checkMove('WON', 'NEEDS_VERIFICATION').allowed).toBe(true);
   });
 
   it('allows REJECTED, EXPIRED and NEEDS_VERIFICATION from every other status', () => {
