@@ -66,18 +66,52 @@ describe('loadConfig', () => {
     }
   });
 
+  it.each(['development', 'test', 'production'])('accepts NODE_ENV=%s', (value) => {
+    expect(loadConfig({ NODE_ENV: value }).nodeEnv).toBe(value);
+  });
+
+  it.each([
+    ['PORT', 'abc', '1–65535'],
+    ['NODE_ENV', 'prod', 'production'],
+    ['LOG_LEVEL', 'loud', 'trace, silent'],
+  ])('explains the expected values for %s=%s', (variable, value, hint) => {
+    try {
+      loadConfig({ [variable]: value });
+      expect.unreachable();
+    } catch (error) {
+      const [issue] = (error as ConfigError).issues;
+      expect(issue?.message).toContain('oczekiwano');
+      expect(issue?.message).toContain(hint);
+      expect((error as ConfigError).name).toBe('ConfigError');
+      expect((error as ConfigError).message).toContain(`  ${variable} — ${issue?.message}`);
+    }
+  });
+
   it('reports all invalid variables at once', () => {
     try {
       loadConfig({ PORT: 'x', NODE_ENV: 'y' });
       expect.unreachable();
     } catch (error) {
       expect((error as ConfigError).issues.map((i) => i.variable)).toEqual(['NODE_ENV', 'PORT']);
+      expect((error as ConfigError).message.split('\n')).toHaveLength(3);
     }
   });
 
   describe('non-loopback host (FR-23 AC4)', () => {
     it('refuses 0.0.0.0 without a password hash', () => {
       expect(() => loadConfig({ HOST: '0.0.0.0' })).toThrow(/OPERATOR_PASSWORD_HASH/);
+    });
+
+    it('names the host in the refusal', () => {
+      try {
+        loadConfig({ HOST: '10.0.0.5' });
+        expect.unreachable();
+      } catch (error) {
+        const [issue] = (error as ConfigError).issues;
+        expect(issue).toMatchObject({ variable: 'OPERATOR_PASSWORD_HASH' });
+        expect(issue?.message).toContain('10.0.0.5');
+        expect(issue?.message).not.toContain('oczekiwano');
+      }
     });
 
     it('refuses 0.0.0.0 with an empty hash', () => {
