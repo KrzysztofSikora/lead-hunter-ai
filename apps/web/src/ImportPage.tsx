@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { Link } from 'react-router';
-import type { ImportResult } from '@lead-hunter/contracts';
+import type { FetchFailureReason, ImportResult } from '@lead-hunter/contracts';
 import styles from './ImportPage.module.css';
 import { importSignal } from './api/signals.js';
 import type { FieldError } from './api/profile.js';
@@ -13,6 +13,7 @@ type State =
   | { state: 'sending' }
   | { state: 'failed' }
   | { state: 'invalid'; fields: FieldError[] }
+  | { state: 'fetchFailed'; reason: FetchFailureReason; httpStatus?: number }
   | { state: 'done'; result: Exclude<ImportResult, { result: 'fetch_failed' }> };
 
 /** Custom schema rules carry Polish text; library codes get a Polish text by code. */
@@ -26,6 +27,7 @@ export function ImportPage() {
   const [text, setText] = useState('');
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState<State>({ state: 'idle' });
+  const textRef = useRef<HTMLTextAreaElement>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -33,12 +35,19 @@ export function ImportPage() {
     setStatus({ state: 'sending' });
     try {
       const outcome = await importSignal(body);
-      if (outcome.ok) {
-        setStatus({ state: 'done', result: outcome.result });
+      if (!outcome.ok) {
+        setStatus({ state: 'invalid', fields: outcome.fields });
+        return;
+      }
+      const { result } = outcome;
+      if (result.result === 'fetch_failed') {
+        const { reason, httpStatus } = result;
+        setStatus({ state: 'fetchFailed', reason, ...(httpStatus ? { httpStatus } : {}) });
+        textRef.current?.focus();
+      } else {
+        setStatus({ state: 'done', result });
         setText('');
         setUrl('');
-      } else {
-        setStatus({ state: 'invalid', fields: outcome.fields });
       }
     } catch {
       setStatus({ state: 'failed' });
@@ -59,6 +68,7 @@ export function ImportPage() {
           <label htmlFor="import-text">{t.textLabel}</label>
           <textarea
             id="import-text"
+            ref={textRef}
             rows={10}
             value={text}
             onChange={(event) => setText(event.target.value)}
@@ -102,6 +112,12 @@ export function ImportPage() {
       {status.state === 'failed' && (
         <p role="alert" className={styles.error}>
           {t.failed}
+        </p>
+      )}
+      {status.state === 'fetchFailed' && (
+        <p role="alert" className={styles.error}>
+          {t.fetchFailed[status.reason]}
+          {status.httpStatus ? ` (HTTP ${status.httpStatus})` : ''} {t.pastePrompt}
         </p>
       )}
       {status.state === 'done' && (

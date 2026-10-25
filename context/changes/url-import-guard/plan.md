@@ -327,13 +327,15 @@ apps/api/src/modules/signals/ports.ts   PageFetcher port
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Address guard and shared HTTP client
 - [x] Phase 2: Page fetch with robots.txt and the import contract
-- [ ] Phase 3: Import page handles a refused or failed fetch
+- [x] Phase 3: Import page handles a refused or failed fetch
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 2) Import a real public job page (a Useme or justjoin.it offer you may open) with only the URL filled — run: `pnpm dev`, log in, Import, paste the URL, or `curl -s -X POST localhost:8080/api/signals/import -H 'content-type: application/json' -H "cookie: $COOKIE" -d '{"url":"https://<offer>"}'` — expected: 201, card shows the page title, readable main text without menus, label "Pobrana strona (jednorazowo)" — evidence: none (the run has no internet; save the response JSON and a card screenshot under `evidence/`)
 - [ ] (Phase 2) Import a page of a site whose robots.txt disallows all bots (`curl -s https://<site>/robots.txt` shows `User-agent: *` + `Disallow: /`) with only the URL — run: same as above — expected: 422 `{"result":"fetch_failed","reason":"robots_disallowed"}` and the server log shows only the robots.txt request for that host — evidence: none (no internet here)
 - [ ] (Phase 2) `pnpm docker:build` succeeds with the new runtime dependencies (`@mozilla/readability`, `linkedom`, `robots-parser`, `ipaddr.js`, `undici`) — run: `pnpm docker:build` on a machine where Corepack can download pnpm — evidence: none (in this sandbox the build stops at `corepack` with `SELF_SIGNED_CERT_IN_CHAIN` before reaching the project; `pnpm build` and a node import of the built `robots.js` pass)
+- [ ] (Phase 3) Failed fetch on the Import page — run: `pnpm dev`, log in, Import, URL `http://10.0.0.5.nip.io/` with no text, submit — expected: alert "adres prywatny lub lokalny" + paste prompt, URL still in its field, cursor in the text area; then paste any text, submit: "Zaimportowano" and the card shows the URL as the source — evidence: none (no browser session with internet here; save two 360 px screenshots under `evidence/`)
+- [ ] (Phase 3) Read every `import.fetchFailed` text in `apps/web/src/strings.pl.ts` for wording — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -345,6 +347,8 @@ apps/api/src/modules/signals/ports.ts   PageFetcher port
 - [minor] (Phase 2) Web: until Phase 3, `ImportOutcome` and `ImportPage` state exclude `fetch_failed` (a 422 throws the generic failure) so typecheck stays green; Phase 3 widens it.
 - [minor] (Phase 2) `.prettierignore` gains `apps/api/test/fixtures/pages` (an ISO-8859-2 fixture must stay byte-exact); `eslint.config.js` `DRIVERS` gains `linkedom`, `@mozilla/readability`, `robots-parser`; `robots-parser` is CommonJS, so `robots.ts` casts the default import to the callable.
 - [minor] (Phase 2) linkedom keeps the text of an HTML fragment without `<html>` in `documentElement` and leaves `<body>` empty; `extract.ts` falls back to it (the plan's `UNVERIFIED` item). robots-parser matches the token `LeadHunterAI` as expected (`Disallow` in a `LeadHunterAI` group applies, `*` group otherwise).
+
+- [minor] (Phase 3) `ImportOutcome` now carries any `ImportResult` (incl. `fetch_failed`); the page narrows it. The error alert appends `(HTTP <status>)` when `httpStatus` is present. No component tests (budget, as planned); e2e specs pass unchanged.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
