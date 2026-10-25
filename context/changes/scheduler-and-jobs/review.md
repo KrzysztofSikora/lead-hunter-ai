@@ -97,7 +97,7 @@ findings below keep their numbering; the new ones continue at R5.
 - Fix: In `retryWhileBusy`, catch inside the interval callback, stop the timer and report through an `onError` option (server: `logger.error`, slot time only); add a unit case with an attempt that throws. Delete each cancel from `retries` once its retry finishes (have `retryWhileBusy` call a `onSettled` or return after clearing).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (a3e3222)
 
 ### R6: `JobRunRepository.isRunning` is dead after R2
 - Severity: minor
@@ -106,4 +106,4 @@ findings below keep their numbering; the new ones continue at R5.
 - Fix: Remove `isRunning` from the port and the repository.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (8c611cc)

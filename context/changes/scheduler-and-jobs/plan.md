@@ -361,7 +361,7 @@ per time, plus the 10-minute analysis interval (D-7). It returns `{ nextRunAt(),
 - [minor] (Phase 3) `AnalysisRunner.retry(id)` (repository + kick) is the route's dependency; `kick` stays the same function.
 - [minor] (Phase 4) Plan names `useJobs()`/`useDiscoverNow()` hooks; the web app has no query library, so `api/jobs.ts` exports plain `listJobs`/`discoverNow` and `SourcesPage` polls with `setInterval` every 3 s while `running`. The **Przebiegi** list is stacked cards (one per run), not a `<table>`, for 360 px.
 - [minor] (Phase 4) Nothing automated proves the web part (D-15: no web tests); the `evidence/jobs-sample.json` is a `GET /api/jobs` from the integration fixture (partial cycle, mock LLM).
-- [minor] (Review R2) `JobList.running` comes from the new `JobLock.isHeld()` (live lock) instead of any `running` row, so a crashed foreign run stops blocking the UI after the stale window; `JobRunRepository.isRunning` is now unused.
+- [minor] (Review R2) `JobList.running` comes from the new `JobLock.isHeld()` (live lock) instead of any `running` row, so a crashed foreign run stops blocking the UI after the stale window; `JobRunRepository.isRunning` is now unused (removed in review round 2, R6).
 - [minor] (Review R4) `shutdown()` sets a `stopping` flag the cycle's `shouldContinue` checks.
 - [FOLLOW-UP] S-05: add the money value of cost to `JobRun.cost` once the price table exists
   (D-9).
