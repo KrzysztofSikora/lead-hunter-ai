@@ -379,3 +379,5 @@ invalid output → `FAILED` + `invalid_output: …`; nothing ever logs prompts, 
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
+- [minor] (fix-review R1) The guard now replaces an invented address shorter than `[usunięto]` with `[…]`, caps link notes at 5 plus one count note, and `complete()` re-validates the guarded result (`invalid_output: guard`, billed cost kept).
+- [minor] (fix-review R2) `ProviderError` carries optional `usage` and a new kind `not_json`; refusal, truncation, empty and non-JSON answers are now costed and stored. Timeouts and SDK retries stay uncosted (`docs/llm.md`).

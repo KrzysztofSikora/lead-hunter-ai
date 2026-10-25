@@ -58,7 +58,7 @@ Gates: typecheck ok, lint ok, unit tests ok (39 files, 497 tests), e2e ok (4), i
 - Fix: in `complete()`, run `OpportunityAnalysis.parse(guarded.result)` before `saveComplete` (a failure falls into the existing `internal_error` path, or better a dedicated `invalid_output: guard`), and make the guard length-safe: clip the replaced string to the field's limit or use a replacement no longer than the removed value; cap the per-analysis link notes (e.g. one note with a count after N). Add a guard test that crosses `SHORT`/`LONG`.
 - Effort: small
 - Lesson candidate: no (covered by the existing lesson; this is a breach of it)
-- Decision: open
+- Decision: fixed (e8569ee)
 
 ### R2: Billed refusals, truncations and non-JSON answers are not costed, so the monthly cap under-counts
 - Severity: major
@@ -67,7 +67,7 @@ Gates: typecheck ok, lint ok, unit tests ok (39 files, 497 tests), e2e ok (4), i
 - Fix: carry usage on the failure: give `ProviderError` an optional `usage` (set it for `refusal`/`truncated`/`empty`) and have the adapters catch the `SyntaxError` from `parseModelJson` and rethrow it as a value that also carries usage (e.g. `ProviderError('not_json')` with usage, stored as `invalid_output: not_json`); in the runner's catch, bill `costMicroUsd(error.usage, price)` via the existing `billed` path. Add one integration test per kind asserting the cost row. Truly unknown cases (timeouts, SDK retries) stay documented as uncosted.
 - Effort: small
 - Lesson candidate: Every provider answer that was billed must be stored with its usage and cost, whatever the outcome.
-- Decision: open
+- Decision: fixed (e8569ee) + lesson proposed
 
 ### R3: `docs/llm.md` misstates the data-block escaping
 - Severity: minor
@@ -76,7 +76,7 @@ Gates: typecheck ok, lint ok, unit tests ok (39 files, 497 tests), e2e ok (4), i
 - Fix: write `` `<` `` in `docs/llm.md` (and in plan D-6).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (e2d2c19)
 
 ### R4: Opportunity page no longer resets to "loading" when the id changes
 - Severity: minor
@@ -85,4 +85,4 @@ Gates: typecheck ok, lint ok, unit tests ok (39 files, 497 tests), e2e ok (4), i
 - Fix: reset to `loading` when `id` changes (e.g. keep `setLoad({ state: 'loading' })` but skip it when only `reloads` changed, or key `<Detail>` / the page on `id`), and clear the timeout in the button's cleanup.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (09c75ad)
