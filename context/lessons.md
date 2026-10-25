@@ -25,3 +25,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: analysis-and-scoring, fix-review
 - Scope: `e2e/**`, `scripts/**`, any gate command
 - Status: accepted (user rule: fast MVP; fixed in the analysis-and-scoring PR)
+
+## Store every billed provider answer with its usage and cost, whatever its outcome
+- Why: refusals, truncations and non-JSON answers were billed but stored without cost, so the monthly cap under-counted real spend.
+- Seen in: llm-providers, R2
+- Scope: `apps/api/src/infrastructure/llm/**`, `apps/api/src/modules/analysis/service.ts`
+- Status: proposed in the PR for llm-providers
