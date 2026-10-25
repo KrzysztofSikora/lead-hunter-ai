@@ -10,11 +10,13 @@ import {
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
+import type { JobsService } from '../jobs/service.js';
 import type { Refusal, SourceService } from './service.js';
 
 const IdParams = z.object({ id: z.coerce.number().int().positive() });
 const NotFound = z.object({ error: z.literal('not_found') }).strict();
 const Refused = z.union([
+  z.object({ error: z.literal('busy') }).strict(),
   z.object({ error: z.literal('too_soon'), nextAllowedAt: z.iso.datetime() }).strict(),
   z.object({ error: z.literal('disabled') }).strict(),
 ]);
@@ -36,7 +38,11 @@ function refusal(refused: Refusal) {
 }
 
 /** D-10: brief §15. Runs are synchronous (D-7): the answer carries the result. */
-export function registerSourceRoutes(app: FastifyInstance, service: SourceService): void {
+export function registerSourceRoutes(
+  app: FastifyInstance,
+  service: SourceService,
+  jobs: JobsService,
+): void {
   const typed = app.withTypeProvider<ZodTypeProvider>();
 
   typed.get('/api/sources', { schema: { response: { 200: SourceList } } }, async () =>
@@ -93,7 +99,10 @@ export function registerSourceRoutes(app: FastifyInstance, service: SourceServic
       },
     },
     async (request, reply) => {
-      const outcome = await service.run(request.params.id);
+      // D-4: a source run takes the same lock as a cycle.
+      const started = await jobs.runSource(request.params.id);
+      if (started.kind === 'busy') return reply.code(409).send({ error: 'busy' });
+      const { outcome } = started;
       if (outcome.kind === 'done') return outcome.result;
       const { status, body } = refusal(outcome);
       return reply.code(status).send(body as never);

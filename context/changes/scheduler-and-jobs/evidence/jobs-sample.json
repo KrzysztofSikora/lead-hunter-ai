@@ -1,0 +1,91 @@
+{
+  "items": [
+    {
+      "id": 3,
+      "type": "source_run",
+      "trigger": "manual",
+      "parentId": 1,
+      "source": {
+        "id": 2,
+        "name": "Hacker News — Seeking freelancer"
+      },
+      "status": "failed",
+      "startedAt": "2026-01-01T12:00:00.000Z",
+      "finishedAt": "2026-01-01T12:00:00.000Z",
+      "scheduledFor": null,
+      "counters": {
+        "fetched": 0,
+        "new": 0,
+        "duplicates": 0,
+        "rejected": 0,
+        "analysed": 0,
+        "failed": 0,
+        "skipped": 0
+      },
+      "error": {
+        "reason": "http_status",
+        "httpStatus": 500
+      },
+      "cost": null
+    },
+    {
+      "id": 2,
+      "type": "source_run",
+      "trigger": "manual",
+      "parentId": 1,
+      "source": {
+        "id": 1,
+        "name": "We Work Remotely — Programming"
+      },
+      "status": "ok",
+      "startedAt": "2026-01-01T12:00:00.000Z",
+      "finishedAt": "2026-01-01T12:00:00.000Z",
+      "scheduledFor": null,
+      "counters": {
+        "fetched": 2,
+        "new": 2,
+        "duplicates": 0,
+        "rejected": 1,
+        "analysed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "error": null,
+      "cost": null
+    },
+    {
+      "id": 1,
+      "type": "discovery",
+      "trigger": "manual",
+      "parentId": null,
+      "source": null,
+      "status": "partial",
+      "startedAt": "2026-01-01T12:00:00.000Z",
+      "finishedAt": "2026-01-01T12:00:00.000Z",
+      "scheduledFor": null,
+      "counters": {
+        "fetched": 2,
+        "new": 2,
+        "duplicates": 0,
+        "rejected": 1,
+        "analysed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "error": null,
+      "cost": null
+    }
+  ],
+  "total": 3,
+  "page": 1,
+  "pageSize": 20,
+  "running": false,
+  "schedule": {
+    "timezone": "Europe/Warsaw",
+    "times": [
+      "08:00",
+      "18:00"
+    ],
+    "nextRunAt": null
+  }
+}

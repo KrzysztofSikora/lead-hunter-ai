@@ -1,4 +1,5 @@
 import type { RssConfig, SourceFailureReason } from '@lead-hunter/contracts';
+import type { JobTrigger } from '../jobs/ports.js';
 
 /** One entry of a feed, mapped to the fields of a raw signal (S-10 Design). */
 export interface FeedItem {
@@ -73,6 +74,12 @@ export interface RunSummary {
 export type AttemptOutcome =
   { ok: true } | { ok: false; reason: SourceFailureReason; httpStatus?: number };
 
+/** S-12: who started a run, and the cycle it belongs to. */
+export interface RunContext {
+  parentRunId: number | null;
+  trigger: JobTrigger;
+}
+
 export interface SourceRepository {
   list(): SourceRecord[];
   get(id: number): SourceRecord | undefined;
@@ -86,6 +93,6 @@ export interface SourceRepository {
   /** Stores the outcome of the attempt; a failure may also move `next_allowed_at` forward. */
   finishAttempt(id: number, outcome: AttemptOutcome, at: number, nextAllowedAt?: number): void;
   saveCursor(id: number, cursorJson: string): void;
-  startRun(sourceId: number, at: number): number;
+  startRun(sourceId: number, at: number, context?: RunContext): number;
   finishRun(runId: number, summary: RunSummary): void;
 }

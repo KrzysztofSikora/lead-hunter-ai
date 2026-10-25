@@ -38,6 +38,8 @@ export interface AnalysisRunner {
   drain(): Promise<void>;
   /** Fire and forget: errors go to `onError`. */
   kick(): void;
+  /** D-12: puts a `FAILED` analysis back in the queue and kicks the drain. */
+  retry(id: number): 'reset' | 'not_failed' | 'not_found';
   /** D-11: what the UI and the brief need to say how much analysis is done and waiting. */
   status(): AnalysisServiceStatus;
   /** Resolves when no drain is in flight. */
@@ -190,10 +192,15 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     return inFlight;
   };
 
+  const kickDrain = (): void => void drain().catch(deps.onError);
+
   return {
     drain,
-    kick() {
-      drain().catch(deps.onError);
+    kick: kickDrain,
+    retry(id) {
+      const outcome = repository.retryFailed(id, clock.now().getTime());
+      if (outcome === 'reset') kickDrain();
+      return outcome;
     },
     status() {
       const analysedToday = repository.countSince(startOfWarsawDay(clock.now()).getTime());

@@ -20,6 +20,7 @@ describe('loadConfig', () => {
       fetchMaxBytes: 1_048_576,
       sourceMinIntervalMinutes: 60,
       sourceMaxAttempts: 3,
+      discoveryTimes: ['08:00', '18:00'],
     });
   });
 
@@ -39,6 +40,7 @@ describe('loadConfig', () => {
         FETCH_MAX_BYTES: '200000',
         SOURCE_MIN_INTERVAL_MINUTES: '120',
         SOURCE_MAX_ATTEMPTS: '2',
+        DISCOVERY_TIMES: '18:30, 07:15',
         ...HASH,
       }),
     ).toEqual({
@@ -56,6 +58,7 @@ describe('loadConfig', () => {
       fetchMaxBytes: 200_000,
       sourceMinIntervalMinutes: 120,
       sourceMaxAttempts: 2,
+      discoveryTimes: ['07:15', '18:30'],
     });
   });
 
@@ -94,6 +97,11 @@ describe('loadConfig', () => {
     ['SOURCE_MIN_INTERVAL_MINUTES', '1441'],
     ['SOURCE_MAX_ATTEMPTS', '0'],
     ['SOURCE_MAX_ATTEMPTS', '6'],
+    ['DISCOVERY_TIMES', '8:00'],
+    ['DISCOVERY_TIMES', '24:00'],
+    ['DISCOVERY_TIMES', '02:30'],
+    ['DISCOVERY_TIMES', '08:00,08:00'],
+    ['DISCOVERY_TIMES', '01:00,03:00,04:00,05:00,06:00,07:00,09:00'],
   ])('rejects %s=%s and names the variable', (variable, value) => {
     const run = () => loadConfig({ [variable]: value });
     expect(run).toThrow(ConfigError);

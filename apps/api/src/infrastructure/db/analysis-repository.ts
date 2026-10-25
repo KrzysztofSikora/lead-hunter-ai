@@ -163,6 +163,20 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
         );
       });
     },
+    retryFailed(id, at) {
+      const reset = db
+        .update(opportunities)
+        .set({ analysisStatus: 'PENDING', updatedAt: at })
+        .where(and(eq(opportunities.id, id), eq(opportunities.analysisStatus, 'FAILED')))
+        .run();
+      if (reset.changes > 0) return 'reset';
+      const exists = db
+        .select({ id: opportunities.id })
+        .from(opportunities)
+        .where(eq(opportunities.id, id))
+        .get();
+      return exists ? 'not_failed' : 'not_found';
+    },
     saveFailed(analysis) {
       db.transaction((tx) => {
         tx.insert(analyses)

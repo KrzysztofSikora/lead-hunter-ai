@@ -12,7 +12,7 @@ async function main(): Promise<number> {
   const { sqlite, db } = openDb(join(resolve(config.dataDir), 'lead-hunter.db'));
   try {
     runMigrations(db);
-    const { service } = createSourceRuntime({
+    const { jobs } = createSourceRuntime({
       db,
       config,
       http: createHttpClient({
@@ -22,7 +22,12 @@ async function main(): Promise<number> {
       clock: { now: () => new Date() },
       logger: { info: () => undefined, warn: () => undefined },
     });
-    const results = await service.runEnabled();
+    const started = jobs.startCycle('cli');
+    if (started.kind !== 'started') {
+      process.stdout.write('przebieg w toku\n');
+      return 1;
+    }
+    const { results, summary } = await started.done;
     if (results.length === 0) {
       process.stdout.write('brak skonfigurowanych źródeł\n');
       return 0;
@@ -48,6 +53,8 @@ async function main(): Promise<number> {
         );
       }
     }
+    const label = { ok: 'ok', partial: 'częściowy', failed: 'nieudany' }[summary.status];
+    process.stdout.write(`przebieg ${started.runId}: ${label}\n`);
     return failed ? 1 : 0;
   } finally {
     sqlite.close();

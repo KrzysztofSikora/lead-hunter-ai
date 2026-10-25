@@ -92,3 +92,14 @@ export {
   SourceRunResult,
   UpdateSourceRequest,
 } from './sources.js';
+export {
+  JobCost,
+  JobCounters,
+  JobErrorReason,
+  JobList,
+  JobListQuery,
+  JobRun,
+  JobSchedule,
+  JobTrigger,
+  RetryAnalysisResult,
+} from './jobs.js';
