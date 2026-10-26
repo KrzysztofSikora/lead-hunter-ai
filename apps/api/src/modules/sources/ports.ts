@@ -29,6 +29,8 @@ export interface DiscoverContext {
    * stopped (opaque to the service); absent means the start of the day.
    */
   resumeAt?: string;
+  /** S-19 D-8: the keys the cursor remembers; an adapter skips the checks it has already paid for. */
+  seen: ReadonlySet<string>;
 }
 
 export type AdapterOutcome =
@@ -36,6 +38,11 @@ export type AdapterOutcome =
       ok: true;
       items: FeedItem[];
       skipped: number;
+      /**
+       * S-19 D-8: keys the adapter checked and dropped (a closed issue); the service remembers them
+       * in the cursor so the check is not paid for again.
+       */
+      checkedKeys?: string[];
       /** S-18 D-9: the adapter stopped at its page cap; the run is `partial`. */
       truncated?: true;
       /**

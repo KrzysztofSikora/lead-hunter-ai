@@ -1,0 +1,93 @@
+[
+  {
+    "id": "demo",
+    "url": "https://github.com/demo-org/demo-repo/issues/21",
+    "title": "DEMO reward",
+    "organization": {
+      "name": "demo-org"
+    },
+    "pendingPrice": {
+      "value": 15000,
+      "unit": "USD_CENT"
+    },
+    "programmingLanguages": ["TypeScript"]
+  },
+  {
+    "id": "demo",
+    "url": "https://github.com/demo-org/demo-repo/issues/22",
+    "title": "DEMO reward",
+    "organization": {
+      "name": "demo-org"
+    },
+    "pendingPrice": {
+      "value": 5000,
+      "unit": "EUR_CENT"
+    },
+    "programmingLanguages": ["TypeScript"]
+  },
+  {
+    "id": "demo",
+    "url": "https://github.com/demo-org/demo-repo/issues/23",
+    "title": "DEMO reward",
+    "organization": {
+      "name": "demo-org"
+    },
+    "pendingPrice": {
+      "value": 15000,
+      "unit": "USD_CENT"
+    },
+    "programmingLanguages": ["TypeScript"]
+  },
+  {
+    "id": "demo",
+    "url": "https://github.com/demo-org/demo-repo/issues/24",
+    "title": "DEMO reward",
+    "organization": {
+      "name": "demo-org"
+    },
+    "pendingPrice": {
+      "value": 15000,
+      "unit": "USD_CENT"
+    },
+    "programmingLanguages": ["TypeScript"]
+  },
+  {
+    "id": "demo",
+    "url": "https://example.com/not-an-issue",
+    "title": "DEMO reward",
+    "organization": {
+      "name": "demo-org"
+    },
+    "pendingPrice": {
+      "value": 15000,
+      "unit": "USD_CENT"
+    },
+    "programmingLanguages": ["TypeScript"]
+  },
+  {
+    "id": "demo",
+    "url": "https://github.com/../demo-repo/issues/1",
+    "title": "DEMO reward",
+    "organization": {
+      "name": "demo-org"
+    },
+    "pendingPrice": {
+      "value": 15000,
+      "unit": "USD_CENT"
+    },
+    "programmingLanguages": ["TypeScript"]
+  },
+  {
+    "id": "demo",
+    "url": "https://github.com/demo-org/demo-repo/issues/26",
+    "title": "DEMO reward",
+    "organization": {
+      "name": "demo-org"
+    },
+    "pendingPrice": {
+      "value": 15000,
+      "unit": "USD_CENT"
+    },
+    "programmingLanguages": ["TypeScript"]
+  }
+]

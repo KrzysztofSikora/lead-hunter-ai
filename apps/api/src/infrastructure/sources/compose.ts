@@ -19,6 +19,8 @@ import { createRobotsCheck } from './manual/robots.js';
 import { createBzpAdapter } from './bzp/adapter.js';
 import { createGithubApi } from './github/api.js';
 import { createGithubAdapter } from './github/adapter.js';
+import { createOpireList } from './opire/api.js';
+import { createOpireAdapter } from './opire/adapter.js';
 import { createTedAdapter } from './ted/adapter.js';
 import { createRssAdapter } from './rss/adapter.js';
 
@@ -106,10 +108,16 @@ export function createSourceRuntime({
     maxTextChars: config.importMaxTextChars,
     ...(logger ? { logger } : {}),
   });
+  const opire = createOpireAdapter({
+    github: githubApi,
+    fetchList: createOpireList({ http, clock, timeoutMs: config.fetchTimeoutMs }),
+    maxTextChars: config.importMaxTextChars,
+    ...(logger ? { logger } : {}),
+  });
   const service = createSourceService({
     repository: createSourceRepository(db),
     signals: createSignalRepository(db),
-    adapters: { rss, bzp, ted, github, ...overrides } as SourceAdapters,
+    adapters: { rss, bzp, ted, github, opire, ...overrides } as SourceAdapters,
     clock,
     minIntervalMs: config.sourceMinIntervalMinutes * 60_000,
     ...(profile ? { profile } : {}),

@@ -68,7 +68,7 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
 
   it('reads the window in UTC-day slices with the documented parameters', async () => {
     const { adapter, state } = harness(() => ({ body: FIXTURE }));
-    const outcome = await adapter.discover(CONFIG, { since: NOW - 2 * DAY });
+    const outcome = await adapter.discover(CONFIG, { since: NOW - 2 * DAY, seen: new Set() });
     // since is the 24th 12:00, so the slices start on the 24th, 25th and 26th.
     expect(state.log.map((r) => r.url.searchParams.get('PublicationDateFrom'))).toEqual([
       '2026-10-24T00:00:00.000Z',
@@ -87,7 +87,7 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
   it('keeps every gap between two requests at or above the minimum, health check included', async () => {
     const { adapter, state } = harness(() => ({ body: fullPage() }));
     await adapter.healthCheck(CONFIG);
-    await adapter.discover(CONFIG, { since: NOW });
+    await adapter.discover(CONFIG, { since: NOW, seen: new Set() });
     const gaps = state.log.slice(1).map((r, i) => r.at - (state.log[i]?.at ?? 0));
     expect(state.log.length).toBeGreaterThan(5);
     expect(Math.min(...gaps)).toBeGreaterThanOrEqual(BZP_MIN_GAP_MS);
@@ -98,7 +98,7 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
 
   it('stops at the page cap, reports the gap start and never calls it complete', async () => {
     const { adapter, state } = harness(() => ({ body: fullPage() }));
-    const outcome = await adapter.discover(CONFIG, { since: NOW - DAY });
+    const outcome = await adapter.discover(CONFIG, { since: NOW - DAY, seen: new Set() });
     expect(state.log).toHaveLength(BZP_PAGE_CAP);
     expect(outcome).toMatchObject({
       ok: true,
@@ -121,14 +121,14 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
       return { body: day === '2026-10-24' && page < 25 ? fullPage() : '[]' };
     };
     const first = harness(answer);
-    const one = await first.adapter.discover(CONFIG, { since });
+    const one = await first.adapter.discover(CONFIG, { since, seen: new Set() });
     expect(one).toMatchObject({ ok: true, truncated: true, resumeFrom: since, resumeAt: '11' });
     const second = harness(answer);
-    const two = await second.adapter.discover(CONFIG, { since, resumeAt: '11' });
+    const two = await second.adapter.discover(CONFIG, { since, resumeAt: '11', seen: new Set() });
     expect(pagesAsked(second.state)[0]).toBe('2026-10-24#11');
     expect(two).toMatchObject({ ok: true, truncated: true, resumeFrom: since, resumeAt: '21' });
     const third = harness((n, url) => (n > 0 ? answer(n, url) : {}));
-    const done = await third.adapter.discover(CONFIG, { since, resumeAt: '21' });
+    const done = await third.adapter.discover(CONFIG, { since, resumeAt: '21', seen: new Set() });
     expect(done).toEqual({ ok: true, items: [], skipped: 0 });
     expect(pagesAsked(third.state)).toContain('2026-10-26#1');
   });
@@ -136,7 +136,7 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
   it('is complete, not truncated, when the cap is reached exactly at the end', async () => {
     // Window of one day: ten full pages would be truncated, nine plus a short one is complete.
     const { adapter, state } = harness((n) => ({ body: n < 10 ? fullPage() : '[]' }));
-    const outcome = await adapter.discover(CONFIG, { since: NOW });
+    const outcome = await adapter.discover(CONFIG, { since: NOW, seen: new Set() });
     expect(state.log).toHaveLength(10);
     expect(outcome).toEqual({ ok: true, items: [], skipped: 0 });
   });
@@ -145,13 +145,13 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
     const { adapter } = harness((n) =>
       n === 1 ? { body: JSON.stringify(JSON.parse(FIXTURE)) } : { status: 500 },
     );
-    const outcome = await adapter.discover(CONFIG, { since: NOW - DAY });
+    const outcome = await adapter.discover(CONFIG, { since: NOW - DAY, seen: new Set() });
     expect(outcome).toEqual({ ok: false, reason: 'http_status', httpStatus: 500 });
   });
 
   it('maps 403 to rate_limited with a one-minute hint and no second request (D-18)', async () => {
     const { adapter, state } = harness(() => ({ status: 403 }));
-    const outcome = await adapter.discover(CONFIG, { since: NOW });
+    const outcome = await adapter.discover(CONFIG, { since: NOW, seen: new Set() });
     expect(outcome).toEqual({
       ok: false,
       reason: 'rate_limited',
@@ -165,7 +165,7 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
     const { adapter, state } = harness((n) =>
       n === 1 ? { status: 429, headers: { 'retry-after': '5' } } : { body: '[]' },
     );
-    const outcome = await adapter.discover(CONFIG, { since: NOW });
+    const outcome = await adapter.discover(CONFIG, { since: NOW, seen: new Set() });
     expect(outcome).toMatchObject({ ok: true });
     expect(state.log).toHaveLength(2);
     expect(state.sleeps[0]).toBe(5_000);
@@ -173,14 +173,14 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
 
   it('gives up after the attempts, or at once for a Retry-After above 30 s', async () => {
     const tired = harness(() => ({ status: 503 }));
-    expect(await tired.adapter.discover(CONFIG, { since: NOW })).toMatchObject({
+    expect(await tired.adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toMatchObject({
       ok: false,
       reason: 'rate_limited',
       httpStatus: 503,
     });
     expect(tired.state.log).toHaveLength(3);
     const told = harness(() => ({ status: 429, headers: { 'retry-after': '3600' } }));
-    expect(await told.adapter.discover(CONFIG, { since: NOW })).toMatchObject({
+    expect(await told.adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toMatchObject({
       ok: false,
       retryAfterMs: 3_600_000,
     });
@@ -197,7 +197,7 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
     ];
     for (const [answer, expected] of cases) {
       const { adapter } = harness(() => answer);
-      expect(await adapter.discover(CONFIG, { since: NOW })).toMatchObject({
+      expect(await adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toMatchObject({
         ok: false,
         ...expected,
       });

@@ -553,7 +553,7 @@ Unchanged `SourceFailureReason` values:
 - [x] Phase 1: Source types, bounty facts storage and the token header
 - [x] Phase 2: Reward parsing and the bounty guard rules
 - [x] Phase 3: GitHub search adapter and preset (checkpoint)
-- [ ] Phase 4: Opire adapter and preset
+- [x] Phase 4: Opire adapter and preset
 - [ ] Phase 5: Sources view editor, source policy and test plan
 
 ## Human checks
@@ -561,6 +561,7 @@ Unchanged `SourceFailureReason` values:
 - [ ] (Phase 3) One real run of the GitHub preset without a token: record the run result, the request count, the response size and one signal compared with its issue page; confirm a newly labelled old issue appears (D-4 `sort=updated`) — run: add the preset in the Sources view, then `pnpm discover` with only it enabled (no `GITHUB_TOKEN`) — evidence: `context/changes/code-bounties/evidence/github-run.txt` (not produced: `api.github.com` is unreachable from the session)
 - [ ] (Phase 3) One run with a read-only, public-data `GITHUB_TOKEN`: no 403 occurs — run: set `GITHUB_TOKEN` in `.env`, `pnpm discover` — evidence: `context/changes/code-bounties/evidence/github-run.txt` (no token, no personal data in it)
 - [ ] (Phase 3) If the real response differs from the synthetic fixtures in `apps/api/test/fixtures/bounties/`, replace them with trimmed anonymised recordings (the roadmap's "recorded responses") — run: compare `/search/issues` output with `github-search-*.json` — evidence: the replaced fixtures
+- [ ] (Phase 4) One real run of the Opire preset: record the real response shape against `map-reward.ts` (field names, envelope, unit), the counts of open, closed and skipped rewards, and one signal compared with its issue; if the shape differs, replace `opire-rewards.json` with a trimmed real one — run: add the preset in the Sources view, then `pnpm discover` with only it enabled — evidence: `context/changes/code-bounties/evidence/opire-run.txt` (not produced: `api.opire.dev` is unreachable from the session)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -596,6 +597,17 @@ Unchanged `SourceFailureReason` values:
   with `languagesFromProfile` (D-20), so the contract field only supplies the labels.
 - [minor] (Phase 3) Plan's 503 row: a 503 that persists after `maxAttempts` is `rate_limited` with
   status 503 (the TED/BZP convention), not `http_status`.
+- [minor] (Phase 4) Opire's list is fetched by `opire/api.ts` (`createOpireList`), a plain GET with
+  no headers, not through the shared GitHub helper: the helper's spacing would delay the list by
+  6 s for nothing, and the plan's "no `Authorization`" is then true by construction. It maps 429/503
+  to `rate_limited`, other non-2xx to `http_status`, bad JSON to `invalid_feed`.
+- [minor] (Phase 4) `DiscoverContext.seen` is required, so the BZP and TED adapter tests pass
+  `seen: new Set()`. The service merges `checkedKeys` ahead of the item keys, de-duplicated.
+- [minor] (Phase 4) A 404/410 answer to an issue check is remembered in `checkedKeys` (plan: "not
+  checked again"); a closed issue too. A transferred issue is the signal the answer names (its
+  key and URL), while the reward's own key goes to the cursor (v1 R5).
+- [minor] (Phase 4) The Phase 1 test "no adapter → `internal`" for a stored `opire` source now
+  uses an invalid stored config (`{ unexpected: true }`), because the adapter exists.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

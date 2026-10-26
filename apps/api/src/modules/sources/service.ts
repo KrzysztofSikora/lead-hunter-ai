@@ -354,6 +354,7 @@ export function createSourceService({
       const outcome = await adapter.discover(checked.config, {
         since,
         ...(resumedAt && previous.resumeAt !== null ? { resumeAt: previous.resumeAt } : {}),
+        seen: new Set(previous.seen),
       });
       if (!outcome.ok) return fail(outcome);
       const truncated = outcome.truncated === true;
@@ -425,7 +426,10 @@ export function createSourceService({
           );
         }
       }
-      const kept = [...remembered, ...seen].slice(0, CURSOR_MAX_KEYS);
+      const kept = [...new Set([...remembered, ...(outcome.checkedKeys ?? []), ...seen])].slice(
+        0,
+        CURSOR_MAX_KEYS,
+      );
       repository.saveCursor(
         id,
         JSON.stringify({
@@ -530,6 +534,8 @@ export function createSourceService({
             labels: preset.github.labels,
             languages: profile ? languagesFromProfile(profile.get()) : [],
           };
+        } else if (preset.type === 'opire') {
+          config = {};
         } else if (preset.tender !== null) {
           config = {
             cpvPrefixes: preset.tender.cpvPrefixes,
