@@ -57,7 +57,7 @@ contains, so `git diff main HEAD` is the change. No `mutation.md` exists for thi
 - Fix: (A, cheap now) add a *Decisions* row that accepts "first source wins" for a shared item, fix the misleading test comment, and add one sentence to `docs/source-policy.md` ("Kiedy") so the operator knows a filter on one Freelancer.com source can hide an item that another would pass. (B, more behaviour) in `service.run`, when a duplicate's existing opportunity is still in the untouched system state `REJECTED` + `prefilter_rule = 'source_filter'` and this source's verdict passes, clear the source-filter fields and move it back to `NEW`/`PENDING` with a system event. That needs a new repository method and a test. Choose B only if order independence matters more than the extra state transition.
 - Effort: small (A) | medium (B)
 - Lesson candidate: When a per-source rule writes to a shared, deduplicated record, decide and test what a second source that disagrees does.
-- Decision: open
+- Decision: fixed (a68292f; first source wins, D-19 in plan.md) + lesson proposed
 
 ### R2: FR-31 AC2 "with the filter off the same item passes to FR-07" has no test, and the `enabled` check is unguarded
 - Severity: major
@@ -66,7 +66,7 @@ contains, so `git diff main HEAD` is the change. No `mutation.md` exists for thi
 - Fix: in the existing AC1–AC3 test, after the re-read, `PATCH { filter: { …, enabled: false } }` (phrases kept), advance the clock, serve one new item containing `[FOR HIRE]`, run, and assert `filtered: 0, new: 1` and that the item is `NEW`/`PENDING` with no `source_filter` rule. That is a few lines and no new test.
 - Effort: small
 - Lesson candidate: For every on/off switch an AC names, test the off state with input that the on state would reject.
-- Decision: open
+- Decision: fixed (a68292f) + lesson proposed
 
 ### R3: README still offers the withdrawn WWR presets, and two notes are stale
 - Severity: minor
@@ -75,7 +75,7 @@ contains, so `git diff main HEAD` is the change. No `mutation.md` exists for thi
 - Fix: update the README table, the *Źródła RSS/Atom* bullet and the human-check list to the S-17 presets, with one line on the source filter. In source-policy, say that the default source filter drops `SEEKING WORK` and FR-07 still catches it for older sources. Add a `[minor]` deviation for the merged migration and correct the README deviation line.
 - Effort: small
 - Lesson candidate: After merging the default branch into a change, re-check every "untouched because X" claim in the plan against the merged tree.
-- Decision: open
+- Decision: fixed (b9db994; merged-migration deviation logged in plan.md)
 
 ### R4: The filter editor keeps showing the unnormalised draft after a save
 - Severity: minor
@@ -84,4 +84,4 @@ contains, so `git diff main HEAD` is the change. No `mutation.md` exists for thi
 - Fix: after a successful phrase save, set both drafts from the returned `Source` (`updateSource` already returns it): `setExclude(saved.filter.exclude.join('\n'))`, and the same for include. The checkbox path keeps the draft as it is (plan-review R2 #7).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (09dca0f)

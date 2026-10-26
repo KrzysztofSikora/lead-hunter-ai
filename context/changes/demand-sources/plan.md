@@ -125,6 +125,7 @@ When done:
 | D-15 | Reason wording | "filtr źródła: <phrase>" and "filtr źródła: brak frazy", exactly as FR-31. The list shows `Analiza: pominięta — filtr źródła: …`, and history shows the same reason. Formatted in one helper `prefilterReason()` in `apps/web/src/opportunityCard.ts` | - | Fixed by the PRD | costly (AC wording) | prd |
 | D-16 | Duplicates and blank lines in a filter, given that response schemas cannot transform (plan-review #1) | One `SourceFilter` schema, used for the PATCH body, `SourcePreset` and `Source`, with no `.transform()`: phrases `z.string().trim().min(1).max(100)`, lists `.max(30)` and a `.refine()` that rejects a case-insensitive duplicate (400 `validation_failed`, path `filter.include`). The web editor splits lines, trims, drops empty lines and dedupes before it sends, so the operator never sees that 400 from the UI | B: dedupe in the service before `SourceFilter.parse` (forgiving API, but the stored value then differs from the request silently); C: `SourceFilterInput` with a transform for the body plus a plain `SourceFilter` for responses (forgiving and explicit, but two schemas to keep in step) | One schema, encodes in responses, and the API never rewrites what it was sent. Loosening to B or C later is additive | costly (API contract) | agent |
 | D-17 | Where the shared system-move helpers live (plan-review #5) | New `apps/api/src/infrastructure/db/system-move.ts` exports `Tx`, `moveFromNew`, `statusOf`, `recordSystemMove`, moved verbatim from `analysis-repository.ts`, which imports them. `signal-repository.ts` uses the same functions | B: copy them into `signal-repository.ts` (no move, but the two rejection paths' event shapes can drift); C: call the analysis repository from the signal repository (couples two repositories inside one transaction) | One definition of the event shape. Pure move, covered by the existing analysis tests | cheap | agent |
+| D-19 | Same item in two sources, one with a filter that rejects it (review R1) | First source wins: a shared item is decided by the source that stores it first; a later source sees a duplicate (D-4) and does not re-open it. Documented in `docs/source-policy.md`, covered by the AC test | B: when the existing opportunity is still untouched `REJECTED` by `source_filter` and the later source passes it, move it back to `NEW`/`PENDING` with a system event (order independent, but a new repository method and state transition) | Simplest, matches D-4, and never overrides a decision; cost is order dependence for overlapping sources | cheap | agent |
 | D-18 | A stored filter that fails validation (plan-review #8) | `readFilter` returns off and empty, and the run logs `source_filter_invalid` with the source id. Unit-tested for `NULL`, invalid JSON and JSON that fails the schema. Not shown in the UI | B: fail the run with an explicit error (louder, but one bad row would stop a source that otherwise works); C: a `filterInvalid` flag on `Source` (visible, but another API field for a state that validate-before-store makes unreachable except by hand-editing the DB) | Only a hand-edited DB can reach it; the log names it | cheap | agent |
 
 ## Design
@@ -384,8 +385,12 @@ left `PENDING` half-filtered.
 
 - [minor] Phase 3: `prefilterReason(rule, phrase)` takes the rule and phrase, not the whole
   `prefilter` object, because TypeScript does not narrow `prefilter.rule` through the object. The
-  history row already used the `source_filter` cause since Phase 2, so no change there. README and
-  CLAUDE.md list neither presets nor counts, so they are untouched.
+  history row already used the `source_filter` cause since Phase 2, so no change there. (README
+  was first believed untouched; after the merge with `main` it lists presets and was updated in
+  the review fix, R3.)
+- [minor] Merge with `main`: `main` brought its own `0010` (offer drafts), so the two planned
+  migrations became one regenerated `0011_mean_zaran.sql` holding both additive nullable columns
+  (`sources.filter_json`, `opportunities.prefilter_phrase`). No behaviour change.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
