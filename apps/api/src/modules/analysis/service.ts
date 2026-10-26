@@ -318,8 +318,8 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       for (let attempt = 1; ; attempt += 1) {
         tracker.attempt(attempt);
         try {
+          // An answer that resolved is kept even if the abort raced it: it was billed (R1).
           provided = await active.analyzeOpportunity(input, { signal: controller.signal });
-          if (controller.signal.aborted) return cancelledOut();
           break;
         } catch (error) {
           // An abort can surface as any error, so the signal decides, not the error class.

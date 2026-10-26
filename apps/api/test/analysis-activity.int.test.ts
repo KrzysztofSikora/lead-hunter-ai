@@ -351,19 +351,45 @@ describe('cancel and the paused queue (FR-34 AC3, AC4)', () => {
 
   it('does not take the next item when the pause lands between two items', async () => {
     const provider = new GatedProvider();
-    const t = await setup({ provider });
+    let checks = 0;
+    let land: () => void = () => undefined;
+    const t = await setup({
+      provider,
+      // The second look at the flag is the one before the second item, after the first is saved.
+      wrapRunnerState: (real) => ({
+        ...real,
+        isPaused() {
+          checks += 1;
+          if (checks === 2) land();
+          return real.isPaused();
+        },
+      }),
+    });
+    land = () => t.runner.cancel();
     const first = await t.post(`DEMO pierwsze. ${BODY}`);
     const second = await t.post(`DEMO drugie. ${BODY}`);
     t.runner.kick();
     await until(() => provider.calls.length === 1);
-    // Pausing and settling in the same tick: the answer is kept, the drain must then stop.
-    const cancelled = t.cancel();
     provider.calls[0]!.resolve();
-    await cancelled;
     await t.runner.idle();
+
     expect(provider.calls).toHaveLength(1);
+    expect(storedFor(t, first)).toEqual([{ status: 'COMPLETE', error: null, cost: 0 }]);
     expect(storedFor(t, second)).toEqual([]);
-    expect(storedFor(t, first).length).toBeLessThanOrEqual(1);
+    expect((await t.status()).paused).toBe(true);
+  });
+
+  it('keeps an answer that resolved before the abort won the race (R1)', async () => {
+    const provider = new GatedProvider();
+    const t = await setup({ provider });
+    const id = await t.post(`DEMO jedno. ${BODY}`);
+    t.runner.kick();
+    await until(() => provider.calls.length === 1);
+    // Same tick: the provider settles, then the operator cancels.
+    provider.calls[0]!.resolve();
+    expect(await t.cancel()).toEqual({ cancelled: true, paused: true });
+    await t.runner.idle();
+    expect(storedFor(t, id)[0]!.status).toBe('COMPLETE');
   });
 
   it('keeps the pause over a restart and resumes the queue on request (AC3)', async () => {

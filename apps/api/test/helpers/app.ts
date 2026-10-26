@@ -27,7 +27,7 @@ import {
   type AnalysisRunner,
   type Sleep,
 } from '../../src/modules/analysis/service.js';
-import type { LlmProvider } from '../../src/modules/analysis/ports.js';
+import type { LlmProvider, RunnerState } from '../../src/modules/analysis/ports.js';
 import { createProfileService } from '../../src/modules/profile/service.js';
 import { createPaymentRepository } from '../../src/infrastructure/db/payment-repository.js';
 import { createOpportunityRepository } from '../../src/infrastructure/db/opportunity-repository.js';
@@ -110,6 +110,8 @@ export async function buildTestApp(
     heartbeatMs?: number;
     /** The analysis backoff wait; a no-op unless a test holds it open (S-20). */
     sleep?: Sleep;
+    /** Wraps the stored pause flag, to land a cancel at an exact point of the drain. */
+    wrapRunnerState?: (real: RunnerState) => RunnerState;
   } = {},
 ): Promise<{
   app: FastifyInstance;
@@ -140,7 +142,7 @@ export async function buildTestApp(
     maxAgeDays: config.prefilterMaxAgeDays,
     ...llmRunnerDeps(config.llm),
     sleep: options.sleep ?? (async () => undefined),
-    runnerState: createRunnerState(db),
+    runnerState: (options.wrapRunnerState ?? ((real) => real))(createRunnerState(db)),
     onError: () => undefined,
   });
   // Pages go through the real fetcher; the global MockAgent answers (nothing leaves the machine).
