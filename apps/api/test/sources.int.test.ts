@@ -470,12 +470,40 @@ describe('sources (FR-04, FR-18 AC3)', () => {
       duplicates: 3,
     });
 
-    // The same feed on a source with the filter off passes every new item on; the ones that
-    // belong to an earlier opportunity stay duplicates and keep their status (D-4).
+    // Switching the filter off keeps the phrases and lets a new item through that the filter
+    // would have dropped (FR-31 AC2).
+    expect(
+      (
+        await call('PATCH', `/api/sources/${id}`, {
+          filter: { enabled: false, include: ['arduino'], exclude: ['[for hire]'] },
+        })
+      ).statusCode,
+    ).toBe(200);
+    serve(FL, FL_ARDUINO, {
+      status: 200,
+      body: rss.replace(
+        '</channel>',
+        `${item(4, 'DEMO [FOR HIRE] Garden lights', 'Available for hire')}</channel>`,
+      ),
+    });
+    clock.advance(2 * HOUR);
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+      new: 1,
+      filtered: 0,
+      duplicates: 3,
+    });
+    const garden = ((await call('GET', '/api/opportunities')).json().items as typeof items).find(
+      (i) => i.source.title.includes('Garden lights'),
+    );
+    expect(garden).toMatchObject({ businessStatus: 'NEW', analysisStatus: 'PENDING' });
+    expect(garden?.prefilter?.rule).not.toBe('source_filter');
+
+    // The same feed on another source: the items already stored stay duplicates and keep their
+    // status, so the first source to see a shared item decides it (D-4, D-19).
     const other = await add('freelancer-react');
     const second = await call('POST', `/api/sources/${other}/run`);
     expect(second.json()).toMatchObject({ new: 0, filtered: 0, duplicates: 3 });
-    expect(db().select().from(rawSignals).all()).toHaveLength(3);
+    expect(db().select().from(rawSignals).all()).toHaveLength(4);
   });
 
   it('applies the HN default: a SEEKING WORK comment is stored as rejected by the source filter (plan-review #1)', async () => {
