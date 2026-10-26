@@ -27,8 +27,6 @@ export interface ActivityTracker {
   finish(outcome: AnalysisHistoryEntry['outcome'], reason: AnalysisReasonCode | null): void;
   /** An entry that needed no provider call (a stored result was copied). */
   recordReused(entry: Omit<ActivityStart, 'maxAttempts'>): void;
-  /** Drops the active entry without a history record (the call never started). */
-  discard(): void;
   active(): AnalysisActiveEntry | null;
   history(): AnalysisHistoryEntry[];
 }
@@ -138,9 +136,6 @@ export function createActivityTracker({
         startedAt: now,
         finishedAt: now,
       });
-    },
-    discard() {
-      current = null;
     },
     active: () => current,
     history() {
