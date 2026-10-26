@@ -91,3 +91,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: public-tenders, R4
 - Scope: `apps/api/src/modules/sources/service.ts`, `apps/api/src/infrastructure/sources/**`
 - Status: proposed in the PR for public-tenders
+
+## A test that names a cross-record situation must create the real link the production path creates, not a look-alike row
+- Why: a look-alike row (an unused identity instead of the evidence link) lets the assertion pass under any rule, so the test proves nothing
+- Seen in: insights, R1
+- Scope: `apps/api/test/**`
+- Status: proposed in the PR for insights
