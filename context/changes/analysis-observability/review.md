@@ -54,7 +54,7 @@ Gates: typecheck ok, lint ok, unit tests ok (63 files, 869 tests), e2e ok (5/5),
 - Fix: in that branch keep the answer and fall through to the normal guard/score/save (the plan's stated behaviour; the queue is already paused by `cancel()`, so nothing else runs); `cancel()` then reports `cancelled: true` for a request whose answer was kept, so set `cancellable = undefined` before the check or report from the outcome. Second option: keep "cancelled" but store `provided.usage` and its cost on the `FAILED` row, and record the choice as a *Decisions* row.
 - Effort: small
 - Lesson candidate: no (covered by the existing billed-answer lesson)
-- Decision: open
+- Decision: fixed (37f4214)
 
 ### R2: The "pause between two items" test exercises the abort path, and the plan-review 1 case is missing
 - Severity: minor
@@ -63,7 +63,7 @@ Gates: typecheck ok, lint ok, unit tests ok (63 files, 869 tests), e2e ok (5/5),
 - Fix: after R1, make the test deterministic: resolve the gated call, wait until the first row is `COMPLETE` while the drain is still in flight (e.g. a second gated call is not yet allowed because a held `sleep` or a stub `nextWaiting` hook pauses between items), then cancel; assert `COMPLETE` for the first, nothing for the second, `paused: true`. Replace `toBeLessThanOrEqual(1)` with the exact expected row.
 - Effort: small
 - Lesson candidate: Assert the exact outcome of a race test, and check it fails when the guard it names is removed.
-- Decision: open
+- Decision: fixed (37f4214) + lesson proposed
 
 ### R3: "Upłynęło … z limitu" keeps counting through backoff and saving
 - Severity: minor
@@ -72,7 +72,7 @@ Gates: typecheck ok, lint ok, unit tests ok (63 files, 869 tests), e2e ok (5/5),
 - Fix: render the elapsed-against-timeout row only when `entry.stage === 'requesting'`; during `backoff` the existing "Następna próba" row already says when the next attempt starts.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (d73019c)
 
 ### R4: Unused `discard()` on the activity tracker
 - Severity: minor
@@ -81,4 +81,4 @@ Gates: typecheck ok, lint ok, unit tests ok (63 files, 869 tests), e2e ok (5/5),
 - Fix: remove it from the interface and the implementation.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (9411760)
