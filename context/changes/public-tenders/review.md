@@ -67,7 +67,7 @@ Round 2: the run resumed at the review step. The earlier `/fix-review` and `/pr-
 - Fix: keep the position inside the day in the cursor (`resumeFrom` + `resumePage`, or the TED `iterationNextToken`), so the next run continues where the cap stopped instead of at the day's start. If that is not wanted, then when a whole run was spent on one day, move `resumeFrom` to the next day and log a `day_capped <date>` gap so the loss is visible. Either way, add a test with two runs over a day that needs more than the cap, followed by a day with a notice that must arrive.
 - Effort: medium
 - Lesson candidate: A resume cursor must make progress on every run; test the case where one unit of work is larger than the per-run budget.
-- Decision: open
+- Decision: fixed (e0b3f01) + lesson proposed
 
 ### R2: Threshold sentences are read as the notice's estimated value
 - Severity: major
@@ -76,7 +76,7 @@ Round 2: the run resumed at the review step. The earlier `/fix-review` and `/pr-
 - Fix: accept only a label directly followed by a separator and the amount, e.g. replace `[^\d\n]{0,60}` with an optional short parenthesised qualifier and a required `:`/`–` (`\s*(?:\([^)\n]{0,40}\)\s*)?[:–-]\s*`). Or reject a match whose gap contains a comparison (`nie przekracza`, `mniejsz`, `poniżej`, `powyżej`, `przekracza`, `prog`). Add both sentences above as `null` cases to `tender-text.test.ts`.
 - Effort: small
 - Lesson candidate: A pattern that extracts a source fact must have negative tests with the domain's look-alike phrasing (thresholds, limits, ranges), not only with unrelated text.
-- Decision: open
+- Decision: fixed (39bc5e3) + lesson proposed
 
 ### R3: TED's page cap makes the first run, and the first run after each UTC midnight, `partial`
 - Severity: minor
@@ -85,4 +85,4 @@ Round 2: the run resumed at the review step. The earlier `/fix-review` and `/pr-
 - Fix: count the cap per slice (e.g. 5 data pages per day) or exclude the terminating empty page from the cap. Alternatively, size the cap to `2 × slices + headroom`. Add a test: a 3-slice window with one short page plus a token per slice completes as `ok`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (e0b3f01)
