@@ -170,6 +170,8 @@ endpoint as follows:
 | D-15 | Opire's response is an object, not an array, or the fields differ | `map-reward.ts` accepts an array, or an object with an array under `rewards` or `data`. Anything else → `invalid_feed`. A reward without a usable `url` → `skipped`. Every field is read in `map-reward.ts` only | B: array only (strict, but one wrapper change breaks the source) | A shape change is a one-file fix, and it never turns into silent "no results" | cheap | agent |
 | D-16 | Phase 1 registry shape and the plan-review fixes it carries (plan-review 1, 9, 10) | `SourceAdapters = Partial<Record<SourceKind, SourceAdapter>>`; a stored type with no adapter fails its run and its check with `internal` (tested). `AdapterOutcome.ok` gains `checkedKeys?: string[]`, which the service merges into the cursor, so Opire's closed issues are remembered (finding 1). The endpoint shown for a bounty source is a per-type constant in the service, used by `toSource` and `logHost` (finding 9) | B: `Record` with stub adapters (typechecks, but a stub hides the missing-adapter path) | Findings 1, 9 and 10 land in the port and service this phase touches anyway | cheap | agent |
 | D-17 | Reward parser refinements from plan-review 8 | A `$` right after a letter other than `US` (`CA$`, `AU$`) is refused: the whole parse gives `null` (an unknown currency is an ambiguity, never USD). Body lines with `pay`, `paid`, `budget`, `płac…`, `płatn…` are candidates besides `bounty`, `reward`, `nagroda`. Zero, out-of-range (> 10⁹ units) and quotes longer than 60 chars are refused the same way | B: skip the refused amount and keep the others (a reward would survive next to `CA$200`, but the issue then states two amounts and one is unreadable) | Truth first: an amount the parser cannot read must not leave another one looking certain | cheap | agent |
+| D-18 | What `publishedAt` does a bounty signal carry (plan-review 2)? | `null` for GitHub search results (and for Opire later). The issue's creation date is a text line `Utworzono: YYYY-MM-DD`, so the fact is kept and the pre-filter's `too_old` rule (which skips `null`) does not drop an open bounty because its issue is old | B: `created_at` as `publishedAt` (the card shows a date, but an active bounty on a 3-month-old issue is rejected as `too_old`). C: the fetch time (a date the source never stated) | An open bounty is current while it is open; truth first, no invented date | cheap | agent |
+| D-19 | What happens to items already fetched when a later request in the run fails (plan-review 3)? | A failure before any success is the run's failure. After at least one search succeeded, the run returns the items found so far as `ok` + `truncated` (run `partial`). The failure is not hidden: the run is `partial` and the next run repeats the quota | B: fail the whole run (simple, but wastes the quota already spent and drops items) | The limit is per minute, so the earlier queries are the expensive part | cheap | agent |
 
 ## Design
 
@@ -430,6 +432,9 @@ guard (D-10).
   calls) fits in 10 searches per minute and 60 core calls per hour, provided they run ≥ 60 min
   apart (`SOURCE_MIN_INTERVAL_MINUTES`). A health check uses one more request. A secondary rate
   limit is mapped to `rate_limited`, never silent.
+- **Link-count `spam`.** The pre-filter rejects a text with more than 10 links
+  (`prefilter.ts:24`). Issue bodies with templates or reference lists can pass that, and the
+  signal is then stored but rejected as `spam`. Not mitigated in this change (plan-review 7).
 - **Coverage.** Many real bounties state the amount only in a bot comment (Algora). Those
   issues get `reward: null`, so they are not `DIRECT_REQUEST` and have no budget. That is the
   honest outcome, and reading comments is out of scope.
@@ -440,12 +445,14 @@ guard (D-10).
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Generic source types, bounty facts storage and the token header
 - [x] Phase 2: Reward parsing and the bounty guard rules
-- [ ] Phase 3: GitHub search adapter and preset
+- [x] Phase 3: GitHub search adapter and preset
 - [ ] Phase 4: Opire adapter and preset
 - [ ] Phase 5: Sources view editor, source policy and test plan
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 3) One real run of the GitHub preset without a token: record the run result and the request count, and compare one signal with its issue page — run: add the preset in the Sources view, enable only it, `pnpm discover` — evidence: none (the sandbox proxy refuses api.github.com); save to `evidence/github-run.txt` without token or personal data
+- [ ] (Phase 3) Then one run with a read-only, public-data `GITHUB_TOKEN` in `.env`: check that no 403 occurs and that the response fits the size limit — run: `pnpm discover` — evidence: none (same file)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -454,6 +461,10 @@ guard (D-10).
 - [minor] Phase 1: `buildTestApp` gained `adapters` and `sourceLogger` options, and `createSourceRuntime` an `adapters` override, for the fake-adapter tests.
 - [REVIEW] Plan-review findings 2 (Opire `too_old`), 3 (mid-run failures keep earlier items), 4 (D-8 and D-5 are `costly`), 5 (closed rewards stay out of `skipped`), 6 (`per_page` 30), 7 (link-count `spam`), 8 (parser: `CA$`, `pay|paid|budget`) and 11 (done in Phase 1 contracts: query length is checked in `GithubSearchConfig`) are not yet in the plan text. Phases 2–4 apply them and add the Decisions rows then. D-8 and D-5 should be read as `costly`.
 - [REVIEW] The roadmap asks for adapter tests on recorded responses; D-14 uses synthetic fixtures because the sandbox proxy refuses the APIs. Recorded fixtures are owed through the Phase 3 and 4 human checks.
+- [minor] Phase 3: `buildTestApp` gained `sourceSleep` (records the search spacing) and passes the profile reader to the source runtime; `createSourceRuntime`/`SourceDeps` gained an optional `profile`. The existing preset-id list test gained `github-bounties`.
+- [minor] Phase 3 (plan-review 6, D-4): `per_page` is 30, not 50, so a page with full bodies stays under the 1 MiB response limit (an oversize page is already an explicit `too_large`).
+- [minor] Phase 3: a search item that is not a GitHub issue URL counts as `skipped` (run `partial`); a pull request is dropped silently, since `is:issue` should not return one.
+- [minor] Phase 3: the existing "no adapter registered" test uses `opire`, which Phase 4 registers; Phase 4 must switch that test to another unregistered kind or a stubbed registry.
 - [FOLLOW-UP] Re-check stored bounty signals when their issue closes, and enrich a stored
   duplicate with a reward that a later source states (D-12 B).
 - [FOLLOW-UP] Read issue comments for bot-stated amounts (Algora), within the core rate limit.

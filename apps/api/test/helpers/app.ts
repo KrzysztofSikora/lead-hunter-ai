@@ -117,6 +117,8 @@ export async function buildTestApp(
     adapters?: SourceAdapters;
     /** Captures the source service's log lines. */
     sourceLogger?: { info(message: string): void; warn(message: string): void };
+    /** S-19: the wait between source requests (search spacing, backoff); a no-op by default. */
+    sourceSleep?: (ms: number) => Promise<void>;
   } = {},
 ): Promise<{
   app: FastifyInstance;
@@ -169,7 +171,8 @@ export async function buildTestApp(
     config,
     http,
     clock,
-    sleep: async () => undefined,
+    sleep: options.sourceSleep ?? (async () => undefined),
+    profile: { get: () => profileService.get().profile },
     ...(options.adapters ? { adapters: options.adapters } : {}),
     ...(options.sourceLogger ? { logger: options.sourceLogger } : {}),
     ...(options.jobLock ? { jobLock: options.jobLock } : {}),

@@ -1,0 +1,71 @@
+{
+  "_comment": "DEMO — synthetic, UNVERIFIED shape of GET /search/issues until a recorded response replaces it (S-19 D-14).",
+  "total_count": 7,
+  "incomplete_results": false,
+  "items": [
+    {
+      "html_url": "https://github.com/demo-org/demo-api/issues/11",
+      "number": 11,
+      "title": "DEMO: add retry to the sync client",
+      "body": "The client gives up after one failure.\n\nBounty: 250 USD for a merged fix.",
+      "state": "open",
+      "created_at": "2026-09-01T10:00:00Z",
+      "labels": [{ "name": "bounty" }, { "name": "good first issue" }]
+    },
+    {
+      "html_url": "https://github.com/demo-org/demo-api/issues/12",
+      "number": 12,
+      "title": "DEMO: [$200] export to CSV",
+      "body": "Please add CSV export.",
+      "state": "open",
+      "created_at": "2026-09-02T10:00:00Z",
+      "labels": [{ "name": "paid" }]
+    },
+    {
+      "html_url": "https://github.com/demo-org/demo-ui/issues/13",
+      "number": 13,
+      "title": "DEMO: dark mode",
+      "body": "Reward: $50 for the toggle. Reward: $75 for the full theme.",
+      "state": "open",
+      "created_at": "2026-09-03T10:00:00Z",
+      "labels": [{ "name": "bounty" }]
+    },
+    {
+      "html_url": "https://github.com/demo-org/demo-ui/issues/14",
+      "number": 14,
+      "title": "DEMO: broken layout on small screens",
+      "body": "Layout breaks under 320px.",
+      "state": "open",
+      "created_at": "2026-09-04T10:00:00Z",
+      "labels": [{ "name": "💎 Bounty" }]
+    },
+    {
+      "html_url": "https://github.com/demo-org/demo-ui/pull/15",
+      "number": 15,
+      "title": "DEMO: a pull request",
+      "body": "Not an issue.",
+      "state": "open",
+      "created_at": "2026-09-05T10:00:00Z",
+      "labels": [{ "name": "bounty" }],
+      "pull_request": { "url": "https://api.github.com/repos/demo-org/demo-ui/pulls/15" }
+    },
+    {
+      "html_url": "https://example.invalid/not-github/16",
+      "number": 16,
+      "title": "DEMO: foreign url",
+      "body": null,
+      "state": "open",
+      "created_at": "2026-09-06T10:00:00Z",
+      "labels": []
+    },
+    {
+      "html_url": "https://github.com/demo-org/demo-api/issues/17",
+      "number": 17,
+      "title": "DEMO: old issue with a null body",
+      "body": null,
+      "state": "open",
+      "created_at": "2019-01-01T00:00:00Z",
+      "labels": [{ "name": "paid" }]
+    }
+  ]
+}

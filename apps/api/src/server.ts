@@ -115,6 +115,7 @@ async function main(): Promise<void> {
     config,
     http,
     clock,
+    profile: { get: () => profileService.get().profile },
     onSignalCreated: () => runner.kick(),
     logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
   });

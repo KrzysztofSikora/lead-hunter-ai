@@ -1,0 +1,25 @@
+{
+  "_comment": "DEMO — synthetic, UNVERIFIED (S-19 D-14). Issue 11 repeats the TypeScript page.",
+  "total_count": 2,
+  "incomplete_results": false,
+  "items": [
+    {
+      "html_url": "https://github.com/demo-org/demo-api/issues/11",
+      "number": 11,
+      "title": "DEMO: add retry to the sync client",
+      "body": "The client gives up after one failure.\n\nBounty: 250 USD for a merged fix.",
+      "state": "open",
+      "created_at": "2026-09-01T10:00:00Z",
+      "labels": [{ "name": "bounty" }]
+    },
+    {
+      "html_url": "https://github.com/demo-org/demo-js/issues/21",
+      "number": 21,
+      "title": "DEMO: parser crashes on empty input",
+      "body": "Stack trace attached.",
+      "state": "open",
+      "created_at": "2026-09-07T10:00:00Z",
+      "labels": [{ "name": "bounty" }]
+    }
+  ]
+}

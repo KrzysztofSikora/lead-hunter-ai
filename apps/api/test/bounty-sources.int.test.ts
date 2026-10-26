@@ -1,5 +1,8 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { eq } from 'drizzle-orm';
-import { describe, expect, it } from 'vitest';
+import { getGlobalDispatcher, type MockAgent } from 'undici';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { opportunities, rawSignals, sources } from '../src/infrastructure/db/schema.js';
 import type {
   AdapterOutcome,
@@ -8,6 +11,7 @@ import type {
   SourceAdapter,
 } from '../src/modules/sources/ports.js';
 import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/app.js';
+import { profile } from './helpers/analysis.js';
 
 const HOUR = 3_600_000;
 const GITHUB_CONFIG = { labels: ['bounty'], languages: ['TypeScript'] };
@@ -248,5 +252,292 @@ describe('analysis of bounty signals (S-19 D-10, FR-33 AC1, FR-27 AC1)', () => {
     expect(withoutReward).toMatchObject({ analysisStatus: 'COMPLETE', amountMaxMinor: null });
     expect(second.latestAnalysis.result.sourceBudget).toBeNull();
     expect(second.analysis.evidenceLevel).not.toBe('DIRECT_REQUEST');
+  });
+});
+
+// ---- GitHub search adapter (Phase 3) --------------------------------------------------------
+
+const fixture = (name: string): string =>
+  readFileSync(fileURLToPath(new URL(`./fixtures/bounties/${name}`, import.meta.url)), 'utf8');
+const TS_PAGE = fixture('github-search-typescript.json');
+const JS_PAGE = fixture('github-search-javascript.json');
+const GITHUB = 'https://api.github.com';
+const TOKEN = 'ghp_DEMOcanary0123456789';
+
+type Answer = { status: number; body?: string; headers?: Record<string, string> };
+interface Seen {
+  q: string;
+  perPage: string | null;
+  authorization: string | undefined;
+}
+let githubSeen: Seen[] = [];
+let githubAnswer: (q: string, index: number) => Answer = () => ({ status: 200, body: TS_PAGE });
+
+beforeAll(() => {
+  const agent = getGlobalDispatcher() as unknown as MockAgent;
+  agent
+    .get(GITHUB)
+    .intercept({ path: (path: string) => path.startsWith('/search/issues') })
+    .reply((opts) => {
+      const url = new URL(opts.path, GITHUB);
+      const headers = opts.headers as Record<string, string> | undefined;
+      githubSeen.push({
+        q: url.searchParams.get('q') ?? '',
+        perPage: url.searchParams.get('per_page'),
+        authorization: headers?.authorization ?? headers?.Authorization,
+      });
+      const answer = githubAnswer(url.searchParams.get('q') ?? '', githubSeen.length - 1);
+      return {
+        statusCode: answer.status,
+        data: answer.body ?? '',
+        responseOptions: { headers: answer.headers ?? { 'content-type': 'application/json' } },
+      };
+    })
+    .persist();
+});
+
+beforeEach(() => {
+  githubSeen = [];
+  githubAnswer = (q) => ({
+    status: 200,
+    body: q.includes('language:JavaScript') ? JS_PAGE : TS_PAGE,
+  });
+});
+
+describe('GitHub search source (S-19 D-3, D-4, D-5, FR-33 AC1)', () => {
+  async function github(options: { env?: Record<string, string>; languages?: boolean } = {}) {
+    const sleeps: number[] = [];
+    const clock = new FakeClock();
+    const warnings: string[] = [];
+    const lines: string[] = [];
+    const built = await buildTestApp({
+      clock,
+      env: { LLM_PROVIDER: 'mock', ...options.env },
+      sourceSleep: async (ms) => {
+        sleeps.push(ms);
+      },
+      sourceLogger: {
+        info: (message) => lines.push(message),
+        warn: (message) => {
+          warnings.push(message);
+          lines.push(message);
+        },
+      },
+    });
+    const cookie = await loginAsOperator(built.app);
+    const call = (method: 'GET' | 'POST' | 'PATCH' | 'PUT', url: string, payload?: object) =>
+      built.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    await call(
+      'PUT',
+      '/api/profile',
+      profile({
+        skills: ['TypeScript', 'Node.js', 'Arduino'],
+        preferredTechnologies: [],
+      }),
+    );
+    const db = () => openTestDb(built.dir).db;
+    const add = async () => {
+      const created = await call('POST', '/api/sources', { preset: 'github-bounties' });
+      return { created, id: created.json().id as number };
+    };
+    return { ...built, clock, call, db, add, sleeps, lines, warnings };
+  }
+
+  it('adds the preset once, with languages from the profile', async () => {
+    const { add, call } = await github();
+    const { created } = await add();
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      type: 'github',
+      name: 'GitHub — płatne zgłoszenia (bounty)',
+      presetId: 'github-bounties',
+      github: { labels: ['bounty', 'paid', '💎 Bounty'], languages: ['TypeScript', 'JavaScript'] },
+    });
+    expect((await call('POST', '/api/sources', { preset: 'github-bounties' })).statusCode).toBe(
+      409,
+    );
+    expect(
+      (await call('GET', '/api/sources')).json().presets.map((p: { id: string }) => p.id),
+    ).toContain('github-bounties');
+  });
+
+  it('sends one query per language with the fixed qualifiers and spaces them (anonymous)', async () => {
+    const { add, call, db, sleeps } = await github();
+    const { id } = await add();
+
+    const run = await call('POST', `/api/sources/${id}/run`);
+    expect(run.json()).toMatchObject({ status: 'partial', fetched: 7, new: 6, failed: 1 });
+
+    expect(githubSeen.map((r) => r.q)).toEqual([
+      'is:issue is:open archived:false label:bounty,paid,"💎 Bounty" language:TypeScript',
+      'is:issue is:open archived:false label:bounty,paid,"💎 Bounty" language:JavaScript',
+    ]);
+    expect(githubSeen.map((r) => r.perPage)).toEqual(['30', '30']);
+    expect(githubSeen.map((r) => r.authorization)).toEqual([undefined, undefined]);
+    expect(sleeps).toEqual([6_100]);
+
+    const rows = db().select().from(rawSignals).where(eq(rawSignals.sourceId, id)).all();
+    const urls = rows.map((row) => row.sourceUrl).sort();
+    expect(urls).toContain('https://github.com/demo-org/demo-api/issues/11');
+    expect(urls).not.toContain('https://github.com/demo-org/demo-ui/pull/15');
+    expect(urls.every((url) => url?.startsWith('https://github.com/'))).toBe(true);
+    const rewards = Object.fromEntries(
+      rows.map((row) => [
+        row.sourceUrl,
+        JSON.parse(row.bountyJson ?? 'null')?.reward?.amountMinor ?? null,
+      ]),
+    );
+    expect(rewards).toMatchObject({
+      'https://github.com/demo-org/demo-api/issues/11': 25_000,
+      'https://github.com/demo-org/demo-api/issues/12': 20_000,
+      'https://github.com/demo-org/demo-ui/issues/13': null,
+      'https://github.com/demo-org/demo-ui/issues/14': null,
+      'https://github.com/demo-org/demo-api/issues/17': null,
+      'https://github.com/demo-org/demo-js/issues/21': null,
+    });
+    // An open bounty does not go stale with the age of its issue (plan-review 2).
+    expect(rows.every((row) => row.publishedAt === null)).toBe(true);
+  });
+
+  it('uses the token for the header and the closer spacing; both states', async () => {
+    const withToken = await github({ env: { GITHUB_TOKEN: TOKEN } });
+    const { id } = await withToken.add();
+    await withToken.call('POST', `/api/sources/${id}/run`);
+    expect(githubSeen.map((r) => r.authorization)).toEqual([`Bearer ${TOKEN}`, `Bearer ${TOKEN}`]);
+    expect(withToken.sleeps).toEqual([2_100]);
+
+    // The token never shows in what the operator and the logs can see.
+    const listed = JSON.stringify((await withToken.call('GET', '/api/sources')).json());
+    const rows = JSON.stringify(withToken.db().select().from(rawSignals).all());
+    const sourceRows = JSON.stringify(withToken.db().select().from(sources).all());
+    for (const place of [listed, rows, sourceRows, withToken.lines.join('\n')]) {
+      expect(place).not.toContain(TOKEN);
+    }
+  });
+
+  it('keeps the earlier page when a later query fails, and marks the run partial', async () => {
+    githubAnswer = (q) =>
+      q.includes('language:JavaScript')
+        ? { status: 500, body: '{}' }
+        : { status: 200, body: TS_PAGE };
+    const { add, call, db } = await github();
+    const { id } = await add();
+
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+      status: 'partial',
+      new: 5,
+    });
+    expect(githubSeen).toHaveLength(2);
+    expect(db().select().from(rawSignals).all()).toHaveLength(5);
+  });
+
+  it('fails explicitly: 500, bad JSON, wrong shape, and stores nothing', async () => {
+    const { add, call, db, clock } = await github();
+    const { id } = await add();
+    const cases: [Answer, object][] = [
+      [
+        { status: 500, body: '{}' },
+        { reason: 'http_status', httpStatus: 500 },
+      ],
+      [{ status: 200, body: '<html>' }, { reason: 'invalid_feed' }],
+      [{ status: 200, body: '{"items": 3}' }, { reason: 'invalid_feed' }],
+      [
+        { status: 403, body: '{}' },
+        { reason: 'http_status', httpStatus: 403 },
+      ],
+    ];
+    for (const [answer, error] of cases) {
+      githubAnswer = () => answer;
+      expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+        status: 'failed',
+        error,
+      });
+      clock.advance(HOUR + 60_000);
+    }
+    expect(db().select().from(rawSignals).all()).toEqual([]);
+  });
+
+  it('stops at an exhausted rate limit with the wait the reset time gives, in one request', async () => {
+    const { add, call, clock } = await github();
+    const { id } = await add();
+    const resetIn = 20 * 60_000;
+    githubAnswer = () => ({
+      status: 403,
+      body: '{"message":"rate limit"}',
+      headers: {
+        'x-ratelimit-remaining': '0',
+        'x-ratelimit-reset': String(Math.floor((clock.now().getTime() + resetIn) / 1000)),
+      },
+    });
+
+    const run = (await call('POST', `/api/sources/${id}/run`)).json();
+    expect(run).toMatchObject({
+      status: 'failed',
+      error: { reason: 'rate_limited', httpStatus: 403 },
+    });
+    expect(githubSeen).toHaveLength(1);
+    const wait = new Date(run.nextAllowedAt).getTime() - clock.now().getTime();
+    expect(wait).toBeGreaterThanOrEqual(HOUR);
+  });
+
+  it('bounds a hostile reset time to an hour and treats 429 the same way', async () => {
+    const { add, call, clock } = await github();
+    const { id } = await add();
+    githubAnswer = () => ({
+      status: 429,
+      body: '{}',
+      headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '99999999999' },
+    });
+    const run = (await call('POST', `/api/sources/${id}/run`)).json();
+    expect(run).toMatchObject({
+      status: 'failed',
+      error: { reason: 'rate_limited', httpStatus: 429 },
+    });
+    expect(new Date(run.nextAllowedAt).getTime() - clock.now().getTime()).toBeLessThanOrEqual(
+      HOUR + 60_000,
+    );
+    expect(githubSeen).toHaveLength(1);
+  });
+
+  it('a second run stores nothing new', async () => {
+    const { add, call, clock } = await github();
+    const { id } = await add();
+    await call('POST', `/api/sources/${id}/run`);
+    clock.advance(HOUR + 60_000);
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+      new: 0,
+      duplicates: 6,
+    });
+  });
+
+  it('lets an issue through when the source filter is off that the filter rejects when on', async () => {
+    const off = await github();
+    const { id } = await off.add();
+    await off.call('PATCH', `/api/sources/${id}`, {
+      filter: { enabled: false, include: [], exclude: ['retry'] },
+    });
+    expect((await off.call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+      new: 6,
+      filtered: 0,
+    });
+
+    githubSeen = [];
+    const on = await github();
+    const created = await on.add();
+    await on.call('PATCH', `/api/sources/${created.id}`, {
+      filter: { enabled: true, include: [], exclude: ['retry'] },
+    });
+    expect((await on.call('POST', `/api/sources/${created.id}/run`)).json()).toMatchObject({
+      new: 6,
+      filtered: 1,
+    });
+  });
+
+  it('checks the connection with one request and stores nothing', async () => {
+    const { add, call, db } = await github();
+    const { id } = await add();
+    expect((await call('POST', `/api/sources/${id}/check`)).json()).toMatchObject({ ok: true });
+    expect(githubSeen).toHaveLength(1);
+    expect(db().select().from(rawSignals).all()).toEqual([]);
   });
 });

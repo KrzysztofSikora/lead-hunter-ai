@@ -22,6 +22,9 @@ const FREELANCER_SKILLS: readonly [slug: string, label: string, keyword: string]
   ['ai-automation', 'AI i automatyzacja', 'ai automation'],
 ];
 
+/** S-19 D-3: the labels the GitHub bounty preset searches for. */
+export const GITHUB_BOUNTY_LABELS = ['bounty', 'paid', '💎 Bounty'] as const;
+
 export const PRESETS: readonly SourcePreset[] = [
   {
     id: 'hn-freelance',
@@ -49,6 +52,16 @@ export const PRESETS: readonly SourcePreset[] = [
     accessNote: `Kanał RSS kategorii „Jobs and Paid Consultancy” forum Arduino (Discourse): wątki ze zleceniami. ${POLL_NOTE} Adres i regulamin do weryfikacji.`,
     termsUrl: 'https://www.arduino.cc/en/terms-conditions',
     filter: { enabled: true, include: [], exclude: ['[FOR HIRE]', 'looking for work'] },
+  },
+  {
+    id: 'github-bounties',
+    type: 'github',
+    name: 'GitHub — płatne zgłoszenia (bounty)',
+    url: 'https://api.github.com/search/issues',
+    accessNote:
+      'Oficjalne API wyszukiwania GitHub: otwarte zgłoszenia z etykietą bounty lub paid, jedno zapytanie na język z profilu (najwyżej 5 na przebieg, limit 10 zapytań na minutę bez tokenu). Opcjonalny GITHUB_TOKEN (tylko do odczytu, dane publiczne) podnosi limit. Kwota trafia do sygnału tylko wtedy, gdy zgłoszenie ją podaje.',
+    termsUrl: 'https://docs.github.com/en/site-policy/github-terms/github-terms-of-service',
+    filter: off(),
   },
 ];
 

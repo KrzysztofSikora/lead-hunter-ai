@@ -3,8 +3,10 @@ import {
   GithubSearchConfig,
   SourceFilter,
   type CreateSourceRequest,
+  type OperatorProfile,
   type Source,
   type SourceKind,
+  type SourcePreset,
   type SourceHealth,
   type SourceList,
   type SourceRunResult,
@@ -14,7 +16,8 @@ import type { Clock } from '../shared/clock.js';
 import { canonicalizeUrl, contentHash, normaliseSnippet } from '../signals/identity.js';
 import { ingest } from '../signals/ingest.js';
 import type { SignalRepository } from '../signals/ports.js';
-import { MANUAL_ACCESS_NOTE, PRESETS, WITHDRAWN_PRESETS } from './presets.js';
+import { languagesFromProfile } from './github-languages.js';
+import { GITHUB_BOUNTY_LABELS, MANUAL_ACCESS_NOTE, PRESETS, WITHDRAWN_PRESETS } from './presets.js';
 import { applySourceFilter, readFilter } from './source-filter.js';
 import type {
   AdapterOutcome,
@@ -40,6 +43,8 @@ export interface SourceDeps {
   adapters: SourceAdapters;
   clock: Clock;
   minIntervalMs: number;
+  /** S-19 D-4: the operator's profile, for the languages of the GitHub preset. */
+  profile?: { get(): Pick<OperatorProfile, 'skills' | 'preferredTechnologies'> };
   /** Called after a run stored new signals, so analysis starts without waiting for its timer. */
   onSignalCreated?: () => void;
   /** Source id, host, reason and counts only; never item text (FR-24 AC2). */
@@ -124,6 +129,7 @@ export function createSourceService({
   adapters,
   clock,
   minIntervalMs,
+  profile,
   onSignalCreated,
   logger,
 }: SourceDeps): SourceService {
@@ -329,6 +335,31 @@ export function createSourceService({
     }
   }
 
+  /** S-19: a preset of another type brings its own config, checked by that type's adapter. */
+  const createTyped = (preset: SourcePreset): CreateOutcome => {
+    const adapter = adapters[preset.type];
+    if (!adapter) return { kind: 'invalid', issues: ['To źródło jest niedostępne.'] };
+    const config =
+      preset.type === 'github'
+        ? {
+            labels: [...GITHUB_BOUNTY_LABELS],
+            languages: profile ? languagesFromProfile(profile.get()) : [],
+          }
+        : {};
+    const checked = adapter.validateConfig(config);
+    if (!checked.ok) return { kind: 'invalid', issues: checked.issues };
+    const inserted = repository.insert({
+      type: preset.type,
+      name: preset.name,
+      configJson: JSON.stringify(checked.config),
+      configKey: checked.key,
+      presetId: preset.id,
+      filterJson: JSON.stringify(preset.filter),
+      at: clock.now().getTime(),
+    });
+    return inserted ? { kind: 'created', source: toSource(inserted) } : { kind: 'exists' };
+  };
+
   async function check(id: number): Promise<CheckOutcome> {
     const record = repository.get(id);
     if (!record) return { kind: 'not_found' };
@@ -385,6 +416,7 @@ export function createSourceService({
       if ('preset' in request) {
         const preset = PRESETS.find((candidate) => candidate.id === request.preset);
         if (!preset) return { kind: 'unknown_preset' };
+        if (preset.type !== 'rss') return createTyped(preset);
         ({ name, url } = preset);
         presetId = preset.id;
         filterJson = JSON.stringify(preset.filter);
