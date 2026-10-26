@@ -265,7 +265,7 @@ The operator owns their data and can get it back after a failure:
 - [x] Phase 1: Delete an opportunity (API, spend kept)
 - [x] Phase 2: Export and the UI (delete button, export link)
 - [x] Phase 3: Backup command and daily job
-- [ ] Phase 4: Retention
+- [x] Phase 4: Retention
 - [ ] Phase 5: Restore procedure, tested in CI
 
 ## Human checks
@@ -290,6 +290,7 @@ The operator owns their data and can get it back after a failure:
 - [minor] The copy is switched to `journal_mode = DELETE` before the check, so a backup is one self-contained file (no `-wal`/`-shm` to match when restoring).
 - [minor] Plan-review #6: `runDaily()` never rejects (tested with a throwing store); the scheduler's maintenance cron is kept out of `nextRunAt()`, which stays the next discovery slot.
 - [minor] The CLI test for the failing directory uses a path below a regular file, since a read-only directory does not fail for root.
+- [minor] Phase 4: `deleteClosedBefore` reuses the phase 1 `remove` routine inside its own batch transaction; the existing `backup.int.test.ts` `runDaily` test now expects the second (retention) log line.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

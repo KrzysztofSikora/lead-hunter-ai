@@ -26,6 +26,7 @@ describe('loadConfig', () => {
       discoveryTimes: ['08:00', '18:00'],
       backupDir: resolve('./data/backups'),
       backupKeep: 14,
+      retentionDays: 90,
     });
   });
 
@@ -49,6 +50,7 @@ describe('loadConfig', () => {
         DISCOVERY_TIMES: '18:30, 07:15',
         BACKUP_DIR: '/mnt/copies',
         BACKUP_KEEP: '30',
+        RETENTION_DAYS: '30',
         ...HASH,
       }),
     ).toEqual({
@@ -70,6 +72,7 @@ describe('loadConfig', () => {
       discoveryTimes: ['07:15', '18:30'],
       backupDir: '/mnt/copies',
       backupKeep: 30,
+      retentionDays: 30,
     });
   });
 
@@ -125,6 +128,8 @@ describe('loadConfig', () => {
     ['SOURCE_MAX_ATTEMPTS', '6'],
     ['BACKUP_KEEP', '0'],
     ['BACKUP_KEEP', '366'],
+    ['RETENTION_DAYS', '6'],
+    ['RETENTION_DAYS', '3651'],
     ['BACKUP_DIR', '   '],
     ['DISCOVERY_TIMES', '8:00'],
     ['DISCOVERY_TIMES', '24:00'],

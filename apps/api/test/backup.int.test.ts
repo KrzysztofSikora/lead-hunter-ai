@@ -137,10 +137,11 @@ describe('DataService.runDaily', () => {
 
   it('logs the file, its size and the removed copies', async () => {
     await build().runDaily();
-    expect(logs).toHaveLength(1);
+    expect(logs).toHaveLength(2);
     expect(logs[0]).toMatch(
       /^info backup: .*lead-hunter-20261026T013000Z\.db \(\d+ B\), removed 0 old copies$/,
     );
+    expect(logs[1]).toMatch(/^info retention: removed 0 opportunities/);
   });
 
   it('never rejects: a failing store is logged', async () => {

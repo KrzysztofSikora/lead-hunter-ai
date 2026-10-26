@@ -32,6 +32,7 @@ export const ENV_VARIABLES = [
   'DISCOVERY_TIMES',
   'BACKUP_DIR',
   'BACKUP_KEEP',
+  'RETENTION_DAYS',
 ] as const;
 
 /** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
@@ -111,6 +112,7 @@ export const EnvSchema = z
     ),
     BACKUP_DIR: optional(z.string().trim().min(1)),
     BACKUP_KEEP: optional(z.coerce.number().int().min(1).max(365)),
+    RETENTION_DAYS: optional(z.coerce.number().int().min(7).max(3650)),
   })
   .superRefine((env, ctx) => {
     const missing = (path: string, message: string) =>
@@ -188,6 +190,8 @@ export interface Config {
   backupDir: string;
   /** Newest copies kept by the rotation (S-15 D-6). */
   backupKeep: number;
+  /** Days a REJECTED or EXPIRED opportunity stays unchanged before the daily job deletes it (S-15 D-4). */
+  retentionDays: number;
 }
 
 export interface ConfigIssue {
@@ -219,6 +223,7 @@ const EXPECTED: Record<string, string> = {
   SOURCE_MIN_INTERVAL_MINUTES: 'oczekiwano liczby całkowitej 60–1440',
   SOURCE_MAX_ATTEMPTS: 'oczekiwano liczby całkowitej 1–5',
   BACKUP_KEEP: 'oczekiwano liczby całkowitej 1–365',
+  RETENTION_DAYS: 'oczekiwano liczby całkowitej 7–3650',
   LLM_PROVIDER: 'oczekiwano: mock, anthropic lub openai-compatible',
   LLM_MONTHLY_BUDGET_USD: 'oczekiwano liczby 0.01–100000 (USD)',
   LLM_PAID: 'oczekiwano true lub false',
@@ -282,6 +287,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       : DEFAULT_DISCOVERY_TIMES,
     backupDir: resolve(v.BACKUP_DIR ?? join(v.DATA_DIR ?? './data', 'backups')),
     backupKeep: v.BACKUP_KEEP ?? 14,
+    retentionDays: v.RETENTION_DAYS ?? 90,
     ...(llm ? { llm } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };

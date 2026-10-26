@@ -146,6 +146,7 @@ async function main(): Promise<void> {
     clock,
     backups: createSqliteBackupStore(sqlite, config.backupDir),
     backupKeep: config.backupKeep,
+    retentionDays: config.retentionDays,
     logger: { info: (message) => logInfo(message), error: (message) => logger.error(message) },
   });
   // The list shows the next slot; the scheduler starts after the app, so it is read lazily.

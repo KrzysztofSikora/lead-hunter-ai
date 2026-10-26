@@ -4,6 +4,9 @@ import { instantToWarsawDate, startOfWarsawMonth } from '../shared/warsaw-day.js
 import { toExportRow } from './export-rows.js';
 import type { BackupStore, DataRepository } from './ports.js';
 
+/** Opportunities deleted per transaction by retention (S-15 D-4). */
+const RETENTION_BATCH = 500;
+
 export interface DataLogger {
   info(message: string): void;
   error(message: string): void;
@@ -15,6 +18,8 @@ export interface DataDeps {
   /** Absent in tests that never back up. */
   backups?: BackupStore;
   backupKeep?: number;
+  /** Days REJECTED/EXPIRED rows stay unchanged before `runDaily` deletes them (default 90). */
+  retentionDays?: number;
   logger?: DataLogger;
 }
 
@@ -31,7 +36,7 @@ export interface DataService {
   exportData(): { body: DataExport; date: string };
   /** FR-22 AC1: a verified copy, then the rotation. Rejects when the copy cannot be made. */
   backup(): Promise<BackupResult>;
-  /** The 03:30 job. Never rejects: every failure is logged (plan-review #6). */
+  /** The 03:30 job: backup, then retention unless the backup failed. Never rejects (plan-review #6). */
   runDaily(): Promise<void>;
 }
 
@@ -61,6 +66,21 @@ export function createDataService(deps: DataDeps): DataService {
         );
       } catch (error) {
         log.error(`backup failed: ${message(error)}`);
+        return;
+      }
+      try {
+        const days = deps.retentionDays ?? 90;
+        const now = deps.clock.now();
+        const removed = deps.repository.deleteClosedBefore(
+          now.getTime() - days * 86_400_000,
+          startOfWarsawMonth(now).getTime(),
+          RETENTION_BATCH,
+        );
+        log.info(
+          `retention: removed ${removed} opportunities (REJECTED/EXPIRED, unchanged for ${days} days)`,
+        );
+      } catch (error) {
+        log.error(`retention failed: ${message(error)}`);
       }
     },
     deleteOpportunity: (id) =>

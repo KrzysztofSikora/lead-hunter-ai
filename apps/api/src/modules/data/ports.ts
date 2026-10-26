@@ -20,6 +20,12 @@ export interface DataRepository {
    * Returns false when the id is unknown.
    */
   deleteOpportunity(id: number, usageSince: number): boolean;
+  /**
+   * Deletes opportunities in REJECTED or EXPIRED whose last change is older than `before` (epoch
+   * ms) and that have no payment, `batch` per transaction, the same way as `deleteOpportunity`
+   * (S-15 D-4). Returns how many were deleted.
+   */
+  deleteClosedBefore(before: number, usageSince: number, batch: number): number;
   /** Allowlisted columns only; secrets and runtime state are never selected. */
   exportAll(): ExportTables;
 }

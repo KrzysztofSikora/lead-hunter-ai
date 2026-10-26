@@ -1,4 +1,4 @@
-import { eq, getTableColumns, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, inArray, lt, notExists, sql } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { DataRepository, ExportTables } from '../../modules/data/ports.js';
@@ -193,38 +193,74 @@ function pick(table: SQLiteTable, name: string): Record<string, SQLiteColumn> {
   );
 }
 
+type Tx = Parameters<Parameters<BetterSQLite3Database['transaction']>[0]>[0];
+
 export function createDataRepository(db: BetterSQLite3Database): DataRepository {
+  /**
+   * S-15 D-1: the month's billed usage is copied to `deleted_usage` first, then the opportunity
+   * goes (its children cascade) and with it the one raw signal it owns. Runs inside a transaction.
+   */
+  function remove(tx: Tx, id: number, usageSince: number): boolean {
+    const row = tx
+      .select({ signalId: opportunities.primarySignalId })
+      .from(opportunities)
+      .where(eq(opportunities.id, id))
+      .get();
+    if (!row) return false;
+    tx.run(sql`INSERT INTO deleted_usage (kind, created_at, cost_micro_usd, counted, unknown_cost)
+      SELECT 'analysis', ${analyses.createdAt}, ${analyses.costMicroUsd},
+        CASE WHEN ${analyses.reusedFromAnalysisId} IS NULL THEN 1 ELSE 0 END,
+        CASE WHEN ${analyses.status} = 'COMPLETE' AND ${analyses.costMicroUsd} IS NULL AND ${analyses.provider} <> 'mock' AND ${analyses.reusedFromAnalysisId} IS NULL THEN 1 ELSE 0 END
+      FROM ${analyses}
+      WHERE ${analyses.opportunityId} = ${id} AND ${analyses.createdAt} >= ${usageSince}`);
+    tx.run(sql`INSERT INTO deleted_usage (kind, created_at, cost_micro_usd, counted, unknown_cost)
+      SELECT 'offer_draft', ${offerDrafts.createdAt}, ${offerDrafts.costMicroUsd}, 1,
+        CASE WHEN ${offerDrafts.status} <> 'FAILED' AND ${offerDrafts.costMicroUsd} IS NULL AND ${offerDrafts.provider} <> 'mock' THEN 1 ELSE 0 END
+      FROM ${offerDrafts}
+      WHERE ${offerDrafts.opportunityId} = ${id} AND ${offerDrafts.createdAt} >= ${usageSince}`);
+    tx.delete(opportunities).where(eq(opportunities.id, id)).run();
+    tx.delete(rawSignals).where(eq(rawSignals.id, row.signalId)).run();
+    return true;
+  }
+
   return {
-    /**
-     * S-15 D-1: one immediate transaction. The month's billed usage is copied to `deleted_usage`
-     * first, then the opportunity goes (its children cascade) and with it the one raw signal it owns.
-     */
     deleteOpportunity(id, usageSince) {
-      return db.transaction(
-        (tx) => {
-          const row = tx
-            .select({ signalId: opportunities.primarySignalId })
-            .from(opportunities)
-            .where(eq(opportunities.id, id))
-            .get();
-          if (!row) return false;
-          tx.run(sql`INSERT INTO deleted_usage (kind, created_at, cost_micro_usd, counted, unknown_cost)
-            SELECT 'analysis', ${analyses.createdAt}, ${analyses.costMicroUsd},
-              CASE WHEN ${analyses.reusedFromAnalysisId} IS NULL THEN 1 ELSE 0 END,
-              CASE WHEN ${analyses.status} = 'COMPLETE' AND ${analyses.costMicroUsd} IS NULL AND ${analyses.provider} <> 'mock' AND ${analyses.reusedFromAnalysisId} IS NULL THEN 1 ELSE 0 END
-            FROM ${analyses}
-            WHERE ${analyses.opportunityId} = ${id} AND ${analyses.createdAt} >= ${usageSince}`);
-          tx.run(sql`INSERT INTO deleted_usage (kind, created_at, cost_micro_usd, counted, unknown_cost)
-            SELECT 'offer_draft', ${offerDrafts.createdAt}, ${offerDrafts.costMicroUsd}, 1,
-              CASE WHEN ${offerDrafts.status} <> 'FAILED' AND ${offerDrafts.costMicroUsd} IS NULL AND ${offerDrafts.provider} <> 'mock' THEN 1 ELSE 0 END
-            FROM ${offerDrafts}
-            WHERE ${offerDrafts.opportunityId} = ${id} AND ${offerDrafts.createdAt} >= ${usageSince}`);
-          tx.delete(opportunities).where(eq(opportunities.id, id)).run();
-          tx.delete(rawSignals).where(eq(rawSignals.id, row.signalId)).run();
-          return true;
-        },
-        { behavior: 'immediate' },
-      );
+      return db.transaction((tx) => remove(tx, id, usageSince), { behavior: 'immediate' });
+    },
+    /**
+     * S-15 D-4: REJECTED/EXPIRED rows unchanged since `before` and without a payment, `batch` per
+     * immediate transaction so a large backlog never holds the write lock for long.
+     */
+    deleteClosedBefore(before, usageSince, batch) {
+      let total = 0;
+      for (;;) {
+        const removed = db.transaction(
+          (tx) => {
+            const ids = tx
+              .select({ id: opportunities.id })
+              .from(opportunities)
+              .where(
+                and(
+                  inArray(opportunities.businessStatus, ['REJECTED', 'EXPIRED']),
+                  lt(opportunities.updatedAt, before),
+                  notExists(
+                    tx
+                      .select({ one: sql`1` })
+                      .from(payments)
+                      .where(eq(payments.opportunityId, opportunities.id)),
+                  ),
+                ),
+              )
+              .orderBy(opportunities.id)
+              .limit(batch)
+              .all();
+            return ids.filter((row) => remove(tx, row.id, usageSince)).length;
+          },
+          { behavior: 'immediate' },
+        );
+        total += removed;
+        if (removed < batch) return total;
+      }
     },
     /** One deferred read transaction: all tables come from the same snapshot. */
     exportAll() {
