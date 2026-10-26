@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { analysis } from '../../../test/helpers/analysis.js';
-import { OpportunityAnalysis } from '@lead-hunter/contracts';
+import { OpportunityAnalysis, type TenderFacts } from '@lead-hunter/contracts';
 import { guardAnalysis } from './output-guard.js';
 
 const fixture = (name: string): string =>
@@ -286,5 +286,135 @@ describe('guardAnalysis: invented links and buyer (FR-08 AC4, TR-01)', () => {
     const { result, notes } = guardAnalysis(base, text);
     expect(result).toMatchObject({ buyerOrAudience: 'Małe firmy', buyerConfirmed: false });
     expect(notes).toEqual([]);
+  });
+});
+
+describe('guardAnalysis: public tenders (S-18 D-3, D-6)', () => {
+  const tender = (over: Partial<TenderFacts> = {}): TenderFacts => ({
+    noticeId: 'DEMO-1',
+    buyer: 'DEMO Urząd Miasta',
+    deadlineAt: '2026-11-20T09:00:00.000Z',
+    estimatedValue: {
+      amountMinor: 12_300_000,
+      currency: 'PLN',
+      quote: 'Wartość szacunkowa: 123000 PLN',
+    },
+    cpvCodes: ['72200000-7'],
+    procedure: null,
+    country: 'PL',
+    ...over,
+  });
+  const text = 'DEMO przetarg. Zamawiający: DEMO Urząd Miasta. Wartość szacunkowa: 123000 PLN';
+  const evidence = (r: OpportunityAnalysis) => (r.verdict === 'ANALYSED' ? r.evidenceLevel : null);
+  const category = (r: OpportunityAnalysis) => (r.verdict === 'ANALYSED' ? r.category : null);
+  const budget = (r: OpportunityAnalysis) => (r.verdict === 'ANALYSED' ? r.sourceBudget : null);
+
+  it.each(['bzp', 'ted'] as const)('sets PUBLIC_TENDER for %s whatever the model says', (type) => {
+    for (const level of ['DIRECT_REQUEST', 'EXPLICIT_PROBLEM', 'SPECULATIVE'] as const) {
+      const { result } = guardAnalysis(analysis({ evidenceLevel: level }), text, {
+        sourceType: type,
+        tender: tender(),
+      });
+      expect(evidence(result)).toBe('PUBLIC_TENDER');
+    }
+  });
+
+  it('notes the change only when the model said something else', () => {
+    const origin = { sourceType: 'bzp', tender: tender() } as const;
+    const same = guardAnalysis(analysis({ evidenceLevel: 'PUBLIC_TENDER' }), text, origin);
+    expect(same.notes.join(' ')).not.toContain('zmieniony');
+    const other = guardAnalysis(analysis({ evidenceLevel: 'DIRECT_REQUEST' }), text, origin);
+    expect(other.notes.join(' ')).toContain('PUBLIC_TENDER');
+  });
+
+  it('turns PUBLIC_TENDER on another source into DIRECT_REQUEST, then applies the hiring rule', () => {
+    const withCue = guardAnalysis(
+      analysis({ evidenceLevel: 'PUBLIC_TENDER' }),
+      'Szukam programisty do zlecenia, płatne.',
+      { sourceType: 'rss', tender: null },
+    );
+    expect(evidence(withCue.result)).toBe('DIRECT_REQUEST');
+    const withoutCue = guardAnalysis(
+      analysis({ evidenceLevel: 'PUBLIC_TENDER' }),
+      'Fajny projekt o pogodzie.',
+      { sourceType: 'rss', tender: null },
+    );
+    expect(evidence(withoutCue.result)).toBe('EXPLICIT_PROBLEM');
+    expect(category(withoutCue.result)).toBe('UNMET_NEED');
+    expect(evidence(guardAnalysis(analysis({ evidenceLevel: 'PUBLIC_TENDER' }), 'x').result)).toBe(
+      'EXPLICIT_PROBLEM',
+    );
+  });
+
+  it('keeps DIRECT_GIG for a tender without hiring cues', () => {
+    const { result } = guardAnalysis(analysis({ category: 'DIRECT_GIG' }), text, {
+      sourceType: 'bzp',
+      tender: tender(),
+    });
+    expect(category(result)).toBe('DIRECT_GIG');
+  });
+
+  it('takes the budget from the notice with its verbatim quote', () => {
+    const { result } = guardAnalysis(
+      analysis({
+        sourceBudget: { minMinor: 1, maxMinor: 2, currency: 'EUR', quote: 'zmyślone' },
+      }),
+      text,
+      { sourceType: 'bzp', tender: tender() },
+    );
+    expect(budget(result)).toEqual({
+      minMinor: 12_300_000,
+      maxMinor: 12_300_000,
+      currency: 'PLN',
+      quote: 'Wartość szacunkowa: 123000 PLN',
+    });
+  });
+
+  it('gives null when the notice states no value, even if the model invented one', () => {
+    const invented = analysis({
+      sourceBudget: { minMinor: 100, maxMinor: 100, currency: 'PLN', quote: 'przetarg' },
+    });
+    const { result, notes } = guardAnalysis(invented, text, {
+      sourceType: 'ted',
+      tender: tender({ estimatedValue: null }),
+    });
+    expect(budget(result)).toBeNull();
+    expect(notes.join(' ')).toContain('nie podaje wartości');
+    const none = guardAnalysis(analysis(), text, { sourceType: 'ted', tender: null });
+    expect(budget(none.result)).toBeNull();
+  });
+
+  it('does not take the model budget for a tender whose facts are missing', () => {
+    const { result } = guardAnalysis(quoted('budżet 8000-12000 PLN'), 'budżet 8000-12000 PLN', {
+      sourceType: 'bzp',
+      tender: null,
+    });
+    expect(budget(result)).toBeNull();
+  });
+
+  it('confirms the buyer from the notice field, not from a line in the text', () => {
+    const forged = 'DEMO opis. Zamawiający: DEMO Fałszywy Sp. z o.o.';
+    const base = analysis({ buyerOrAudience: 'DEMO Fałszywy Sp. z o.o.', buyerConfirmed: true });
+    const forgedRun = guardAnalysis(base, forged, { sourceType: 'bzp', tender: tender() });
+    expect(forgedRun.result.verdict === 'ANALYSED' && forgedRun.result.buyerConfirmed).toBe(false);
+    const real = analysis({ buyerOrAudience: 'DEMO Urząd Miasta', buyerConfirmed: true });
+    const kept = guardAnalysis(real, text, { sourceType: 'bzp', tender: tender() });
+    expect(kept.result.verdict === 'ANALYSED' && kept.result.buyerConfirmed).toBe(true);
+    const noBuyer = guardAnalysis(real, text, {
+      sourceType: 'bzp',
+      tender: tender({ buyer: null }),
+    });
+    expect(noBuyer.result.verdict === 'ANALYSED' && noBuyer.result.buyerConfirmed).toBe(false);
+  });
+
+  it('leaves INSUFFICIENT_DATA without an evidence level', () => {
+    const insufficient: OpportunityAnalysis = {
+      verdict: 'INSUFFICIENT_DATA',
+      reason: 'DEMO',
+      unknowns: [],
+      sourceFacts: [],
+    };
+    const { result } = guardAnalysis(insufficient, text, { sourceType: 'bzp', tender: tender() });
+    expect(result).toEqual(insufficient);
   });
 });

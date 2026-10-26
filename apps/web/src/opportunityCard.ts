@@ -67,6 +67,28 @@ function money(minMinor: number, maxMinor: number, currency: string) {
   return `${fmt(minMinor)}–${fmt(maxMinor)} ${currency}`;
 }
 
+/** S-18 D-15, D-22: the notice's own facts, all "ze źródła"; a missed value stays unknown. */
+function tenderItems(tender: OpportunityDetail['source']['tender']): CardItem[] {
+  if (!tender) return [];
+  const value = tender.estimatedValue
+    ? formatMinor(tender.estimatedValue.amountMinor, tender.estimatedValue.currency)
+    : tender.valueState === 'absent'
+      ? t.items.tenderValueAbsent
+      : null;
+  return [
+    { id: 'tender', label: t.items.tender, value: t.items.tender, tag: 'source' },
+    item('tenderBuyer', t.items.tenderBuyer, tender.buyer, 'source'),
+    item(
+      'tenderDeadline',
+      t.items.tenderDeadline,
+      tender.deadlineAt ? formatWarsaw(tender.deadlineAt) : null,
+      'source',
+    ),
+    item('tenderValue', t.items.tenderValue, value, 'source'),
+    item('tenderNotice', t.items.tenderNotice, tender.noticeId, 'source'),
+  ];
+}
+
 /** D-15: the rule's label; a source filter adds the matched phrase or "brak frazy". */
 export function prefilterReason(rule: PrefilterRule, phrase: string | null): string {
   return rule === 'source_filter' ? t.history.sourceFilter(phrase) : strings.prefilterRules[rule];
@@ -156,6 +178,7 @@ export function buildCard(data: OpportunityDetail): CardSection[] {
           ? item('publishedAt', t.publishedAt, formatWarsaw(source.publishedAt), 'source')
           : { id: 'publishedAt', label: t.publishedAt, value: t.unknown, tag: 'unknown' },
         item('detectedAt', t.items.detectedAt, formatWarsaw(data.createdAt), null),
+        ...tenderItems(source.tender),
       ],
     },
     excerpt: {

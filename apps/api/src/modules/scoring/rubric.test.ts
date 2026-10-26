@@ -21,6 +21,8 @@ describe('demand (FR-10 AC2 caps)', () => {
   it.each<[EvidenceLevel, boolean, number]>([
     ['DIRECT_REQUEST', true, 30],
     ['DIRECT_REQUEST', false, 22],
+    ['PUBLIC_TENDER', true, 30],
+    ['PUBLIC_TENDER', false, 22],
     ['EXPLICIT_PROBLEM', true, 18],
     ['EXPLICIT_PROBLEM', false, 12],
     ['INDIRECT_SIGNAL', true, 10],

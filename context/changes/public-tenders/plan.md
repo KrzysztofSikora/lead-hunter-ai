@@ -426,7 +426,7 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 - [x] Phase 1: Source types, tender facts storage and the POST client
 - [x] Phase 2: e-Zamówienia BZP adapter (checkpoint)
 - [x] Phase 3: TED search adapter
-- [ ] Phase 4: Public-tender classification and the card
+- [x] Phase 4: Public-tender classification and the card
 - [ ] Phase 5: Sources view tender config and source policy
 
 ## Human checks
@@ -434,6 +434,7 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 - [ ] (Phase 2) One real BZP run: result, one sample signal against its notice page, no 403 or 429, the response shape against `bzp/map-notice.ts` (field names, `noticeType` spelling, whether `htmlBody` and the value are present, the notice page URL), the page size in bytes, and the ignored/kept counts in the log — run: `pnpm db:migrate && pnpm dev`, add "e-Zamówienia (BZP) — IT i oprogramowanie" in Sources and press run, or `pnpm discover` with only it enabled; correct `map-notice.ts` / `adapter.ts` if the shape differs — evidence: none (needs the real API; the planning and implementing sessions could not reach it). Until this is ticked, Phases 3-4 build on an unverified shape.
 
 - [ ] (Phase 3) One real TED run: result, one sample signal against its notice page, the response shape against `ted/map-notice.ts` and `ted/query.ts` (field names, the `buyer-country` alpha-3 filter and date syntax in the query, date/time forms, multilingual objects, value fields, the link), requests per run and the page size in bytes — run: `pnpm db:migrate && pnpm dev`, add "TED — przetargi IT w Polsce" in Sources and press run, or `pnpm discover` with only it enabled; correct `ted/map-notice.ts` / `ted/query.ts` if the shape differs — evidence: none (needs the real API; the implementing session could not reach it).
+- [ ] (Phase 4) Open one analysed BZP card at phone width: deadline (Warsaw time), buyer and value read correctly and "Przetarg publiczny" is clear — run: `pnpm db:migrate && pnpm dev`, run the BZP source, analyse, open the card — evidence: none (needs a real run; the card is unit-tested in `opportunityCard.test.ts`).
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -455,6 +456,9 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 - [minor] (Phase 3) TED field names, date forms (`2026-11-24+01:00` plus a separate time field), the multilingual objects and the HTML link shape are `UNVERIFIED` and sit in `ted/map-notice.ts` (`TED_FIELDS`) and `ted/query.ts`. A link outside `ted.europa.eu` is ignored; the notice page is then built from the publication number. The value is read from the procedure field, else from a single lot; several lots without a procedure value give `unknown`, not a sum. A missing value field is `absent` (D-22). `procedure` carries the TED notice-type code, not a label.
 - [minor] (Phase 3) `source-filter.test.ts` pinned the preset list; it now lists `ted-pl-it`.
 - [FOLLOW-UP] (Phase 3) `ted-page.json` is synthetic (the API was unreachable); replace it with a trimmed real page after the human check (D-14).
+- [minor] (Phase 4) Plan-review 13 / D-23: for a tender source the guard confirms `buyerConfirmed` only when the model's buyer is contained in `TenderFacts.buyer` (the notice's field), never from the text, so a forged `Zamawiający:` line confirms nothing. No tender facts or no buyer gives `false`.
+- [minor] (Phase 4) A tender with no stated value gets `sourceBudget = null` and a guard note only when the model had invented one. Plan-review 9: `INSUFFICIENT_DATA` returns before the tender rules (no evidence level); the card still reads `source.tender`. Tested.
+- [minor] (Phase 4) The card shows the tender block as origin items (`tender`, `tenderBuyer`, `tenderDeadline`, `tenderValue`, `tenderNotice`); "nie podano" only for `valueState: 'absent'`, a missed value is `unknown` (D-22). `docs/scoring.md` documents the row and the guard rule.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

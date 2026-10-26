@@ -84,6 +84,12 @@ describe('confidenceFor (D-3)', () => {
       { evidenceLevel: 'EXPLICIT_PROBLEM', buyerConfirmed: true, unknowns: unknowns(2) },
       'HIGH',
     ],
+    [
+      'public tender, buyer confirmed',
+      { evidenceLevel: 'PUBLIC_TENDER', buyerConfirmed: true },
+      'HIGH',
+    ],
+    ['public tender, buyer not confirmed', { evidenceLevel: 'PUBLIC_TENDER' }, 'MEDIUM'],
     ['3 unknowns', { buyerConfirmed: true, unknowns: unknowns(3) }, 'MEDIUM'],
     ['buyer not confirmed', { buyerConfirmed: false }, 'MEDIUM'],
     ['indirect signal', { evidenceLevel: 'INDIRECT_SIGNAL', buyerConfirmed: true }, 'MEDIUM'],

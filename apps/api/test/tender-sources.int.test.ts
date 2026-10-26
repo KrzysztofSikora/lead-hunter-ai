@@ -276,3 +276,44 @@ describe('tender sources in the source loop (S-18 Phase 1)', () => {
     ).toBe(404);
   });
 });
+
+describe('analysis of tender signals (S-18 Phase 4)', () => {
+  it('classifies a notice as PUBLIC_TENDER and sets the budget only for the notice with a value', async () => {
+    const { call, addSource, bzp, runner } = await setup();
+    const id = addSource('bzp', { cpvPrefixes: ['72'] });
+    const text = (key: string, value: boolean) =>
+      `DEMO przetarg ${key}: dostawa i wdrożenie systemu informatycznego. Zamawiający: DEMO Urząd Miasta.` +
+      (value ? ' Wartość szacunkowa: 123000 PLN' : '');
+    bzp.state.outcome = {
+      ok: true,
+      items: [
+        { ...item('with', facts()), text: text('with', true) },
+        {
+          ...item('without', facts({ noticeId: 'DEMO-2', estimatedValue: null })),
+          text: text('without', false),
+        },
+      ],
+      skipped: 0,
+    };
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({ new: 2 });
+    await runner.drain();
+
+    const list = (await call('GET', '/api/opportunities')).json();
+    const cards = await Promise.all(
+      list.items.map(async (i: { id: number }) =>
+        (await call('GET', `/api/opportunities/${i.id}`)).json(),
+      ),
+    );
+    const by = (key: string) => cards.find((c) => c.source.url.endsWith(`/${key}`));
+    for (const key of ['with', 'without']) {
+      const card = by(key);
+      expect(card.analysis.evidenceLevel).toBe('PUBLIC_TENDER');
+      expect(card.source.tender.deadlineAt).toBe('2026-11-20T09:00:00.000Z');
+    }
+    expect(by('with').latestAnalysis.result.sourceBudget).toMatchObject({
+      maxMinor: 12_300_000,
+      currency: 'PLN',
+    });
+    expect(by('without').latestAnalysis.result.sourceBudget).toBeNull();
+  });
+});

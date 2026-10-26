@@ -13,6 +13,7 @@ export type Category = z.infer<typeof Category>;
 /** Brief §5.4. */
 export const EvidenceLevel = z.enum([
   'DIRECT_REQUEST',
+  'PUBLIC_TENDER',
   'EXPLICIT_PROBLEM',
   'INDIRECT_SIGNAL',
   'SPECULATIVE',

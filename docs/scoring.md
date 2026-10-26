@@ -13,7 +13,7 @@ sumy.
 
 | Składnik | Maks. | Reguła |
 |----------|-------|--------|
-| Popyt (`demand`) | 30 | Poziom dowodu, potwierdzony / niepotwierdzony nabywca: `DIRECT_REQUEST` 30 / 22, `EXPLICIT_PROBLEM` 18 / 12, `INDIRECT_SIGNAL` 10 / 6, `SPECULATIVE` 6 / 3 |
+| Popyt (`demand`) | 30 | Poziom dowodu, potwierdzony / niepotwierdzony nabywca: `DIRECT_REQUEST` 30 / 22, `PUBLIC_TENDER` 30 / 22 (przetarg: źródło `bzp`/`ted`, nadawany regułą), `EXPLICIT_PROBLEM` 18 / 12, `INDIRECT_SIGNAL` 10 / 6, `SPECULATIVE` 6 / 3 |
 | Dopasowanie umiejętności (`skillFit`) | 25 | Liczba różnych umiejętności i preferowanych technologii z profilu, które model wskazał w `relevantSkills` (bez rozróżniania wielkości liter): 0 → 0, 1 → 10, 2 → 16, 3 → 21, ≥ 4 → 25. Wymieniona wykluczona technologia → 0 |
 | Szybkość (`speed`) | 20 | Baza kategorii: `DIRECT_GIG` 12, `B2B_SUBCONTRACT` 10, `HARDWARE_IOT` 6, `UNMET_NEED` 4, `PRODUCT_HYPOTHESIS` 2; plus przedział `estimatedHours.max`: ≤ 40 h → 8, ≤ 120 h → 5, ≤ 400 h → 2, powyżej → 0, nieznane → 3 |
 | Opłacalność (`profitability`) | 15 | Tylko budżet podany w źródle. Górna granica poniżej minimalnej wartości zlecenia z profilu (ta sama waluta) → 0. Inaczej stawka wynikająca z budżetu i szacowanych godzin w relacji do pierwszej stawki godzinowej z profilu (ta sama waluta): ≥ 100 % → 15, ≥ 75 % → 10, ≥ 50 % → 5, poniżej → 0. Brak budżetu, godzin lub stawki → 5 („brak danych — wartość neutralna”) |
@@ -29,7 +29,7 @@ osobno, jako cytat „ze źródła”.
 Reguły, w kolejności:
 
 1. `LOW` — poziom dowodu `SPECULATIVE` albo co najmniej 5 pozycji w `unknowns`;
-2. `HIGH` — poziom `DIRECT_REQUEST` lub `EXPLICIT_PROBLEM`, nabywca potwierdzony i najwyżej
+2. `HIGH` — poziom `DIRECT_REQUEST`, `PUBLIC_TENDER` lub `EXPLICIT_PROBLEM`, nabywca potwierdzony i najwyżej
    2 pozycje w `unknowns`;
 3. `MEDIUM` — pozostałe przypadki.
 
@@ -62,6 +62,12 @@ czego źródło nie powiedziało, jest usuwane lub obniżane, a każda zmiana tr
 - **Budżet ze źródła** zostaje tylko wtedy, gdy cytat występuje w tekście **i** zawiera obie kwoty
   (`minMinor`, `maxMinor`), walutę zgodną z budżetem i nie zaczyna się ani nie kończy w środku
   dłuższej liczby w tekście (np. „500 zł” z „1 500 zł”); inaczej jest usuwany, a opłacalność liczy się jako brak danych.
+- **Przetarg publiczny** (źródło `bzp` lub `ted`): poziom dowodu jest zawsze `PUBLIC_TENDER`,
+  niezależnie od odpowiedzi modelu; budżet ze źródła pochodzi z wartości szacunkowej ogłoszenia
+  (brak wartości = brak budżetu), a nabywca jest potwierdzony tylko, gdy pasuje do pola
+  „Zamawiający” ogłoszenia. Dla przetargu nie obowiązuje obniżanie poziomu i kategorii z braku
+  sygnału zlecenia. `PUBLIC_TENDER` z innego źródła zmienia się na `DIRECT_REQUEST` i podlega
+  regule poniżej.
 - **Poziom dowodu** `DIRECT_REQUEST` bez sygnału zlecenia lub płatności w tekście spada do
   `EXPLICIT_PROBLEM`.
 - **Kategoria** płatna (`DIRECT_GIG`, `B2B_SUBCONTRACT`) bez takiego sygnału zmienia się na

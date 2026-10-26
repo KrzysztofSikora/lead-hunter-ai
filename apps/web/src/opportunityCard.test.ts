@@ -8,6 +8,8 @@ import {
   type CardItem,
   type CardSection,
 } from './opportunityCard.js';
+import { strings } from './strings.pl.js';
+import { formatWarsaw } from './warsawTime.js';
 
 const NOW = '2026-01-01T10:00:00.000Z';
 
@@ -333,5 +335,60 @@ describe('prefilterReason', () => {
 
   it('keeps the plain label for an ordinary rule', () => {
     expect(prefilterReason('spam', null)).toBe('wygląda na spam');
+  });
+});
+
+describe('buildCard: public tender (S-18 D-15)', () => {
+  const tenderDetail = (tender: Partial<NonNullable<OpportunityDetail['source']['tender']>>) => {
+    const base = detail({});
+    return detail({
+      source: {
+        ...base.source,
+        type: 'bzp',
+        tender: {
+          noticeId: 'DEMO-2026/001',
+          buyer: 'DEMO Urząd Miasta',
+          deadlineAt: '2026-11-20T09:00:00.000Z',
+          estimatedValue: null,
+          cpvCodes: [],
+          procedure: null,
+          country: 'PL',
+          ...tender,
+        },
+      },
+    });
+  };
+
+  it('shows buyer, deadline in Warsaw time and notice number tagged "ze źródła"', () => {
+    const card = buildCard(tenderDetail({}));
+    expect(byId(card, 'tender')).toMatchObject({ value: 'Przetarg publiczny', tag: 'source' });
+    expect(byId(card, 'tenderBuyer')).toMatchObject({ value: 'DEMO Urząd Miasta', tag: 'source' });
+    expect(byId(card, 'tenderDeadline')).toMatchObject({
+      value: formatWarsaw('2026-11-20T09:00:00.000Z'),
+      tag: 'source',
+    });
+    expect(String(byId(card, 'tenderDeadline').value)).toContain('10:00');
+    expect(byId(card, 'tenderNotice')).toMatchObject({ value: 'DEMO-2026/001', tag: 'source' });
+  });
+
+  it('shows the stated value, "nie podano" only when the source reports none, else unknown', () => {
+    const stated = buildCard(
+      tenderDetail({ estimatedValue: { amountMinor: 12_300_000, currency: 'PLN', quote: 'DEMO' } }),
+    );
+    expect(byId(stated, 'tenderValue')).toMatchObject({
+      value: '123\u00a0000,00 PLN',
+      tag: 'source',
+    });
+    const absent = buildCard(tenderDetail({ valueState: 'absent' }));
+    expect(byId(absent, 'tenderValue')).toMatchObject({ value: 'nie podano', tag: 'source' });
+    const missed = buildCard(tenderDetail({}));
+    expect(byId(missed, 'tenderValue')).toMatchObject({ value: null, tag: 'unknown' });
+    const noDeadline = buildCard(tenderDetail({ deadlineAt: null }));
+    expect(byId(noDeadline, 'tenderDeadline')).toMatchObject({ value: null, tag: 'unknown' });
+  });
+
+  it('adds nothing for a source without tender facts, and labels the evidence level', () => {
+    expect(flat(buildCard(states.analysed!)).some((i) => i.id.startsWith('tender'))).toBe(false);
+    expect(strings.opportunity.evidenceLevels.PUBLIC_TENDER).toBe('przetarg publiczny');
   });
 });
