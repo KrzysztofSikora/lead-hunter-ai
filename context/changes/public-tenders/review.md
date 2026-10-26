@@ -1,9 +1,11 @@
 # Review: public-tenders
 
 Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (72 files, 1028 tests), e2e ok (5), image not run (no Docker daemon in this session), image smoke not run (no Docker daemon) · Round: 1
+Gates: typecheck ok, lint ok, unit tests ok (72 files, 1028 tests), e2e ok (5), image not run (no Docker daemon in this session), image smoke not run (no Docker daemon) · Round: 2
 
-Base: `2b2dd45` (branch point on `main`), head `2716067`, five phase commits.
+Base: `2b2dd45` (branch point on `main`), head `c475b69`, five phase commits; the code is unchanged since `2716067`.
+
+Round 2: the run resumed at the review step. The earlier `/fix-review` and `/pr-body` attempts ended on a provider usage limit (`.workflow/logs/public-tenders/09-12`), so no round-1 finding has been worked on and none is marked `fixed`. Since round 1, only `review.md`, `pr-body.md` and the roadmap status have changed. I re-checked R1-R3 against the current code. R1 and R3: `bzp/adapter.ts:136-140` and `ted/adapter.ts:142-146` are unchanged. R2: running `findEstimatedValue` again returns 13 000 000 minor PLN and 553 800 000 minor EUR for the two threshold sentences. A second reading of the service cursor, the guard, the TED mapper, the prompt and the Sources editor found no new defect that I could demonstrate. All gates were re-run on this head; the tree stayed clean.
 
 ## Plan vs diff
 | File | Status | Note |
