@@ -54,7 +54,7 @@ Gates: typecheck ok, lint ok, unit tests ok (1065 passed), e2e ok (5 passed), im
 - Fix: Insert an `opportunity_evidence` row that links the Feed B signal to the opportunity (or let a second signal arrive through the real ingest path with the same canonical URL), give Feed B a payment or move that would show up if attribution followed evidence, and assert that `bySource` still holds only Feed A and that the groups still sum to the totals. Rename `corrected` to `before`.
 - Effort: small
 - Lesson candidate: A test that names a cross-record situation must create the real link the production path creates, not a look-alike row
-- Decision: open
+- Decision: fixed (d28ae40) + lesson proposed
 
 ### R2: Unused string `insights.paymentsCount`
 - Severity: minor
@@ -63,4 +63,4 @@ Gates: typecheck ok, lint ok, unit tests ok (1065 passed), e2e ok (5 passed), im
 - Fix: Remove it.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (26ba30a)
