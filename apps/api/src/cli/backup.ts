@@ -1,7 +1,7 @@
+import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { loadConfigOrExit } from './config.js';
 import { openDb } from '../infrastructure/db/client.js';
-import { runMigrations } from '../infrastructure/db/migrate.js';
 import { createSqliteBackupStore } from '../infrastructure/backup/sqlite-backup.js';
 import { createDataRepository } from '../infrastructure/db/data-repository.js';
 import { createDataService } from '../modules/data/service.js';
@@ -9,9 +9,14 @@ import { createDataService } from '../modules/data/service.js';
 /** FR-22 AC1 (S-15 D-12): one verified copy into BACKUP_DIR, then the rotation. */
 async function main(): Promise<number> {
   const config = loadConfigOrExit();
-  const { sqlite, db } = openDb(join(resolve(config.dataDir), 'lead-hunter.db'));
+  const file = join(resolve(config.dataDir), 'lead-hunter.db');
+  if (!existsSync(file)) {
+    process.stderr.write(`kopia zapasowa nie powiodła się: brak bazy ${file}\n`);
+    return 1;
+  }
+  // No migration here: a copy taken with newer code must not change the schema under a running server.
+  const { sqlite, db } = openDb(file);
   try {
-    runMigrations(db);
     const service = createDataService({
       repository: createDataRepository(db),
       clock: { now: () => new Date() },

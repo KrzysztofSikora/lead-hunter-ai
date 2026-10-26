@@ -76,6 +76,13 @@ describe('command-line entry points', () => {
     expect(r.stderr).toContain('kopia zapasowa nie powiodła się');
   });
 
+  it('backup exits 1 and creates nothing when there is no database', () => {
+    const r = run('src/cli/backup.ts', {});
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('brak bazy');
+    expect(existsSync(join(dataDir, 'lead-hunter.db'))).toBe(false);
+  });
+
   it('the server refuses an invalid PORT and names it', () => {
     const r = run('src/server.ts', { PORT: 'abc' });
     expect(r.status).toBe(1);
