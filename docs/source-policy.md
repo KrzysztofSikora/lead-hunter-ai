@@ -37,7 +37,8 @@ ręczną kontrolę (patrz `context/changes/rss-sources/plan.md`, *Human checks*)
   zapytania o zlecenie; nie jest już oferowany (wycofany, shape D-15). Istniejące źródło działa
   dalej i ma w widoku znacznik „preset wycofany".
 - **Limity:** wspólne reguły wyżej. Tytuł wpisu „New comment by …" zastępujemy pierwszą linią
-  komentarza (D-12); komentarze typu „SEEKING WORK" odrzuca filtr wstępny.
+  komentarza (D-12); komentarze typu „SEEKING WORK" odrzuca domyślny filtr źródła `hn-freelance`, a starsze źródła
+  te komentarze nadal łapie filtr wstępny (FR-07).
 
 ### RSS: We Work Remotely (`wwr-programming`, `wwr-full-stack`, `wwr-back-end`, `wwr-devops`) — wycofany (shape D-15)
 - **Dostęp:** oficjalne kanały kategorii pod `https://weworkremotely.com/categories/<kategoria>.rss`.
@@ -77,7 +78,9 @@ Każde źródło ma filtr: frazy do odrzucenia (`exclude`), frazy wymagane (`inc
   kolejności z konfiguracji), potem `include` (niepusta lista bez trafienia = „brak frazy").
   Włączony filtr z pustymi listami przepuszcza wszystko.
 - **Kiedy:** przy przebiegu źródła, tylko dla nowego wpisu. Duplikat (także ręcznie zaimportowany)
-  nie jest odrzucany ponownie, a zmiana filtru nie dotyka zapisanych sygnałów.
+  nie jest odrzucany ponownie, a zmiana filtru nie dotyka zapisanych sygnałów. Wpis wspólny dla
+  kilku źródeł (np. ten sam projekt w kilku kanałach Freelancer.com) rozstrzyga źródło, które
+  zobaczy go pierwsze: jego filtr może ukryć wpis, który inne źródło by przepuściło.
 - **Skutek:** wpis jest zapisany jako `REJECTED` z powodem „filtr źródła: <fraza>" lub „filtr
   źródła: brak frazy", nie trafia do filtra wstępnego ani do LLM i nie wraca do kolejki. Liczba
   takich wpisów jest w wyniku przebiegu, historii przebiegów i w `pnpm discover`.
