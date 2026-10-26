@@ -128,6 +128,22 @@ describe('retention in the daily job (FR-21 AC3)', () => {
     );
   });
 
+  it('keeps a closed row the operator added a note to within the period', async () => {
+    const t = await setup();
+    const noted = await t.importText(1);
+    const stale = await t.importText(2);
+    t.set(noted, 'REJECTED', 100);
+    t.set(stale, 'REJECTED', 100);
+    t.clock.advance(-DAY);
+    expect(
+      (await t.call('POST', `/api/opportunities/${noted}/notes`, { text: 'Klient wróci' }))
+        .statusCode,
+    ).toBe(200);
+    t.clock.advance(DAY);
+    await t.service().runDaily();
+    expect(t.ids()).toEqual([noted]);
+  });
+
   it('deletes a backlog larger than one batch and counts it', async () => {
     const t = await setup();
     const old = t.clock.now().getTime() - 100 * DAY;

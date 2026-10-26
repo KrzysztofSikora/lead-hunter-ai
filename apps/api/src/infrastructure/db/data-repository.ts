@@ -1,4 +1,4 @@
-import { and, eq, getTableColumns, inArray, lt, notExists, sql } from 'drizzle-orm';
+import { and, eq, getTableColumns, gte, inArray, lt, notExists, sql } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { DataRepository, ExportTables } from '../../modules/data/ports.js';
@@ -248,6 +248,19 @@ export function createDataRepository(db: BetterSQLite3Database): DataRepository 
                       .select({ one: sql`1` })
                       .from(payments)
                       .where(eq(payments.opportunityId, opportunities.id)),
+                  ),
+                  // Notes and work entries do not move `updated_at` but are the operator's own input.
+                  notExists(
+                    tx
+                      .select({ one: sql`1` })
+                      .from(activityEvents)
+                      .where(
+                        and(
+                          eq(activityEvents.opportunityId, opportunities.id),
+                          inArray(activityEvents.type, ['NOTE', 'WORK']),
+                          gte(activityEvents.occurredAt, before),
+                        ),
+                      ),
                   ),
                 ),
               )
