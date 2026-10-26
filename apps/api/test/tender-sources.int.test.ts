@@ -201,10 +201,10 @@ describe('tender sources in the source loop (S-18 Phase 1)', () => {
     const id = openTestDb(built.dir)
       .db.insert(sources)
       .values({
-        type: 'bzp',
-        name: 'DEMO bzp',
-        configJson: '{"cpvPrefixes":["72"]}',
-        configKey: 'bzp',
+        type: 'nope',
+        name: 'DEMO nope',
+        configJson: '{}',
+        configKey: 'nope',
         createdAt: at,
         updatedAt: at,
       })

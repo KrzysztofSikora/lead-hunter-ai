@@ -1,0 +1,67 @@
+[
+  {
+    "objectId": "11111111-aaaa-4aaa-8aaa-000000000001",
+    "bzpNumber": "2026/BZP 00000001",
+    "noticeType": "ContractNotice",
+    "orderObject": "DEMO Dostawa i wdrożenie systemu obiegu dokumentów",
+    "organizationName": "DEMO Gmina Przykładowo",
+    "organizationCity": "Przykładowo",
+    "cpvCode": "72000000-5 (Usługi informatyczne)",
+    "publicationDate": "2026-10-20T08:15:00Z",
+    "submittingOffersDate": "2026-11-20T09:00:00Z",
+    "htmlBody": "<html><body><script>alert(1)</script><p>Zamawiający: DEMO Gmina Przykładowo</p><p>Wartość zamówienia: 123&nbsp;456,78 PLN</p><p>Opis: system &amp; wdrożenie</p></body></html>",
+    "_fixture": "DEMO, shape UNVERIFIED"
+  },
+  {
+    "objectId": "11111111-aaaa-4aaa-8aaa-000000000002",
+    "bzpNumber": "2026/BZP 00000002",
+    "noticeType": "ContractNotice",
+    "orderObject": "DEMO Rozwój aplikacji mobilnej",
+    "organizationName": "DEMO Powiat Testowy",
+    "organizationCity": "Testowo",
+    "cpvCode": "48000000-8",
+    "publicationDate": "2026-10-20T10:00:00Z",
+    "submittingOffersDate": "2026-11-18T10:00:00",
+    "htmlBody": "<p>Opis przedmiotu zamówienia bez podanej wartości.</p>"
+  },
+  {
+    "objectId": "11111111-aaaa-4aaa-8aaa-000000000003",
+    "bzpNumber": "2026/BZP 00000003",
+    "noticeType": "ContractAwardNotice",
+    "orderObject": "DEMO Wynik postępowania",
+    "organizationName": "DEMO Gmina Przykładowo",
+    "cpvCode": "72000000-5",
+    "publicationDate": "2026-10-20T11:00:00Z",
+    "submittingOffersDate": null,
+    "htmlBody": "<p>Wynik</p>"
+  },
+  {
+    "objectId": "11111111-aaaa-4aaa-8aaa-000000000004",
+    "noticeType": "ContractNotice",
+    "orderObject": "",
+    "organizationName": "DEMO",
+    "cpvCode": "72000000-5"
+  },
+  {
+    "objectId": "11111111-aaaa-4aaa-8aaa-000000000005",
+    "bzpNumber": "2026/BZP 00000005",
+    "noticeType": "ContractNotice",
+    "orderObject": "DEMO Remont drogi",
+    "organizationName": "DEMO Gmina Drogowa",
+    "cpvCode": "45233120-6",
+    "publicationDate": "2026-10-20T12:00:00Z",
+    "submittingOffersDate": "2026-11-25T10:00:00Z",
+    "htmlBody": "<p>Wartość zamówienia: 5 000 000 PLN</p>"
+  },
+  {
+    "objectId": "11111111-aaaa-4aaa-8aaa-000000000006",
+    "bzpNumber": "2026/BZP 00000006",
+    "noticeType": "ContractNotice",
+    "orderObject": "DEMO Badania i rozwój platformy danych",
+    "organizationName": "DEMO Uczelnia XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+    "cpvCode": "72000000-0,72001000-1,72002000-2,72003000-3,72004000-4,72005000-5,72006000-6,72007000-7,72008000-8,72009000-9,72010000-0,72011000-1,72012000-2,72013000-3,72014000-4,72015000-5,72016000-6,72017000-7,72018000-8,72019000-9,72020000-0,72021000-1,72022000-2,72023000-3,72024000-4",
+    "publicationDate": "2026-10-20T13:00:00Z",
+    "submittingOffersDate": "2126-01-01T00:00:00Z",
+    "htmlBody": "<p>Szacunkowa wartość zamówienia: 99999999999999 PLN</p>"
+  }
+]

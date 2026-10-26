@@ -22,9 +22,14 @@ const FREELANCER_SKILLS: readonly [slug: string, label: string, keyword: string]
   ['ai-automation', 'AI i automatyzacja', 'ai automation'],
 ];
 
+/** S-18 D-7: the CPV divisions that cover software (72), packages (48) and R&D (73). */
+const TENDER_CPV = ['72', '48', '73'];
+
 export const PRESETS: readonly SourcePreset[] = [
   {
     id: 'hn-freelance',
+    type: 'rss',
+    tender: null,
     name: 'Hacker News — Seeking freelancer',
     url: 'https://hnrss.org/whoishiring/freelance',
     accessNote: `Kanał RSS serwisu hnrss.org (nieoficjalne lustro Hacker News): komentarze z miesięcznego wątku „Freelancer? Seeking freelancer?”. ${POLL_NOTE}`,
@@ -33,6 +38,8 @@ export const PRESETS: readonly SourcePreset[] = [
   },
   ...FREELANCER_SKILLS.map(([slug, label, keyword]): SourcePreset => ({
     id: `freelancer-${slug}`,
+    type: 'rss',
+    tender: null,
     name: `Freelancer.com — ${label}`,
     url: `https://www.freelancer.com/rss.xml?keyword=${encodeURIComponent(keyword)}`,
     accessNote: `Kanał RSS projektów Freelancer.com dla słowa kluczowego „${keyword}”: zlecenia, nie oferty pracy. ${POLL_NOTE} Adres i regulamin do weryfikacji.`,
@@ -41,11 +48,24 @@ export const PRESETS: readonly SourcePreset[] = [
   })),
   {
     id: 'arduino-jobs',
+    type: 'rss',
+    tender: null,
     name: 'Arduino Forum — Jobs and Paid Consultancy',
     url: 'https://forum.arduino.cc/c/community/jobs/42.rss',
     accessNote: `Kanał RSS kategorii „Jobs and Paid Consultancy” forum Arduino (Discourse): wątki ze zleceniami. ${POLL_NOTE} Adres i regulamin do weryfikacji.`,
     termsUrl: 'https://www.arduino.cc/en/terms-conditions',
     filter: { enabled: true, include: [], exclude: ['[FOR HIRE]', 'looking for work'] },
+  },
+  {
+    id: 'bzp-it',
+    type: 'bzp',
+    tender: { cpvPrefixes: TENDER_CPV, countries: null },
+    name: 'e-Zamówienia (BZP) — IT i oprogramowanie',
+    url: 'https://ezamowienia.gov.pl/mo-board/api/v1/notice',
+    accessNote:
+      'Oficjalne, publiczne API ogłoszeń BZP (e-Zamówienia): ogłoszenia o zamówieniu z wybranych kodów CPV. Odczyt jest bezpłatny i nie wymaga rejestracji; limit to 30 zapytań na minutę, a przekroczenie kończy się odpowiedzią 403. Struktura odpowiedzi i licencja tekstów do weryfikacji (docs/source-policy.md).',
+    termsUrl: 'https://ezamowienia.gov.pl/pl/integracja/',
+    filter: off(),
   },
 ];
 
@@ -56,6 +76,8 @@ export const PRESETS: readonly SourcePreset[] = [
 export const WITHDRAWN_PRESETS: readonly SourcePreset[] = [
   {
     id: 'hn-jobs-contract',
+    type: 'rss',
+    tender: null,
     name: 'Hacker News — Jobs (contract)',
     url: 'https://hnrss.org/jobs?q=contract',
     accessNote: `Kanał RSS serwisu hnrss.org: ogłoszenia z działu Jobs zawierające „contract”. ${POLL_NOTE}`,
@@ -69,6 +91,8 @@ export const WITHDRAWN_PRESETS: readonly SourcePreset[] = [
     ['wwr-devops', 'DevOps', 'remote-devops-sysadmin-jobs'],
   ].map(([id, label, slug]): SourcePreset => ({
     id: id ?? '',
+    type: 'rss',
+    tender: null,
     name: `We Work Remotely — ${label}`,
     url: `https://weworkremotely.com/categories/${slug}.rss`,
     accessNote: `Oficjalny kanał RSS kategorii We Work Remotely. ${POLL_NOTE}`,

@@ -85,11 +85,15 @@ export type SourceKind = z.infer<typeof SourceKind>;
 export const SourcePreset = z
   .object({
     id: z.string(),
+    /** S-18: the source type the preset creates. */
+    type: SourceKind,
     name: z.string(),
     url: z.string(),
     accessNote: z.string(),
     termsUrl: z.string(),
     filter: SourceFilter,
+    /** S-18 D-7: default CPV prefixes and countries of a tender preset; null for a feed. */
+    tender: TenderSettings.nullable(),
   })
   .strict();
 export type SourcePreset = z.infer<typeof SourcePreset>;

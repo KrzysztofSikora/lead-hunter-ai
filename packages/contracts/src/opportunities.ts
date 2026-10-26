@@ -143,6 +143,11 @@ export const TenderFacts = z
       })
       .strict()
       .nullable(),
+    /**
+     * Plan-review 2: `absent` only when the API itself reports no value; `unknown` (or missing)
+     * when the adapter could not read one, so the card never calls a missed value "nie podano".
+     */
+    valueState: z.enum(['stated', 'absent', 'unknown']).optional(),
     cpvCodes: z.array(z.string().regex(/^\d{8}(-\d)?$/)).max(20),
     procedure: z.string().min(1).max(120).nullable(),
     country: z

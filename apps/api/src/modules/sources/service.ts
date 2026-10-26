@@ -4,6 +4,7 @@ import {
   TedConfig,
   TenderFacts,
   type CreateSourceRequest,
+  type SourceKind,
   type Source,
   type SourceHealth,
   type SourceList,
@@ -97,6 +98,10 @@ export interface SourceService {
 const iso = (ms: number): string => new Date(ms).toISOString();
 
 function parseConfigUrl(record: SourceRecord): string {
+  if (record.type !== 'rss') {
+    // S-18: a tender source's endpoint is fixed; its preset holds it for display.
+    return PRESETS.find((candidate) => candidate.type === record.type)?.url ?? '';
+  }
   try {
     const config = JSON.parse(record.configJson) as { url?: unknown };
     return typeof config.url === 'string' ? config.url : '';
@@ -146,15 +151,24 @@ function checkTender(item: FeedItem, warn: (field: string) => void): string | nu
   return JSON.stringify(parsed.data);
 }
 
-function readSeen(record: SourceRecord): string[] {
-  if (record.cursorJson === null) return [];
+function readCursor(record: SourceRecord): { seen: string[]; resumeFrom: number | null } {
+  if (record.cursorJson === null) return { seen: [], resumeFrom: null };
   try {
-    const cursor = JSON.parse(record.cursorJson) as { seen?: unknown };
-    return Array.isArray(cursor.seen)
-      ? cursor.seen.filter((key): key is string => typeof key === 'string')
-      : [];
+    const cursor = JSON.parse(record.cursorJson) as { seen?: unknown; resumeFrom?: unknown };
+    return {
+      seen: Array.isArray(cursor.seen)
+        ? cursor.seen.filter((key): key is string => typeof key === 'string')
+        : [],
+      // Lesson: a stored date is bounded before it is used.
+      resumeFrom:
+        typeof cursor.resumeFrom === 'number' &&
+        cursor.resumeFrom >= DATE_MIN &&
+        cursor.resumeFrom < DATE_MAX
+          ? cursor.resumeFrom
+          : null,
+    };
   } catch {
-    return [];
+    return { seen: [], resumeFrom: null };
   }
 }
 
@@ -266,10 +280,13 @@ export function createSourceService({
       const checked = adapter.validateConfig(config);
       if (!checked.ok) return fail({ ok: false, reason: 'internal' });
       // D-9: a window that overlaps the last success; the cursor drops what it already saw.
+      // A truncated run leaves a gap; the next one starts at the gap, not after the last success.
+      const previous = readCursor(record);
       const since =
-        record.lastSuccessAt === null
+        previous.resumeFrom ??
+        (record.lastSuccessAt === null
           ? startedAt - FIRST_RUN_LOOKBACK_MS
-          : record.lastSuccessAt - SINCE_OVERLAP_MS;
+          : record.lastSuccessAt - SINCE_OVERLAP_MS);
       const outcome = await adapter.discover(checked.config, { since });
       if (!outcome.ok) return fail(outcome);
       const truncated = outcome.truncated === true;
@@ -277,7 +294,7 @@ export function createSourceService({
       const stored = readFilter(record.filterJson);
       if (stored.invalid) logger?.warn(`source ${id} ${logHost(record)}: source_filter_invalid`);
       const filter = stored.filter;
-      const seen = new Set(readSeen(record));
+      const seen = new Set(previous.seen);
       const remembered: string[] = [];
       counts.fetched = outcome.items.length + outcome.skipped;
       counts.failed = outcome.skipped;
@@ -338,7 +355,13 @@ export function createSourceService({
         }
       }
       const kept = [...remembered, ...seen].slice(0, CURSOR_MAX_KEYS);
-      repository.saveCursor(id, JSON.stringify({ seen: kept }));
+      repository.saveCursor(
+        id,
+        JSON.stringify({
+          seen: kept,
+          ...(truncated ? { resumeFrom: outcome.resumeFrom ?? since } : {}),
+        }),
+      );
 
       const finishedAt = clock.now().getTime();
       if (truncated) logger?.warn(`source ${id} ${logHost(record)}: page_cap`);
@@ -416,22 +439,33 @@ export function createSourceService({
 
     create(request) {
       let name: string;
-      let url: string;
+      let config: Record<string, unknown>;
+      let type: SourceKind = 'rss';
       let presetId: string | null = null;
       let filterJson: string | null = null;
       if ('preset' in request) {
         const preset = PRESETS.find((candidate) => candidate.id === request.preset);
         if (!preset) return { kind: 'unknown_preset' };
-        ({ name, url } = preset);
+        ({ name, type } = preset);
+        // S-18 D-7: a tender preset carries the default CPV prefixes (and countries) instead of a URL.
+        config =
+          preset.tender === null
+            ? { url: preset.url }
+            : {
+                cpvPrefixes: preset.tender.cpvPrefixes,
+                ...(preset.tender.countries ? { countries: preset.tender.countries } : {}),
+              };
         presetId = preset.id;
         filterJson = JSON.stringify(preset.filter);
       } else {
-        ({ name, url } = request);
+        ({ name } = request);
+        config = { url: request.url };
       }
-      const checked = adapters.rss.validateConfig({ url });
+      const checked = (adapters[type] as SourceAdapter | undefined)?.validateConfig(config);
+      if (!checked) return { kind: 'invalid', issues: ['Brak adaptera dla tego typu źródła.'] };
       if (!checked.ok) return { kind: 'invalid', issues: checked.issues };
       const inserted = repository.insert({
-        type: 'rss',
+        type,
         name,
         configJson: JSON.stringify(checked.config),
         configKey: checked.key,

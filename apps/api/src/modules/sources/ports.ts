@@ -26,6 +26,12 @@ export type AdapterOutcome =
       skipped: number;
       /** S-18 D-9: the adapter stopped at its page cap; the run is `partial`. */
       truncated?: true;
+      /**
+       * Plan-review 1, D-21: with `truncated`, the start (UTC epoch ms) of the first part of the
+       * window that was not fetched completely; the next run asks from there, not from
+       * `lastSuccessAt`.
+       */
+      resumeFrom?: number;
     }
   | {
       ok: false;
