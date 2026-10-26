@@ -236,11 +236,12 @@ Observably true when done:
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Insights API for weeks and months
 - [x] Phase 2: Time and cost entries
-- [ ] Phase 3: Wyniki view
+- [x] Phase 3: Wyniki view
 - [ ] Phase 4: Time and cost form on the card, docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 3) *Wyniki* at 360 px: totals readable, per-source table scrolls inside its box without page scroll, wording of the reply line ("X z Y z wynikiem (Z bez wyniku)") and of "brak danych" — run: `pnpm dev`, log in, open `/wyniki` at 360 px after an import → draft → "Oznacz jako wysłane" → payment — evidence: `context/changes/insights/evidence/insights-360.jpg`
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -250,6 +251,8 @@ Observably true when done:
 - [minor] (Phase 1) Plan-review 6: payments are dated by advancing the fake clock (31 October, then 1 November) because a future `paidOn` is refused.
 - [minor] (Phase 2) Plan-review 3: `apps/web/src/opportunityCard.test.ts` gets `work: null` on its `ActivityEvent` literal (the new required field); no assertion changed.
 - [minor] (Phase 2) `WorkCost` is defined once in `status.ts` and reused by `ActivityMetadata` and `WorkRequest`; an unreadable `WORK` metadata row counts as no entry. The `OpportunityPage` history label for `WORK` stays in Phase 4 (plan-review 4).
+- [minor] (Phase 3) `formatMinor` printed a negative amount as `-1,-50`; `net` (payments − costs) may be negative (D-10), so it now formats the sign once (`strings.pl.ts`, row added to `strings.pl.test.ts`).
+- [minor] (Phase 3) The e2e step asserts `offersSent` 1, `contacted` 1, "brak danych" with "1 bez wyniku", the payment sum and no overflow (plan-review 1, 10). With no known outcome the reply line reads "0 z 0 z wynikiem (1 bez wyniku)", which is awkward; wording is a human check.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
