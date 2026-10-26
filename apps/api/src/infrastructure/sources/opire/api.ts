@@ -2,9 +2,8 @@ import type { AdapterOutcome } from '../../../modules/sources/ports.js';
 import type { Clock } from '../../../modules/shared/clock.js';
 import { HttpFetchError, type HttpClient } from '../http/client.js';
 import { GITHUB_MAX_BYTES, GITHUB_MAX_WAIT_MS } from '../github/api.js';
+import { OPIRE_REWARDS_URL } from '../../../modules/sources/endpoints.js';
 import { parseRetryAfter } from '../rss/retry.js';
-
-export const OPIRE_REWARDS_URL = 'https://api.opire.dev/rewards';
 
 export interface OpireApiDeps {
   http: HttpClient;

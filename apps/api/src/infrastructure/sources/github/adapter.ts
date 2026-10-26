@@ -1,5 +1,6 @@
 import { GithubSearchConfig } from '@lead-hunter/contracts';
 import type { AdapterOutcome, FeedItem, SourceAdapter } from '../../../modules/sources/ports.js';
+import { GITHUB_SEARCH_PATH } from '../../../modules/sources/endpoints.js';
 import type { GithubApi } from './api.js';
 import { mapIssue } from './map-issue.js';
 import { buildQueries, type GithubQuery } from './query.js';
@@ -27,7 +28,7 @@ export function createGithubAdapter({
 }: GithubAdapterDeps): SourceAdapter<GithubSearchConfig> {
   async function search(query: GithubQuery, perPage: number): Promise<Search> {
     const path =
-      `/search/issues?q=${encodeURIComponent(query.q)}` +
+      `${GITHUB_SEARCH_PATH}?q=${encodeURIComponent(query.q)}` +
       `&sort=updated&order=desc&per_page=${perPage}`;
     const result = await api.get(path);
     if (!result.ok) return result;

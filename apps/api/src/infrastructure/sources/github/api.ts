@@ -1,9 +1,10 @@
 import type { SourceFailureReason } from '@lead-hunter/contracts';
 import type { Clock } from '../../../modules/shared/clock.js';
+import { GITHUB_API_ORIGIN } from '../../../modules/sources/endpoints.js';
 import { HttpFetchError, type HttpClient } from '../http/client.js';
 import { parseRetryAfter, retryDelay } from '../rss/retry.js';
 
-export const GITHUB_API_ORIGIN = 'https://api.github.com';
+export { GITHUB_API_ORIGIN };
 /** S-19 D-5: 10 searches a minute without a token (6 s), 30 with one (2 s), plus a margin. */
 export const GITHUB_GAP_ANONYMOUS_MS = 6_100;
 export const GITHUB_GAP_TOKEN_MS = 2_100;
@@ -58,12 +59,12 @@ export function createGithubApi({
   const gap = token ? GITHUB_GAP_TOKEN_MS : GITHUB_GAP_ANONYMOUS_MS;
   let lastRequestAt: number | null = null;
 
+  /** Reserves the next slot before sleeping, so concurrent callers queue behind each other (R4). */
   async function space(): Promise<void> {
-    if (lastRequestAt !== null) {
-      const wait = lastRequestAt + gap - clock.now().getTime();
-      if (wait > 0) await sleep(wait);
-    }
-    lastRequestAt = clock.now().getTime();
+    const now = clock.now().getTime();
+    const slot = lastRequestAt === null ? now : Math.max(now, lastRequestAt + gap);
+    lastRequestAt = slot;
+    if (slot > now) await sleep(slot - now);
   }
 
   async function get(path: string): Promise<GithubResult> {

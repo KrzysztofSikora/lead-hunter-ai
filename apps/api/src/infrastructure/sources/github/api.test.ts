@@ -14,7 +14,10 @@ interface Reply {
   error?: Error;
 }
 
-function setup(replies: Reply[], opts: { token?: string } = {}) {
+function setup(
+  replies: Reply[],
+  opts: { token?: string; sleep?: (ms: number) => Promise<void> } = {},
+) {
   const state = {
     now: Date.UTC(2026, 9, 26, 12),
     sleeps: [] as number[],
@@ -42,11 +45,11 @@ function setup(replies: Reply[], opts: { token?: string } = {}) {
     clock: { now: () => new Date(state.now) },
     timeoutMs: 1_000,
     maxAttempts: 3,
-    ...opts,
     sleep: async (ms) => {
       state.sleeps.push(ms);
       state.now += ms;
     },
+    ...opts,
   });
   return { api, state };
 }
@@ -79,6 +82,14 @@ describe('createGithubApi', () => {
     await token.api.get('/a');
     await token.api.get('/b');
     expect(token.state.sleeps).toEqual([GITHUB_GAP_TOKEN_MS]);
+  });
+
+  it('queues concurrent callers behind each other instead of sending back to back (R4)', async () => {
+    // A sleep that leaves the clock alone: every caller is waiting at the same moment.
+    const waits: number[] = [];
+    const { api } = setup([{}], { sleep: async (ms) => void waits.push(ms) });
+    await Promise.all([api.get('/a'), api.get('/b'), api.get('/c')]);
+    expect(waits).toEqual([GITHUB_GAP_ANONYMOUS_MS, 2 * GITHUB_GAP_ANONYMOUS_MS]);
   });
 
   it('parses JSON; a body that is not JSON is invalid_feed', async () => {

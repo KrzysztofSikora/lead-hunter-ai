@@ -1,3 +1,4 @@
+import { SOURCE_ENDPOINTS } from './endpoints.js';
 import {
   BountyFacts,
   BzpConfig,
@@ -103,14 +104,6 @@ export interface SourceService {
 }
 
 const iso = (ms: number): string => new Date(ms).toISOString();
-
-/** S-19 D-1: the fixed endpoint of every API source, for display and the log host. */
-const SOURCE_ENDPOINTS: Readonly<Record<Exclude<SourceKind, 'rss'>, string>> = {
-  bzp: 'https://ezamowienia.gov.pl/mo-board/api/v1/notice',
-  ted: 'https://api.ted.europa.eu/v3/notices/search',
-  github: 'https://api.github.com/search/issues',
-  opire: 'https://api.opire.dev/rewards',
-};
 
 function parseConfigUrl(record: SourceRecord): string {
   if (record.type !== 'rss') return SOURCE_ENDPOINTS[record.type];
