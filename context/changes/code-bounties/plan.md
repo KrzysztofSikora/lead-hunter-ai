@@ -478,7 +478,7 @@ guard (D-10).
 - [FOLLOW-UP] Re-check stored bounty signals when their issue closes, and enrich a stored
   duplicate with a reward that a later source states (D-12 B).
 - [REVIEW] R1 (review round 1): three phase commits (`3c9a423`, `1295634`, `ffdd912`) carry a `Claude-Session` trailer, which `CLAUDE.md` forbids. A run may not rewrite history. Squash-merge the PR with a clean message, or reword those commits before merging; later commits of this change carry no trailer. Deferred.
-- [minor] R3: a 403/429 with `Retry-After` now maps to `rate_limited` like the primary limit (`github/api.ts`), and a failure after the first search query is logged with its reason and status. Storing that reason in the run row stays a [FOLLOW-UP] below.
+- [minor] R3 (narrowed by R7): a 403 with `Retry-After` now maps to `rate_limited` like the primary limit (a 429 with only `Retry-After` stays on the D-5 backoff; D-5's "any other 403 → `http_status`" no longer holds for a 403 with `Retry-After`) (`github/api.ts`), and a failure after the first search query is logged with its reason and status. Storing that reason in the run row stays a [FOLLOW-UP] below.
 - [FOLLOW-UP] Show the reason of a `partial` run's failed later query in the run row (extend `truncated` with an optional `error`), so the UI shows it; today it is only in the log.
 - [FOLLOW-UP] Read issue comments for bot-stated amounts (Algora), within the core rate limit.
 

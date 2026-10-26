@@ -129,4 +129,4 @@ Round 2 re-checks the fixes for R2–R6 (commits `2f9f5c4`, `000a4f7`, `a576990`
 - Fix: restrict the `retry-after` arm to 403 (`response.status === 403 && retry-after !== undefined`), keeping 429 without `remaining: 0` on the backoff path as D-5 states; add an integration test for `429 + retry-after: 5` then `200` (one sleep of 5 000 ms, run `ok`) and one for 403 + `retry-after` (already present). Update the `limitWaitMs` comment to mention the secondary 403. If the 429 change is wanted, instead rewrite the D-5 row and log it as `[REVIEW]`.
 - Effort: small
 - Lesson candidate: "When a fix widens a condition beyond what the finding asked, check it against the costly decision that owns that behaviour and update the row or narrow the fix."
-- Decision: open
+- Decision: fixed (1b23864) + lesson proposed
