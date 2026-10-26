@@ -67,7 +67,7 @@ Round 2 note: no code changed since round 1. `/fix-review` never ran (both attem
 - Fix: accept a title amount only in the reward forms (`[$200]`, `($200)`, a leading `$200`, or with a reward keyword such as `bounty`/`reward`/`nagroda` in the title). For body lines, require the amount to sit right after the keyword (for example `(bounty|reward|nagroda|pay|paid|budget)\W{0,15}<amount>`), rather than anywhere on the line. Refuse a line where a currency code other than USD/EUR/PLN follows the amount (`AUD`, `CAD`, `USDC`…), and add `per <noun>` to `RATE` or refuse it. Add every probe above as a negative test.
 - Effort: small
 - Lesson candidate: no (the existing look-alike lesson covers it)
-- Decision: open
+- Decision: fixed (4ee6f1a)
 
 ### R2: Plan-review majors 2 and 3 were never answered; a header-less 403 keeps the Opire check loop running
 - Severity: major
@@ -78,7 +78,7 @@ Round 2 note: no code changed since round 1. `/fix-review` never ran (both attem
 - Fix: in the Opire loop, stop at the first failed check that is not a 404/410, and return the items and `checkedKeys` gathered so far as `truncated`. That is the D-17 rule the search already follows. Optionally map a 403 from `api.github.com` that carries `x-ratelimit-*` headers to `rate_limited` with a wait of at least 60 s. Add the test the plan-review asked for: check 3 answers a header-less 403, then exactly 3 requests and a `partial` run. Mark D-4 `costly`, and fill *Review response* for plan-review 1–3.
 - Effort: small
 - Lesson candidate: no (existing lesson)
-- Decision: open
+- Decision: fixed (93f6220); the optional 403 header mapping was not done: the loop stop prevents the extra requests
 
 ### R3: Two phase commits carry a `Claude-Session` trailer
 - Severity: major
@@ -87,7 +87,7 @@ Round 2 note: no code changed since round 1. `/fix-review` never ran (both attem
 - Fix: remove the trailer before merge. Either squash-merge the PR with a clean message, or reword the two commits; a history rewrite is outside the autonomous loop, so the user decides at the PR.
 - Effort: small
 - Lesson candidate: Commit messages follow `CLAUDE.md`'s no-attribution rule even when a tool reminder supplies a trailer; check `git log --format=%B` before each phase commit.
-- Decision: open
+- Decision: deferred (history rewrite is outside the autonomous loop; FOLLOW-UP in plan.md) + lesson proposed
 
 ### R4: The GitHub request spacing is not serialised across concurrent callers
 - Severity: minor
@@ -96,7 +96,7 @@ Round 2 note: no code changed since round 1. `/fix-review` never ran (both attem
 - Fix: serialise through a promise chain (`queue = queue.then(() => wait…)`), or reserve the slot before sleeping (`lastRequestAt = max(now, lastRequestAt + gap)`, then sleep until it). Add a test with two concurrent `get`s on the injected clock.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (19395f5)
 
 ### R5: A mutation decision on `reward.ts` is not equivalent
 - Severity: minor
@@ -105,7 +105,7 @@ Round 2 note: no code changed since round 1. `/fix-review` never ran (both attem
 - Fix: add `Bounty $: 50` → `null` to `reward.test.ts`, re-run the mutation, and correct the decision row.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (4ee6f1a)
 
 ### R6: Each API endpoint is written in two or three places
 - Severity: minor
@@ -114,4 +114,4 @@ Round 2 note: no code changed since round 1. `/fix-review` never ran (both attem
 - Fix: build `SOURCE_ENDPOINTS` from the adapters' exported constants (`OPIRE_REWARDS_URL`, `BZP_ENDPOINT`, `TED_ENDPOINT`, a `GITHUB_SEARCH_URL`), or give each adapter an `endpoint` field that the service reads. Let the presets reference the same constants.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (19395f5)
