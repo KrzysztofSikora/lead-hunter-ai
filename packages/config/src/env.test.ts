@@ -23,6 +23,7 @@ describe('loadConfig', () => {
       sourceMinIntervalMinutes: 60,
       sourceMaxAttempts: 3,
       discoveryTimes: ['08:00', '18:00'],
+      github: {},
     });
   });
 
@@ -44,6 +45,7 @@ describe('loadConfig', () => {
         SOURCE_MIN_INTERVAL_MINUTES: '120',
         SOURCE_MAX_ATTEMPTS: '2',
         DISCOVERY_TIMES: '18:30, 07:15',
+        GITHUB_TOKEN: ' ghp_ENV-TOKEN ',
         ...HASH,
       }),
     ).toEqual({
@@ -63,6 +65,7 @@ describe('loadConfig', () => {
       sourceMinIntervalMinutes: 120,
       sourceMaxAttempts: 2,
       discoveryTimes: ['07:15', '18:30'],
+      github: { token: 'ghp_ENV-TOKEN' },
     });
   });
 
@@ -216,6 +219,17 @@ describe('loadConfig', () => {
     it.each(['127.0.0.1', '::1', 'localhost'])('accepts %s without a hash', (host) => {
       expect(loadConfig({ HOST: host }).host).toBe(host);
     });
+  });
+});
+
+describe('loadConfig: GITHUB_TOKEN (S-19 D-9)', () => {
+  it('is absent when unset or empty', () => {
+    expect(loadConfig({}).github).toEqual({});
+    expect(loadConfig({ GITHUB_TOKEN: '' }).github).toEqual({});
+  });
+
+  it('rejects a blank token', () => {
+    expect(() => loadConfig({ GITHUB_TOKEN: '   ' })).toThrow(ConfigError);
   });
 });
 

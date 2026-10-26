@@ -1,9 +1,13 @@
+import { SOURCE_ENDPOINTS } from './endpoints.js';
 import {
+  BountyFacts,
   BzpConfig,
+  GithubSearchConfig,
   SourceFilter,
   TedConfig,
   TenderFacts,
   type CreateSourceRequest,
+  type OperatorProfile,
   type SourceKind,
   type Source,
   type SourceHealth,
@@ -16,6 +20,7 @@ import type { Clock } from '../shared/clock.js';
 import { canonicalizeUrl, contentHash, normaliseSnippet } from '../signals/identity.js';
 import { ingest } from '../signals/ingest.js';
 import type { SignalRepository } from '../signals/ports.js';
+import { languagesFromProfile } from './github-languages.js';
 import { MANUAL_ACCESS_NOTE, PRESETS, WITHDRAWN_PRESETS } from './presets.js';
 import { applySourceFilter, readFilter } from './source-filter.js';
 import type {
@@ -52,6 +57,8 @@ export interface SourceDeps {
   adapters: SourceAdapters;
   clock: Clock;
   minIntervalMs: number;
+  /** S-19 D-20: the operator profile, for the default languages of a new GitHub source. */
+  profile?: { get(): OperatorProfile };
   /** Called after a run stored new signals, so analysis starts without waiting for its timer. */
   onSignalCreated?: () => void;
   /** Source id, host, reason and counts only; never item text (FR-24 AC2). */
@@ -71,6 +78,7 @@ export type UpdateOutcome =
   | { kind: 'updated'; source: Source }
   | { kind: 'not_found' }
   | { kind: 'not_tender_source' }
+  | { kind: 'not_github_source' }
   | { kind: 'invalid'; issues: string[] };
 
 export type RunOutcome = { kind: 'done'; result: SourceRunResult } | Refusal;
@@ -80,8 +88,8 @@ export interface SourceService {
   list(): SourceList;
   create(request: CreateSourceRequest): CreateOutcome;
   /**
-   * D-13: `filter` replaces the whole filter; S-18 D-7: `tender` the tender config. Both are
-   * validated before they are stored.
+   * D-13: `filter` replaces the whole filter; S-18 D-7: `tender` the tender config; S-19 D-11:
+   * `github` the GitHub search config. Each is validated before it is stored.
    */
   update(id: number, patch: UpdateSourceRequest): UpdateOutcome;
   run(id: number, context?: RunContext): Promise<RunOutcome>;
@@ -98,10 +106,7 @@ export interface SourceService {
 const iso = (ms: number): string => new Date(ms).toISOString();
 
 function parseConfigUrl(record: SourceRecord): string {
-  if (record.type !== 'rss') {
-    // S-18: a tender source's endpoint is fixed; its preset holds it for display.
-    return PRESETS.find((candidate) => candidate.type === record.type)?.url ?? '';
-  }
+  if (record.type !== 'rss') return SOURCE_ENDPOINTS[record.type];
   try {
     const config = JSON.parse(record.configJson) as { url?: unknown };
     return typeof config.url === 'string' ? config.url : '';
@@ -130,6 +135,24 @@ function tenderSettings(record: SourceRecord): TenderSettings | null {
     return parsed.success ? parsed.data : null;
   }
   return null;
+}
+
+/** S-19 D-11: the editable config of the GitHub source; null for every other type. */
+function githubSettings(record: SourceRecord): GithubSearchConfig | null {
+  if (record.type !== 'github') return null;
+  const parsed = GithubSearchConfig.safeParse(parseConfig(record));
+  return parsed.success ? parsed.data : null;
+}
+
+/** S-19 D-2: bounty facts are validated before they are stored; invalid ones are dropped. */
+function checkBounty(item: FeedItem, warn: (field: string) => void): string | null {
+  if (item.bounty === undefined) return null;
+  const parsed = BountyFacts.safeParse(item.bounty);
+  if (!parsed.success) {
+    warn(parsed.error.issues[0]?.path.join('.') || 'bounty');
+    return null;
+  }
+  return JSON.stringify(parsed.data);
 }
 
 /** S-18 D-2: facts are validated and bounded before they are stored; invalid ones are dropped. */
@@ -193,6 +216,7 @@ export function createSourceService({
   adapters,
   clock,
   minIntervalMs,
+  profile,
   onSignalCreated,
   logger,
 }: SourceDeps): SourceService {
@@ -206,6 +230,7 @@ export function createSourceService({
       name: record.name,
       url: parseConfigUrl(record),
       tender: tenderSettings(record),
+      github: githubSettings(record),
       presetId: record.presetId,
       accessNote: preset?.accessNote ?? MANUAL_ACCESS_NOTE,
       termsUrl: preset?.termsUrl ?? null,
@@ -322,6 +347,7 @@ export function createSourceService({
       const outcome = await adapter.discover(checked.config, {
         since,
         ...(resumedAt && previous.resumeAt !== null ? { resumeAt: previous.resumeAt } : {}),
+        seen: new Set(previous.seen),
       });
       if (!outcome.ok) return fail(outcome);
       const truncated = outcome.truncated === true;
@@ -341,6 +367,9 @@ export function createSourceService({
         try {
           const tenderJson = checkTender(item, (field) =>
             logger?.warn(`source ${id} ${logHost(record)}: tender_invalid ${field}`),
+          );
+          const bountyJson = checkBounty(item, (field) =>
+            logger?.warn(`source ${id} ${logHost(record)}: bounty_invalid ${field}`),
           );
           const snippet = normaliseSnippet(item.text);
           let canonicalUrl: string | null = null;
@@ -370,6 +399,7 @@ export function createSourceService({
               sourceFact: snippet !== '' ? snippet : (item.url ?? ''),
               jobRunId: runId,
               tenderJson,
+              bountyJson,
             });
             // D-4: only a new opportunity is rejected; a duplicate keeps whatever status it has.
             if (ingested.result === 'created' && !verdict.pass) {
@@ -389,7 +419,10 @@ export function createSourceService({
           );
         }
       }
-      const kept = [...remembered, ...seen].slice(0, CURSOR_MAX_KEYS);
+      const kept = [...new Set([...remembered, ...(outcome.checkedKeys ?? []), ...seen])].slice(
+        0,
+        CURSOR_MAX_KEYS,
+      );
       repository.saveCursor(
         id,
         JSON.stringify({
@@ -489,13 +522,21 @@ export function createSourceService({
         if (!preset) return { kind: 'unknown_preset' };
         ({ name, type } = preset);
         // S-18 D-7: a tender preset carries the default CPV prefixes (and countries) instead of a URL.
-        config =
-          preset.tender === null
-            ? { url: preset.url }
-            : {
-                cpvPrefixes: preset.tender.cpvPrefixes,
-                ...(preset.tender.countries ? { countries: preset.tender.countries } : {}),
-              };
+        if (preset.github !== null) {
+          config = {
+            labels: preset.github.labels,
+            languages: profile ? languagesFromProfile(profile.get()) : [],
+          };
+        } else if (preset.type === 'opire') {
+          config = {};
+        } else if (preset.tender !== null) {
+          config = {
+            cpvPrefixes: preset.tender.cpvPrefixes,
+            ...(preset.tender.countries ? { countries: preset.tender.countries } : {}),
+          };
+        } else {
+          config = { url: preset.url };
+        }
         presetId = preset.id;
         filterJson = JSON.stringify(preset.filter);
       } else {
@@ -524,7 +565,7 @@ export function createSourceService({
       const filter = patch.filter === undefined ? undefined : SourceFilter.parse(patch.filter);
       let configJson: string | undefined;
       if (patch.tender !== undefined) {
-        if (record.type === 'rss') return { kind: 'not_tender_source' };
+        if (record.type !== 'bzp' && record.type !== 'ted') return { kind: 'not_tender_source' };
         const checked =
           record.type === 'bzp'
             ? BzpConfig.safeParse({
@@ -535,6 +576,14 @@ export function createSourceService({
                 cpvPrefixes: patch.tender.cpvPrefixes,
                 countries: patch.tender.countries ?? tenderSettings(record)?.countries,
               });
+        if (!checked.success) {
+          return { kind: 'invalid', issues: checked.error.issues.map((issue) => issue.message) };
+        }
+        configJson = JSON.stringify({ ...parseConfig(record), ...checked.data });
+      }
+      if (patch.github !== undefined) {
+        if (record.type !== 'github') return { kind: 'not_github_source' };
+        const checked = GithubSearchConfig.safeParse(patch.github);
         if (!checked.success) {
           return { kind: 'invalid', issues: checked.error.issues.map((issue) => issue.message) };
         }

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { GITHUB_LANGUAGES } from '@lead-hunter/contracts';
 import type {
   JobList,
   JobRun,
   Source,
+  GithubSearchConfig,
   SourceFilter,
   SourceList,
   TenderSettings,
@@ -15,6 +17,7 @@ import {
   listSources,
   runSource,
   updateSource,
+  updateGithub,
   updateTender,
   type CreateOutcome,
   type Outcome,
@@ -227,6 +230,108 @@ function TenderEditor({
   );
 }
 
+/** S-19 D-11: one entry per line, trimmed, blanks and repeats dropped. */
+function toLines(text: string): string[] {
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (line === '' || seen.has(line.toLowerCase())) continue;
+    seen.add(line.toLowerCase());
+    lines.push(line);
+  }
+  return lines;
+}
+
+/** S-19 D-11: labels and languages of the GitHub search; the server validates the rest. */
+function GithubEditor({
+  source,
+  github,
+  onChanged,
+}: {
+  source: Source;
+  github: GithubSearchConfig;
+  onChanged: () => void;
+}) {
+  const f = t.github;
+  const [labels, setLabels] = useState(github.labels.join('\n'));
+  const [languages, setLanguages] = useState(github.languages.join('\n'));
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  async function save() {
+    setMessage(null);
+    const typed = toLines(languages);
+    const known = new Map<string, string>(
+      GITHUB_LANGUAGES.map((name) => [name.toLowerCase(), name]),
+    );
+    const unknown = typed.find((name) => !known.has(name.toLowerCase()));
+    if (unknown !== undefined) {
+      setMessage({ kind: 'error', text: f.unknownLanguage(unknown) });
+      return;
+    }
+    setPending(true);
+    try {
+      const outcome = await updateGithub(source.id, {
+        labels: toLines(labels),
+        languages: typed.map(
+          (name) => known.get(name.toLowerCase()) as (typeof GITHUB_LANGUAGES)[number],
+        ),
+      });
+      if (outcome.ok) {
+        setLabels(outcome.value.github?.labels.join('\n') ?? labels);
+        setLanguages(outcome.value.github?.languages.join('\n') ?? languages);
+        setMessage({ kind: 'ok', text: f.saved });
+        onChanged();
+      } else if (outcome.refused === 'invalid') {
+        setMessage({
+          kind: 'error',
+          text: outcome.fields.map((field) => field.message).join(' ') || f.invalid,
+        });
+      } else {
+        setMessage({ kind: 'error', text: f.saveFailed });
+      }
+    } catch {
+      setMessage({ kind: 'error', text: f.saveFailed });
+    }
+    setPending(false);
+  }
+
+  return (
+    <fieldset className={styles.filter}>
+      <legend>{f.title}</legend>
+      <div className={styles.field}>
+        <label htmlFor={`gh-labels-${source.id}`}>{f.labelsLabel}</label>
+        <textarea
+          id={`gh-labels-${source.id}`}
+          rows={3}
+          value={labels}
+          onChange={(event) => setLabels(event.target.value)}
+        />
+        <span className={styles.hint}>{f.labelsHint}</span>
+      </div>
+      <div className={styles.field}>
+        <label htmlFor={`gh-languages-${source.id}`}>{f.languagesLabel}</label>
+        <textarea
+          id={`gh-languages-${source.id}`}
+          rows={3}
+          value={languages}
+          onChange={(event) => setLanguages(event.target.value)}
+        />
+        <span className={styles.hint}>{f.languagesHint}</span>
+      </div>
+      <button type="button" disabled={pending} onClick={save}>
+        {pending ? f.saving : f.save}
+      </button>
+      {message && (
+        <p role="status" className={message.kind === 'ok' ? styles.ok : styles.error}>
+          {message.text}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
 function SourceItem({ source, onChanged }: { source: Source; onChanged: () => void }) {
   const [pending, setPending] = useState<'run' | 'check' | 'toggle' | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
@@ -306,7 +411,7 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
             </>
           )}
         </dd>
-        {source.tender && (
+        {(source.tender || source.type === 'github' || source.type === 'opire') && (
           <>
             <dt>{t.endpoint}</dt>
             <dd>{source.url}</dd>
@@ -337,6 +442,9 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
       </dl>
       {source.tender && (
         <TenderEditor source={source} tender={source.tender} onChanged={onChanged} />
+      )}
+      {source.github && (
+        <GithubEditor source={source} github={source.github} onChanged={onChanged} />
       )}
       <FilterEditor source={source} onChanged={onChanged} />
       <div className={styles.actions}>

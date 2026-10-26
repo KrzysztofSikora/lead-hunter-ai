@@ -1,4 +1,5 @@
 import type { SourceFilter, SourcePreset } from '@lead-hunter/contracts';
+import { SOURCE_ENDPOINTS } from './endpoints.js';
 
 /**
  * S-17: ready-made sources that bring requests for work, not job ads. Every URL and terms link
@@ -30,6 +31,7 @@ export const PRESETS: readonly SourcePreset[] = [
     id: 'hn-freelance',
     type: 'rss',
     tender: null,
+    github: null,
     name: 'Hacker News — Seeking freelancer',
     url: 'https://hnrss.org/whoishiring/freelance',
     accessNote: `Kanał RSS serwisu hnrss.org (nieoficjalne lustro Hacker News): komentarze z miesięcznego wątku „Freelancer? Seeking freelancer?”. ${POLL_NOTE}`,
@@ -40,6 +42,7 @@ export const PRESETS: readonly SourcePreset[] = [
     id: `freelancer-${slug}`,
     type: 'rss',
     tender: null,
+    github: null,
     name: `Freelancer.com — ${label}`,
     url: `https://www.freelancer.com/rss.xml?keyword=${encodeURIComponent(keyword)}`,
     accessNote: `Kanał RSS projektów Freelancer.com dla słowa kluczowego „${keyword}”: zlecenia, nie oferty pracy. ${POLL_NOTE} Adres i regulamin do weryfikacji.`,
@@ -50,6 +53,7 @@ export const PRESETS: readonly SourcePreset[] = [
     id: 'arduino-jobs',
     type: 'rss',
     tender: null,
+    github: null,
     name: 'Arduino Forum — Jobs and Paid Consultancy',
     url: 'https://forum.arduino.cc/c/community/jobs/42.rss',
     accessNote: `Kanał RSS kategorii „Jobs and Paid Consultancy” forum Arduino (Discourse): wątki ze zleceniami. ${POLL_NOTE} Adres i regulamin do weryfikacji.`,
@@ -60,8 +64,9 @@ export const PRESETS: readonly SourcePreset[] = [
     id: 'bzp-it',
     type: 'bzp',
     tender: { cpvPrefixes: TENDER_CPV, countries: null },
+    github: null,
     name: 'e-Zamówienia (BZP) — IT i oprogramowanie',
-    url: 'https://ezamowienia.gov.pl/mo-board/api/v1/notice',
+    url: SOURCE_ENDPOINTS.bzp,
     accessNote:
       'Oficjalne, publiczne API ogłoszeń BZP (e-Zamówienia): ogłoszenia o zamówieniu z wybranych kodów CPV. Odczyt jest bezpłatny i nie wymaga rejestracji; limit to 30 zapytań na minutę, a przekroczenie kończy się odpowiedzią 403. Struktura odpowiedzi i licencja tekstów do weryfikacji (docs/source-policy.md).',
     termsUrl: 'https://ezamowienia.gov.pl/pl/integracja/',
@@ -71,11 +76,36 @@ export const PRESETS: readonly SourcePreset[] = [
     id: 'ted-pl-it',
     type: 'ted',
     tender: { cpvPrefixes: TENDER_CPV, countries: ['PL'] },
+    github: null,
     name: 'TED — przetargi IT w Polsce',
-    url: 'https://api.ted.europa.eu/v3/notices/search',
+    url: SOURCE_ENDPOINTS.ted,
     accessNote:
       'Oficjalne API wyszukiwania TED (Urząd Publikacji UE): ogłoszenia otwierające postępowanie, z wybranych kodów CPV i kraju zamawiającego. Wyszukiwanie jest anonimowe i bezpłatne, bez klucza; obowiązuje zasada uczciwego korzystania (do 700 zapytań na minutę). Nazwy pól odpowiedzi i licencja do weryfikacji (docs/source-policy.md).',
     termsUrl: 'https://ted.europa.eu/en/legal-notice',
+    filter: off(),
+  },
+  {
+    id: 'github-bounties',
+    type: 'github',
+    tender: null,
+    github: { labels: ['bounty', 'paid', '💎 Bounty'], languages: [] },
+    name: 'GitHub — płatne zgłoszenia (bounty)',
+    url: SOURCE_ENDPOINTS.github,
+    accessNote:
+      'Oficjalne API wyszukiwania GitHub: otwarte zgłoszenia z etykietą nagrody (bounty, paid, 💎 Bounty), osobne zapytanie dla każdego języka z profilu. Odczyt jest publiczny; bez tokenu obowiązuje limit 10 zapytań na minutę, z opcjonalnym GITHUB_TOKEN (tylko odczyt danych publicznych) 30. Kwota trafia do sygnału tylko wtedy, gdy zgłoszenie ją podaje (docs/source-policy.md).',
+    termsUrl: 'https://docs.github.com/en/site-policy/github-terms/github-terms-of-service',
+    filter: off(),
+  },
+  {
+    id: 'opire-rewards',
+    type: 'opire',
+    tender: null,
+    github: null,
+    name: 'Opire — nagrody za zgłoszenia',
+    url: SOURCE_ENDPOINTS.opire,
+    accessNote:
+      'Publiczne API Opire z aktywnymi nagrodami za zgłoszenia GitHub, bez klucza. Każda nagroda trafia do sygnału tylko wtedy, gdy jej zgłoszenie na GitHubie jest nadal otwarte (sprawdzane przez API GitHub; zamknięte są pomijane). Adres, struktura odpowiedzi i regulamin DO WERYFIKACJI (docs/source-policy.md).',
+    termsUrl: 'https://opire.dev',
     filter: off(),
   },
 ];
@@ -89,6 +119,7 @@ export const WITHDRAWN_PRESETS: readonly SourcePreset[] = [
     id: 'hn-jobs-contract',
     type: 'rss',
     tender: null,
+    github: null,
     name: 'Hacker News — Jobs (contract)',
     url: 'https://hnrss.org/jobs?q=contract',
     accessNote: `Kanał RSS serwisu hnrss.org: ogłoszenia z działu Jobs zawierające „contract”. ${POLL_NOTE}`,
@@ -104,6 +135,7 @@ export const WITHDRAWN_PRESETS: readonly SourcePreset[] = [
     id: id ?? '',
     type: 'rss',
     tender: null,
+    github: null,
     name: `We Work Remotely — ${label}`,
     url: `https://weworkremotely.com/categories/${slug}.rss`,
     accessNote: `Oficjalny kanał RSS kategorii We Work Remotely. ${POLL_NOTE}`,

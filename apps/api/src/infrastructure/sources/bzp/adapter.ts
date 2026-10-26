@@ -1,11 +1,12 @@
 import { BzpConfig } from '@lead-hunter/contracts';
 import type { Clock } from '../../../modules/shared/clock.js';
 import type { AdapterOutcome, FeedItem, SourceAdapter } from '../../../modules/sources/ports.js';
+import { BZP_ENDPOINT } from '../../../modules/sources/endpoints.js';
 import { HttpFetchError, type HttpClient } from '../http/client.js';
 import { parseRetryAfter, retryDelay } from '../rss/retry.js';
 import { BZP_CONTRACT_NOTICE, mapBzpNotice } from './map-notice.js';
 
-export const BZP_ENDPOINT = 'https://ezamowienia.gov.pl/mo-board/api/v1/notice';
+export { BZP_ENDPOINT };
 /** S-18 D-10 and plan-review 7: 2.1 s between two requests keeps a run under 30 per minute. */
 export const BZP_MIN_GAP_MS = 2_100;
 export const BZP_PAGE_SIZE = 100;

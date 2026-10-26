@@ -16,6 +16,8 @@ export const REDACT_PATHS: string[] = [
   'req.headers.cookie',
   'res.headers["set-cookie"]',
   ...SECRET_KEYS.flatMap((key) => [key, `*.${key}`]),
+  // S-19 D-9: a whole `config` object holds the GitHub token two levels down (`config.github.token`).
+  '*.*.token',
 ];
 
 export function createLoggerOptions(

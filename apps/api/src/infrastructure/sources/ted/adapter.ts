@@ -1,12 +1,13 @@
 import { TedConfig } from '@lead-hunter/contracts';
 import type { Clock } from '../../../modules/shared/clock.js';
 import type { AdapterOutcome, FeedItem, SourceAdapter } from '../../../modules/sources/ports.js';
+import { TED_ENDPOINT } from '../../../modules/sources/endpoints.js';
 import { HttpFetchError, type HttpClient } from '../http/client.js';
 import { parseRetryAfter, retryDelay } from '../rss/retry.js';
 import { mapTedNotice, TED_FIELDS } from './map-notice.js';
 import { buildTedQuery } from './query.js';
 
-export const TED_ENDPOINT = 'https://api.ted.europa.eu/v3/notices/search';
+export { TED_ENDPOINT };
 /** S-18 D-10: the same spacing as BZP; TED's fair-use limit (700 per minute) is far above it. */
 export const TED_MIN_GAP_MS = 2_000;
 export const TED_PAGE_SIZE = 100;

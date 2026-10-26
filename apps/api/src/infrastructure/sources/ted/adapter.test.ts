@@ -68,7 +68,7 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
 
   it('posts one query per UTC day with the configured prefixes and country', async () => {
     const { adapter, state } = harness(() => ({ body: FIXTURE }));
-    const outcome = await adapter.discover(CONFIG, { since: NOW - DAY });
+    const outcome = await adapter.discover(CONFIG, { since: NOW - DAY, seen: new Set() });
     expect(state.log).toHaveLength(2);
     expect(state.log[0]?.url).toBe('https://api.ted.europa.eu/v3/notices/search');
     const body = state.log[0]?.body;
@@ -93,20 +93,20 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
       if (n === 2) return { body: fullPage('tok-2') };
       return { body: '{"notices":[],"iterationNextToken":"tok-3"}' };
     });
-    const outcome = await adapter.discover(CONFIG, { since: NOW });
+    const outcome = await adapter.discover(CONFIG, { since: NOW, seen: new Set() });
     expect(state.log.map((r) => r.body.iterationNextToken)).toEqual([undefined, 'tok-1', 'tok-2']);
     expect(outcome).toEqual({ ok: true, items: [], skipped: 0 });
   });
 
   it('stops at a short page without a token', async () => {
     const { adapter, state } = harness(() => ({ body: FIXTURE }));
-    await adapter.discover(CONFIG, { since: NOW });
+    await adapter.discover(CONFIG, { since: NOW, seen: new Set() });
     expect(state.log).toHaveLength(1);
   });
 
   it('is truncated at the page cap and says where the next run resumes', async () => {
     const { adapter, state } = harness((n) => ({ body: fullPage(`tok-${n}`) }));
-    const outcome = await adapter.discover(CONFIG, { since: NOW - DAY });
+    const outcome = await adapter.discover(CONFIG, { since: NOW - DAY, seen: new Set() });
     expect(state.log).toHaveLength(TED_PAGE_CAP);
     expect(outcome).toMatchObject({
       ok: true,
@@ -118,13 +118,17 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
   it('continues a day larger than the cap from the stored token (R1)', async () => {
     const since = Date.parse('2026-10-25T00:00:00Z');
     const { adapter } = harness((n) => ({ body: fullPage(`tok-${n}`) }));
-    expect(await adapter.discover(CONFIG, { since })).toMatchObject({
+    expect(await adapter.discover(CONFIG, { since, seen: new Set() })).toMatchObject({
       truncated: true,
       resumeFrom: since,
       resumeAt: `tok-${TED_PAGE_CAP}`,
     });
     const next = harness((n) => ({ body: n === 1 ? fullPage('next') : '{"notices":[]}' }));
-    const outcome = await next.adapter.discover(CONFIG, { since, resumeAt: 'tok-5' });
+    const outcome = await next.adapter.discover(CONFIG, {
+      since,
+      resumeAt: 'tok-5',
+      seen: new Set(),
+    });
     expect(next.state.log[0]?.body.iterationNextToken).toBe('tok-5');
     expect(next.state.log[0]?.body.query).toContain('publication-date>=20261025');
     expect(next.state.log[2]?.body.query).toContain('publication-date>=20261026');
@@ -140,14 +144,14 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
           ? '{"notices":[{"publication-number":"x"}],"iterationNextToken":"t"}'
           : '{"notices":[]}',
     }));
-    const outcome = await adapter.discover(CONFIG, { since: NOW - 2 * DAY });
+    const outcome = await adapter.discover(CONFIG, { since: NOW - 2 * DAY, seen: new Set() });
     expect(state.log).toHaveLength(6);
     expect(outcome.ok && outcome.truncated).toBeUndefined();
   });
 
   it('is truncated, not complete, when a full page has no token to continue with', async () => {
     const { adapter } = harness(() => ({ body: fullPage(null) }));
-    expect(await adapter.discover(CONFIG, { since: NOW })).toMatchObject({
+    expect(await adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toMatchObject({
       ok: true,
       truncated: true,
       resumeFrom: Date.parse('2026-10-26T00:00:00Z'),
@@ -156,7 +160,7 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
 
   it('keeps at least the spacing between two requests on the injected clock', async () => {
     const { adapter, state } = harness((n) => ({ body: n < 4 ? fullPage(`t${n}`) : undefined }));
-    await adapter.discover(CONFIG, { since: NOW });
+    await adapter.discover(CONFIG, { since: NOW, seen: new Set() });
     const gaps = state.log.slice(1).map((r, i) => r.at - (state.log[i]?.at ?? 0));
     expect(gaps.length).toBeGreaterThan(0);
     expect(Math.min(...gaps)).toBeGreaterThanOrEqual(TED_MIN_GAP_MS);
@@ -164,7 +168,7 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
 
   it('drops pages already read when a later page fails', async () => {
     const { adapter } = harness((n) => (n === 1 ? { body: fullPage('tok') } : { status: 500 }));
-    expect(await adapter.discover(CONFIG, { since: NOW })).toEqual({
+    expect(await adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toEqual({
       ok: false,
       reason: 'http_status',
       httpStatus: 500,
@@ -173,7 +177,7 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
 
   it('maps 403 to http_status (not rate_limited) with no retry', async () => {
     const { adapter, state } = harness(() => ({ status: 403 }));
-    expect(await adapter.discover(CONFIG, { since: NOW })).toEqual({
+    expect(await adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toEqual({
       ok: false,
       reason: 'http_status',
       httpStatus: 403,
@@ -185,11 +189,13 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
     const ok = harness((n) =>
       n === 1 ? { status: 429, headers: { 'retry-after': '3' } } : { body: FIXTURE },
     );
-    expect(await ok.adapter.discover(CONFIG, { since: NOW })).toMatchObject({ ok: true });
+    expect(await ok.adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toMatchObject({
+      ok: true,
+    });
     expect(ok.state.sleeps).toContain(3_000);
 
     const never = harness(() => ({ status: 503 }));
-    expect(await never.adapter.discover(CONFIG, { since: NOW })).toMatchObject({
+    expect(await never.adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toMatchObject({
       ok: false,
       reason: 'rate_limited',
       httpStatus: 503,
@@ -197,7 +203,7 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
     expect(never.state.log).toHaveLength(3);
 
     const long = harness(() => ({ status: 429, headers: { 'retry-after': '600' } }));
-    expect(await long.adapter.discover(CONFIG, { since: NOW })).toMatchObject({
+    expect(await long.adapter.discover(CONFIG, { since: NOW, seen: new Set() })).toMatchObject({
       ok: false,
       reason: 'rate_limited',
       retryAfterMs: 600_000,
@@ -207,13 +213,21 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
 
   it('turns transport errors and bad bodies into explicit failures', async () => {
     expect(
-      await harness(() => new HttpFetchError('timeout')).adapter.discover(CONFIG, { since: NOW }),
+      await harness(() => new HttpFetchError('timeout')).adapter.discover(CONFIG, {
+        since: NOW,
+        seen: new Set(),
+      }),
     ).toEqual({ ok: false, reason: 'timeout' });
     expect(
-      await harness(() => new HttpFetchError('too_large')).adapter.discover(CONFIG, { since: NOW }),
+      await harness(() => new HttpFetchError('too_large')).adapter.discover(CONFIG, {
+        since: NOW,
+        seen: new Set(),
+      }),
     ).toEqual({ ok: false, reason: 'too_large' });
     for (const body of ['not json', '[]', '{"items":[]}', 'null']) {
-      expect(await harness(() => ({ body })).adapter.discover(CONFIG, { since: NOW })).toEqual({
+      expect(
+        await harness(() => ({ body })).adapter.discover(CONFIG, { since: NOW, seen: new Set() }),
+      ).toEqual({
         ok: false,
         reason: 'invalid_feed',
       });

@@ -20,6 +20,8 @@ export interface NewSignal {
   jobRunId?: number | null;
   /** S-18 D-2: validated `TenderFacts` JSON; null for everything but a tender notice. */
   tenderJson?: string | null;
+  /** S-19 D-2: validated `BountyFacts` JSON; null for everything but a bounty issue. */
+  bountyJson?: string | null;
 }
 
 export interface NewEvidence {

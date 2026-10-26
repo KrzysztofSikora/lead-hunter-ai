@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
-import { TenderFacts } from './opportunities.js';
-import { BzpConfig, Source, SourceFilter, TedConfig, UpdateSourceRequest } from './sources.js';
+import { BountyFacts, TenderFacts } from './opportunities.js';
+import {
+  BzpConfig,
+  GithubSearchConfig,
+  OpireConfig,
+  Source,
+  SourceFilter,
+  TedConfig,
+  UpdateSourceRequest,
+} from './sources.js';
 
 const filter = (over: object) => ({ enabled: true, include: [], exclude: [], ...over });
 
@@ -37,6 +45,7 @@ describe('SourceFilter (S-17 D-2, D-16)', () => {
       lastAttemptAt: null,
       lastSuccessAt: null,
       tender: null,
+      github: null,
       lastError: null,
       nextAllowedAt: null,
     };
@@ -143,5 +152,88 @@ describe('TenderFacts (S-18 D-2)', () => {
     ['an unknown key', { extra: 1 }],
   ])('rejects %s', (_name, over) => {
     expect(TenderFacts.safeParse({ ...facts, ...over }).success).toBe(false);
+  });
+});
+
+describe('GithubSearchConfig (S-19 D-3)', () => {
+  const config = (over: object = {}) => ({
+    labels: ['bounty', 'paid', '💎 Bounty'],
+    languages: ['TypeScript'],
+    ...over,
+  });
+
+  it('accepts the defaults and an empty language list', () => {
+    expect(GithubSearchConfig.safeParse(config()).success).toBe(true);
+    expect(GithubSearchConfig.safeParse(config({ languages: [] })).success).toBe(true);
+  });
+
+  it.each<[string, object]>([
+    ['no label', { labels: [] }],
+    ['11 labels', { labels: Array.from({ length: 11 }, (_, n) => `l${n}`) }],
+    ['a case-insensitive duplicate label', { labels: ['Bounty', 'bounty'] }],
+    ['a quote in a label', { labels: ['a"b'] }],
+    ['a control character in a label', { labels: ['a\nb'] }],
+    ['a 51-character label', { labels: ['x'.repeat(51)] }],
+    ['a language off the list', { languages: ['Brainfuck'] }],
+    ['a duplicate language', { languages: ['Go', 'Go'] }],
+    ['six languages', { languages: ['Go', 'Rust', 'C', 'R', 'Lua', 'Zig'] }],
+    ['an unknown key', { query: 'x' }],
+  ])('rejects %s', (_name, over) => {
+    expect(GithubSearchConfig.safeParse(config(over)).success).toBe(false);
+  });
+
+  it('refuses ten long labels whose query would pass 256 characters, and accepts a shorter set', () => {
+    const long = Array.from({ length: 10 }, (_, n) => `${n}`.padEnd(40, 'x'));
+    const refused = GithubSearchConfig.safeParse(config({ labels: long }));
+    expect(refused.success).toBe(false);
+    expect(GithubSearchConfig.safeParse(config({ labels: long.slice(0, 4) })).success).toBe(true);
+  });
+
+  it('is accepted by UpdateSourceRequest alone, and OpireConfig takes nothing', () => {
+    expect(UpdateSourceRequest.safeParse({ github: config() }).success).toBe(true);
+    expect(UpdateSourceRequest.safeParse({ github: config({ labels: [] }) }).success).toBe(false);
+    expect(OpireConfig.safeParse({}).success).toBe(true);
+    expect(OpireConfig.safeParse({ x: 1 }).success).toBe(false);
+  });
+});
+
+describe('BountyFacts (S-19 D-2)', () => {
+  const facts = (over: object = {}) => ({
+    platform: 'github',
+    repository: 'demo-org/demo-repo',
+    issueNumber: 12,
+    labels: ['bounty'],
+    reward: { amountMinor: 15_000, currency: 'USD', quote: '$150' },
+    ...over,
+  });
+
+  it('accepts a stated reward and a missing one', () => {
+    expect(BountyFacts.safeParse(facts()).success).toBe(true);
+    expect(BountyFacts.safeParse(facts({ reward: null })).success).toBe(true);
+  });
+
+  it.each<[string, object]>([
+    ['an unknown platform', { platform: 'gitlab' }],
+    ['a 40-character owner', { repository: `${'a'.repeat(40)}/repo` }],
+    ['a dot-dot repository', { repository: 'owner/..' }],
+    ['a dot repository', { repository: 'owner/.' }],
+    ['a query in the repository', { repository: 'owner/repo?x' }],
+    ['an encoded dot-dot', { repository: 'owner/%2e%2e' }],
+    ['three path parts', { repository: 'a/b/c' }],
+    ['issue number 0', { issueNumber: 0 }],
+    ['issue number over 10^9', { issueNumber: 1_000_000_001 }],
+    ['21 labels', { labels: Array.from({ length: 21 }, (_, n) => `l${n}`) }],
+    ['a 51-character label', { labels: ['x'.repeat(51)] }],
+    ['a zero reward', { reward: { amountMinor: 0, currency: 'USD', quote: '$0' } }],
+    ['a huge reward', { reward: { amountMinor: 10 ** 11 + 1, currency: 'USD', quote: '$1' } }],
+    ['a fractional reward', { reward: { amountMinor: 1.5, currency: 'USD', quote: '$1' } }],
+    ['an unknown currency', { reward: { amountMinor: 100, currency: 'XYZ', quote: '1' } }],
+    [
+      'a 201-character quote',
+      { reward: { amountMinor: 100, currency: 'USD', quote: 'q'.repeat(201) } },
+    ],
+    ['an unknown key', { extra: 1 }],
+  ])('rejects %s', (_name, over) => {
+    expect(BountyFacts.safeParse(facts(over)).success).toBe(false);
   });
 });

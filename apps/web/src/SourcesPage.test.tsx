@@ -24,6 +24,7 @@ const bzp = {
   name: 'DEMO BZP',
   url: 'https://ezamowienia.gov.pl/mo-board/api/v1/notice',
   tender: { cpvPrefixes: ['72', '48', '73'], countries: null },
+  github: null,
 };
 const ted = {
   ...base,
@@ -32,6 +33,7 @@ const ted = {
   name: 'DEMO TED',
   url: 'https://api.ted.europa.eu/v3/notices/search',
   tender: { cpvPrefixes: ['72'], countries: ['PL'] },
+  github: null,
 };
 const feed = {
   ...base,
@@ -40,6 +42,7 @@ const feed = {
   name: 'DEMO RSS',
   url: 'https://example.com/feed',
   tender: null,
+  github: null,
 };
 
 function stubApi(
@@ -134,4 +137,65 @@ it('shows a generic error when the save fails', async () => {
   render(<SourcesPage />);
   fireEvent.click(await screen.findByText(t.tender.save));
   await screen.findByText(t.tender.saveFailed);
+});
+
+const github = {
+  ...base,
+  id: 4,
+  type: 'github',
+  name: 'DEMO GitHub',
+  url: 'https://api.github.com/search/issues',
+  tender: null,
+  github: { labels: ['bounty', 'paid'], languages: ['TypeScript', 'Go'] },
+};
+
+it('sends PATCH { github } with trimmed, deduplicated lines and shows the API endpoint', async () => {
+  const patches = stubApi([github, feed], (body) => {
+    const g = (body as { github: { labels: string[]; languages: string[] } }).github;
+    return new Response(JSON.stringify({ ...github, github: g }));
+  });
+  render(<SourcesPage />);
+  await screen.findByText('DEMO GitHub');
+  expect(screen.getByText(github.url)).toBeTruthy();
+  expect(screen.getAllByLabelText(t.github.labelsLabel)).toHaveLength(1);
+  fireEvent.change(screen.getByLabelText(t.github.languagesLabel), {
+    target: { value: ' typescript \n\nTypeScript\n' },
+  });
+  fireEvent.change(screen.getByLabelText(t.github.labelsLabel), {
+    target: { value: 'bounty\n Bounty \n💎 Bounty' },
+  });
+  fireEvent.click(screen.getByText(t.github.save));
+  await screen.findByText(t.github.saved);
+  expect(patches).toEqual([
+    {
+      url: '/api/sources/4',
+      body: { github: { labels: ['bounty', '💎 Bounty'], languages: ['TypeScript'] } },
+    },
+  ]);
+});
+
+it('refuses an unknown language before sending and shows a server issue next to the typed values', async () => {
+  const patches = stubApi(
+    [github],
+    () =>
+      new Response(
+        JSON.stringify({
+          error: 'validation_failed',
+          fields: [
+            { path: 'github', code: 'invalid', message: 'Etykieta występuje więcej niż raz.' },
+          ],
+        }),
+        { status: 400 },
+      ),
+  );
+  render(<SourcesPage />);
+  const languages = await screen.findByLabelText(t.github.languagesLabel);
+  fireEvent.change(languages, { target: { value: 'Klingon' } });
+  fireEvent.click(screen.getByText(t.github.save));
+  await screen.findByText(t.github.unknownLanguage('Klingon'));
+  expect(patches).toHaveLength(0);
+  fireEvent.change(languages, { target: { value: 'Rust' } });
+  fireEvent.click(screen.getByText(t.github.save));
+  await screen.findByText('Etykieta występuje więcej niż raz.');
+  expect((languages as HTMLTextAreaElement).value).toBe('Rust');
 });
