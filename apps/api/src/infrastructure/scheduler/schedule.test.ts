@@ -56,6 +56,56 @@ describe('startScheduler', () => {
     },
   );
 
+  it.each([
+    [
+      'autumn change (2026-10-25)',
+      '2026-10-24T22:00:00Z',
+      '2026-10-25T22:00:00Z',
+      '2026-10-25T02:30:00.000Z',
+    ],
+    [
+      'spring change (2027-03-28)',
+      '2027-03-27T22:00:00Z',
+      '2027-03-28T22:00:00Z',
+      '2027-03-28T01:30:00.000Z',
+    ],
+    [
+      'an ordinary winter day',
+      '2026-12-01T00:00:00Z',
+      '2026-12-02T00:00:00Z',
+      '2026-12-01T02:30:00.000Z',
+    ],
+  ])(
+    'runs the maintenance exactly once at 03:30 Warsaw across %s',
+    { timeout: 30_000 },
+    async (_name, from, until, expected) => {
+      vi.useFakeTimers({ now: new Date(from) });
+      const runs: string[] = [];
+      scheduler = startScheduler({
+        times: ['08:00'],
+        onSlot: () => undefined,
+        analysisTick: () => undefined,
+        maintenance: () => runs.push(new Date().toISOString()),
+        tickMs: 24 * HOUR,
+        clock,
+      });
+      await vi.advanceTimersByTimeAsync(Date.parse(until) - Date.parse(from));
+      expect(runs).toEqual([expected]);
+    },
+  );
+
+  it('keeps the maintenance out of nextRunAt', () => {
+    vi.useFakeTimers({ now: new Date('2026-11-02T00:00:00Z') });
+    scheduler = startScheduler({
+      times: ['08:00'],
+      onSlot: () => undefined,
+      analysisTick: () => undefined,
+      maintenance: () => undefined,
+      clock,
+    });
+    expect(scheduler.nextRunAt()?.toISOString()).toBe('2026-11-02T07:00:00.000Z');
+  });
+
   it('gives an early fire the same slot key as the exact minute', async () => {
     vi.useFakeTimers({ now: new Date('2026-11-02T06:59:59.990Z') });
     const slots: number[] = [];

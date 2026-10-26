@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ConfigError, ENV_VARIABLES, loadConfig } from './env.js';
 import { DEFAULT_LLM_PRICES } from './llm-prices.js';
@@ -23,6 +24,8 @@ describe('loadConfig', () => {
       sourceMinIntervalMinutes: 60,
       sourceMaxAttempts: 3,
       discoveryTimes: ['08:00', '18:00'],
+      backupDir: resolve('./data/backups'),
+      backupKeep: 14,
     });
   });
 
@@ -44,6 +47,8 @@ describe('loadConfig', () => {
         SOURCE_MIN_INTERVAL_MINUTES: '120',
         SOURCE_MAX_ATTEMPTS: '2',
         DISCOVERY_TIMES: '18:30, 07:15',
+        BACKUP_DIR: '/mnt/copies',
+        BACKUP_KEEP: '30',
         ...HASH,
       }),
     ).toEqual({
@@ -63,7 +68,13 @@ describe('loadConfig', () => {
       sourceMinIntervalMinutes: 120,
       sourceMaxAttempts: 2,
       discoveryTimes: ['07:15', '18:30'],
+      backupDir: '/mnt/copies',
+      backupKeep: 30,
     });
+  });
+
+  it('puts the backups under DATA_DIR by default', () => {
+    expect(loadConfig({ DATA_DIR: '/srv/lh' }).backupDir).toBe('/srv/lh/backups');
   });
 
   it('treats an empty string as unset', () => {
@@ -112,6 +123,9 @@ describe('loadConfig', () => {
     ['SOURCE_MIN_INTERVAL_MINUTES', '1441'],
     ['SOURCE_MAX_ATTEMPTS', '0'],
     ['SOURCE_MAX_ATTEMPTS', '6'],
+    ['BACKUP_KEEP', '0'],
+    ['BACKUP_KEEP', '366'],
+    ['BACKUP_DIR', '   '],
     ['DISCOVERY_TIMES', '8:00'],
     ['DISCOVERY_TIMES', '24:00'],
     ['DISCOVERY_TIMES', '02:30'],

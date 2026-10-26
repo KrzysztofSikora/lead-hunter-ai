@@ -264,7 +264,7 @@ The operator owns their data and can get it back after a failure:
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Delete an opportunity (API, spend kept)
 - [x] Phase 2: Export and the UI (delete button, export link)
-- [ ] Phase 3: Backup command and daily job
+- [x] Phase 3: Backup command and daily job
 - [ ] Phase 4: Retention
 - [ ] Phase 5: Restore procedure, tested in CI
 
@@ -272,6 +272,7 @@ The operator owns their data and can get it back after a failure:
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 2) At phone width the *Usuń okazję* two-step confirm on a card reads clearly and cannot be hit by accident — run: `docker compose up --build`, open an opportunity, narrow the window to ~375 px, tap *Usuń okazję*, then *Anuluj* — evidence: none (Chromium is not installed in the autonomous run; take screenshots with `E2E_EVIDENCE=1 pnpm e2e` after `pnpm exec playwright install chromium` if wanted)
 - [ ] (Phase 2) The *Eksportuj dane (JSON)* link in *Profil* downloads `lead-hunter-export-<date>.json` that opens as JSON — run: `docker compose up --build`, log in, open *Profil*, click the link — evidence: none (the response is asserted in `apps/api/test/data-export.int.test.ts`)
+- [ ] (Phase 3) On the Pi, the backup command writes a file owned by uid 1000 — run: `docker compose exec app node apps/api/dist/cli/backup.js`, then `ls -l data/backups/` — evidence: none (needs the Pi; the CLI is covered by `apps/api/test/cli.int.test.ts`)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -284,6 +285,11 @@ The operator owns their data and can get it back after a failure:
 - [minor] `.gitignore` has `data/`, which hid the new module `apps/api/src/modules/data/`; added the negation `!apps/api/src/modules/data/`.
 - [minor] `POST /api/opportunities/:id/payments` answers `200` (not `201`); the phase 1 test asserts what the route does.
 - Plan-review majors (answered before implementing, per lesson): #3 phase 2 uses an explicit per-table column allowlist in `data-repository.ts` plus a test comparing `getTableColumns` with allowlist + "not exported" list; #1 phase 3 bounds the writer in the test and passes a large `progress` page count / aborts after bounded restarts; #2 phase 5 restores from a backup of a DB migrated only up to an earlier journal entry and asserts `0013` applies, and the smoke restores in place on the same volume.
+- [minor] Plan-review #1: `write()` copies in one step (`progress` returns a huge page count), so a writer on another connection cannot restart it between steps; the test uses a bounded writer and asserts every row committed before `write()` started is in the copy and `quick_check` is `ok`. No restart-limit error was added.
+- [minor] Plan-review #9: a second copy in the same UTC second is refused (`kopia … już istnieje`) and left alone; `.partial` files are removed by the rotation only when older than 10 minutes.
+- [minor] The copy is switched to `journal_mode = DELETE` before the check, so a backup is one self-contained file (no `-wal`/`-shm` to match when restoring).
+- [minor] Plan-review #6: `runDaily()` never rejects (tested with a throwing store); the scheduler's maintenance cron is kept out of `nextRunAt()`, which stays the next discovery slot.
+- [minor] The CLI test for the failing directory uses a path below a regular file, since a read-only directory does not fail for root.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

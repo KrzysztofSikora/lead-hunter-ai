@@ -15,6 +15,7 @@
     "start": "pnpm --filter @lead-hunter/api start",
     "db:migrate": "pnpm --filter @lead-hunter/api db:migrate",
     "auth:hash": "pnpm --filter @lead-hunter/api auth:hash",
+    "backup": "pnpm --filter @lead-hunter/api backup",
     "discover": "pnpm --filter @lead-hunter/api discover",
     "seed:demo": "pnpm --filter @lead-hunter/api seed:demo",
     "fixtures:record": "pnpm --filter @lead-hunter/api fixtures:record",

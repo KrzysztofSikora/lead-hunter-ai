@@ -23,3 +23,10 @@ export interface DataRepository {
   /** Allowlisted columns only; secrets and runtime state are never selected. */
   exportAll(): ExportTables;
 }
+
+export interface BackupStore {
+  /** Writes a verified, self-contained copy of the database. Rejects without leaving a file. */
+  write(at: Date): Promise<{ file: string; bytes: number }>;
+  /** Deletes copies beyond the newest `keep`; returns the removed paths. Foreign files stay. */
+  prune(keep: number): string[];
+}
