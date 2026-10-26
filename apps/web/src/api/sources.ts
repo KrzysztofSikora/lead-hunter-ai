@@ -5,6 +5,7 @@ import {
   SourceRunResult,
   ValidationError,
   type CreateSourceRequest,
+  type UpdateSourceRequest,
 } from '@lead-hunter/contracts';
 import { apiFetch } from './client.js';
 import type { FieldError } from './profile.js';
@@ -43,11 +44,11 @@ export async function createSource(body: CreateSourceRequest): Promise<CreateOut
   throw new Error(`create source failed: ${response.status}`);
 }
 
-export async function setSourceEnabled(id: number, enabled: boolean): Promise<Source> {
+export async function updateSource(id: number, patch: UpdateSourceRequest): Promise<Source> {
   const response = await apiFetch(`/api/sources/${id}`, {
     method: 'PATCH',
     headers: json,
-    body: JSON.stringify({ enabled }),
+    body: JSON.stringify(patch),
   });
   if (!response.ok) throw new Error(`update source failed: ${response.status}`);
   return Source.parse(await response.json());

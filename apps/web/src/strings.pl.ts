@@ -146,8 +146,19 @@ export const strings = {
     tooSoon: (time: string) => `Następna próba możliwa o ${time}.`,
     sourceDisabled: 'Źródło jest wyłączone.',
     notFound: 'Nie znaleziono źródła.',
-    runDone: (n: number, dup: number, failed: number) =>
-      `Pobrano: nowe ${n}, duplikaty ${dup}, pominięte ${failed}.`,
+    runDone: (n: number, dup: number, failed: number, filtered: number) =>
+      `Pobrano: nowe ${n}, duplikaty ${dup}, pominięte ${failed}, odrzucone przez filtr źródła ${filtered}.`,
+    withdrawn: 'preset wycofany',
+    filter: {
+      title: 'Filtr źródła',
+      enabled: 'Filtr włączony',
+      excludeLabel: 'Odrzucaj, gdy zawiera (jedna fraza w wierszu)',
+      includeLabel: 'Wymagaj jednej z fraz (jedna fraza w wierszu)',
+      save: 'Zapisz filtr',
+      saving: 'Zapisywanie…',
+      saved: 'Filtr zapisany.',
+      saveFailed: 'Nie udało się zapisać filtru. Sprawdź frazy (do 30, do 100 znaków).',
+    },
     runFailed: (reason: string) => `Błąd pobierania: ${reason}.`,
     checkOk: (time: string) => `Kanał odpowiada (${time}).`,
     checkFailed: (reason: string) => `Kanał nie odpowiada: ${reason}.`,
@@ -184,6 +195,7 @@ export const strings = {
       analysed: 'przeanalizowane',
       failed: 'błędy',
       skipped: 'pominięte',
+      sourceFiltered: 'odrzucone przez filtr źródła',
     },
   },
   pipeline: {
@@ -340,6 +352,7 @@ export const strings = {
     excluded_technology: 'wykluczona technologia',
     excluded_category: 'wykluczona kategoria',
     no_profile_match: 'brak dopasowania do profilu',
+    source_filter: 'filtr źródła',
   },
   import: {
     title: 'Import ogłoszenia',
@@ -565,6 +578,7 @@ export const strings = {
       reason: 'powód',
       prefilter: (rule: string) => `filtr wstępny: ${rule}`,
       insufficientData: 'za mało danych do oceny',
+      sourceFilter: (phrase: string | null) => `filtr źródła: ${phrase ?? 'brak frazy'}`,
       skipped: (stages: string) => `pominięto: ${stages}`,
       contract: (value: string) => `umowa: ${value}`,
       contractDates: (start: string | null, end: string | null) =>

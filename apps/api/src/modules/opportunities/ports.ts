@@ -39,6 +39,7 @@ export interface OpportunityRow {
   lastVerifiedAt: number | null;
   prefilterRule: PrefilterRule | null;
   prefilterMatches: number | null;
+  prefilterPhrase: string | null;
   /** Null until the pre-filter has run. */
   prefilterAt: number | null;
   language: 'pl' | 'en' | null;

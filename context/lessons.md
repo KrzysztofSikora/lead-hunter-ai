@@ -56,6 +56,18 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Scope: `context/changes/*/plan.md`, `/plan` revise mode and `/implement`
 - Status: proposed in the PR for scheduler-and-jobs
 
+## When a per-source rule writes to a shared, deduplicated record, decide and test what a second source that disagrees does
+- Why: the first source to store an item decided it for every later source, depending on run order, and nothing recorded or tested that.
+- Seen in: demand-sources, R1
+- Scope: `apps/api/src/modules/sources/`, `apps/api/src/modules/signals/`
+- Status: proposed in the PR for demand-sources
+
+## For every on/off switch an acceptance criterion names, test the off state with input that the on state would reject
+- Why: an off state tested only with empty settings or duplicate input leaves the switch unchecked, so dropping it breaks nothing.
+- Seen in: demand-sources, R2
+- Scope: integration tests for settings with an `enabled` flag
+- Status: proposed in the PR for demand-sources
+
 ## Assert the exact outcome of a race test, and check it fails when the guard it names is removed
 - Why: a test whose assertion accepts either branch (`<= 1`) passed while the guard it was written for was never exercised.
 - Seen in: analysis-observability, R2

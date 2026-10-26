@@ -14,6 +14,7 @@ import styles from './OpportunitiesPage.module.css';
 import { getAnalysisStatus } from './api/analysis.js';
 import { formatUsd } from './usd.js';
 import { listOpportunities, PAGE_SIZE, type ListFilters } from './api/opportunities.js';
+import { prefilterReason } from './opportunityCard.js';
 import { strings } from './strings.pl.js';
 import { formatWarsaw, isCalendarDate, warsawDayEnd, warsawDayStart } from './warsawTime.js';
 
@@ -376,7 +377,7 @@ function analysisLabel(item: OpportunitySummary): string {
       return t.analysisComplete;
     case 'SKIPPED':
       return item.prefilter?.rule
-        ? t.skippedBecause(strings.prefilterRules[item.prefilter.rule])
+        ? t.skippedBecause(prefilterReason(item.prefilter.rule, item.prefilter.phrase))
         : t.analysisSkipped;
     default:
       return t.analysisFailed;

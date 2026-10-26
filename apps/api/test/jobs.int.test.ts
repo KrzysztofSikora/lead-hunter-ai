@@ -16,17 +16,18 @@ import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/
 const feed = (name: string): string =>
   readFileSync(fileURLToPath(new URL(`./fixtures/feeds/${name}`, import.meta.url)), 'utf8');
 const WWR_FEED = feed('synthetic-wwr-programming.xml');
+const HN_FEED = feed('synthetic-hnrss-freelance.xml');
 
-const WWR = 'https://weworkremotely.com';
+const FL = 'https://www.freelancer.com';
 const HN = 'https://hnrss.org';
 const answers = new Map<string, { status: number; body?: string }>();
 
 beforeAll(() => {
   const agent = getGlobalDispatcher() as unknown as MockAgent;
   for (const [origin, path] of [
-    [WWR, '/categories/remote-programming-jobs.rss'],
+    [FL, '/rss.xml?keyword=arduino'],
     [HN, '/whoishiring/freelance'],
-    [WWR, '/robots.txt'],
+    [FL, '/robots.txt'],
     [HN, '/robots.txt'],
   ] as const) {
     agent
@@ -46,7 +47,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   answers.clear();
-  answers.set(`${WWR}/robots.txt`, { status: 404 });
+  answers.set(`${FL}/robots.txt`, { status: 404 });
   answers.set(`${HN}/robots.txt`, { status: 404 });
 });
 
@@ -94,13 +95,37 @@ function harness(clock = new FakeClock()) {
 }
 
 describe('job lock and cycle history (FR-17)', () => {
+  it('reports the items a source filter rejected on the run and its cycle (FR-31 AC3)', async () => {
+    answers.set(`${HN}/whoishiring/freelance`, { status: 200, body: HN_FEED });
+    const { app, jobs } = await buildTestApp({ clock: new FakeClock() });
+    const cookie = await loginAsOperator(app);
+    const created = await app.inject({
+      method: 'POST',
+      url: '/api/sources',
+      headers: { cookie },
+      payload: { preset: 'hn-freelance' },
+    });
+    expect(created.statusCode).toBe(201);
+    const started = jobs.startCycle('manual');
+    if (started.kind !== 'started') throw new Error('cycle did not start');
+    await started.done;
+
+    const listed = await app.inject({ method: 'GET', url: '/api/jobs', headers: { cookie } });
+    const items = listed.json().items as { type: string; counters: Record<string, number> }[];
+    for (const type of ['discovery', 'source_run']) {
+      const counters = items.find((i) => i.type === type)?.counters;
+      expect(counters).toMatchObject({ new: 2, sourceFiltered: 1 });
+      expect(counters?.rejected).toBeGreaterThanOrEqual(1);
+    }
+  });
+
   it('runs a cycle with one failing source as partial and links signals to their run (AC5)', async () => {
-    answers.set(`${WWR}/categories/remote-programming-jobs.rss`, { status: 200, body: WWR_FEED });
+    answers.set(`${FL}/rss.xml?keyword=arduino`, { status: 200, body: WWR_FEED });
     answers.set(`${HN}/whoishiring/freelance`, { status: 500, body: 'oops' });
     const clock = new FakeClock();
     const { app, jobs, dir } = await buildTestApp({ clock });
     const cookie = await loginAsOperator(app);
-    for (const preset of ['wwr-programming', 'hn-freelance']) {
+    for (const preset of ['freelancer-arduino', 'hn-freelance']) {
       const res = await app.inject({
         method: 'POST',
         url: '/api/sources',
@@ -366,7 +391,7 @@ async function addPresets(
   app: Awaited<ReturnType<typeof buildTestApp>>['app'],
   cookie: string,
 ): Promise<void> {
-  for (const preset of ['wwr-programming', 'hn-freelance']) {
+  for (const preset of ['freelancer-arduino', 'hn-freelance']) {
     const res = await app.inject({
       method: 'POST',
       url: '/api/sources',
@@ -379,7 +404,7 @@ async function addPresets(
 
 describe('jobs API (FR-17, FR-18)', () => {
   it('lists a partial cycle with its source runs and live counters, and a retry changes them (AC5, FR-18)', async () => {
-    answers.set(`${WWR}/categories/remote-programming-jobs.rss`, {
+    answers.set(`${FL}/rss.xml?keyword=arduino`, {
       status: 200,
       body: FEED_WITH_BLANK,
     });
@@ -473,7 +498,7 @@ describe('jobs API (FR-17, FR-18)', () => {
   });
 
   it('refuses a second cycle and a source run while one is live (AC2, AC4)', async () => {
-    answers.set(`${WWR}/categories/remote-programming-jobs.rss`, { status: 200, body: WWR_FEED });
+    answers.set(`${FL}/rss.xml?keyword=arduino`, { status: 200, body: WWR_FEED });
     const clock = new FakeClock();
     const { app, jobs } = await buildTestApp({ clock });
     const cookie = await loginAsOperator(app);
@@ -509,7 +534,7 @@ describe('jobs API (FR-17, FR-18)', () => {
   });
 
   it('retries a failed source run once the feed recovers without duplicating signals (FR-18 AC2)', async () => {
-    answers.set(`${WWR}/categories/remote-programming-jobs.rss`, { status: 500, body: 'oops' });
+    answers.set(`${FL}/rss.xml?keyword=arduino`, { status: 500, body: 'oops' });
     const clock = new FakeClock();
     const { app, runner } = await buildTestApp({ clock });
     const cookie = await loginAsOperator(app);
@@ -517,7 +542,7 @@ describe('jobs API (FR-17, FR-18)', () => {
       method: 'POST',
       url: '/api/sources',
       headers: { cookie },
-      payload: { preset: 'wwr-programming' },
+      payload: { preset: 'freelancer-arduino' },
     });
 
     const failed = await app.inject({
@@ -528,7 +553,7 @@ describe('jobs API (FR-17, FR-18)', () => {
     expect(failed.statusCode).toBe(200);
     expect(failed.json()).toMatchObject({ status: 'failed', new: 0 });
 
-    answers.set(`${WWR}/categories/remote-programming-jobs.rss`, { status: 200, body: WWR_FEED });
+    answers.set(`${FL}/rss.xml?keyword=arduino`, { status: 200, body: WWR_FEED });
     clock.advance(24 * 60 * 60_000);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       const run = await app.inject({
@@ -553,7 +578,7 @@ describe('jobs API (FR-17, FR-18)', () => {
   });
 
   it('retries a failed analysis into the same opportunity and updates the run counters (FR-18 AC2)', async () => {
-    answers.set(`${WWR}/categories/remote-programming-jobs.rss`, { status: 200, body: WWR_FEED });
+    answers.set(`${FL}/rss.xml?keyword=arduino`, { status: 200, body: WWR_FEED });
     let calls = 0;
     const real = new MockProvider();
     const flaky: LlmProvider = {
@@ -576,7 +601,7 @@ describe('jobs API (FR-17, FR-18)', () => {
       method: 'POST',
       url: '/api/sources',
       headers: { cookie },
-      payload: { preset: 'wwr-programming' },
+      payload: { preset: 'freelancer-arduino' },
     });
     await app.inject({ method: 'POST', url: '/api/sources/1/run', headers: { cookie } });
     await runner.drain();

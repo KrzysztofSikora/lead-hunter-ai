@@ -1,12 +1,19 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import type { JobList, JobRun, Source, SourceList, SourcePreset } from '@lead-hunter/contracts';
+import type {
+  JobList,
+  JobRun,
+  Source,
+  SourceFilter,
+  SourceList,
+  SourcePreset,
+} from '@lead-hunter/contracts';
 import styles from './SourcesPage.module.css';
 import {
   checkSource,
   createSource,
   listSources,
   runSource,
-  setSourceEnabled,
+  updateSource,
   type CreateOutcome,
   type Outcome,
 } from './api/sources.js';
@@ -44,6 +51,93 @@ function refusalText(outcome: Exclude<Outcome<unknown>, { ok: true }>): string {
   }
 }
 
+/** D-16: one phrase per line; trimmed, blank lines dropped, case-insensitive duplicates dropped. */
+function toPhrases(text: string): string[] {
+  const seen = new Set<string>();
+  const phrases: string[] = [];
+  for (const line of text.split('\n')) {
+    const phrase = line.trim();
+    const key = phrase.toLowerCase();
+    if (phrase === '' || seen.has(key)) continue;
+    seen.add(key);
+    phrases.push(phrase);
+  }
+  return phrases;
+}
+
+/** D-14: the switch saves at once and keeps the phrases; the phrases save with the button. */
+function FilterEditor({ source, onChanged }: { source: Source; onChanged: () => void }) {
+  const f = t.filter;
+  const [exclude, setExclude] = useState(source.filter.exclude.join('\n'));
+  const [include, setInclude] = useState(source.filter.include.join('\n'));
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+
+  async function save(filter: SourceFilter, done: string | null) {
+    setPending(true);
+    setMessage(null);
+    try {
+      const saved = await updateSource(source.id, { filter });
+      if (done) {
+        setExclude(saved.filter.exclude.join('\n'));
+        setInclude(saved.filter.include.join('\n'));
+      }
+      setMessage(done ? { kind: 'ok', text: done } : null);
+      onChanged();
+    } catch {
+      setMessage({ kind: 'error', text: f.saveFailed });
+    }
+    setPending(false);
+  }
+
+  const phrases = () => ({ include: toPhrases(include), exclude: toPhrases(exclude) });
+
+  return (
+    <fieldset className={styles.filter}>
+      <legend>{f.title}</legend>
+      <label className={styles.check}>
+        <input
+          type="checkbox"
+          checked={source.filter.enabled}
+          disabled={pending}
+          onChange={(event) => save({ ...source.filter, enabled: event.target.checked }, null)}
+        />{' '}
+        {f.enabled}
+      </label>
+      <div className={styles.field}>
+        <label htmlFor={`exclude-${source.id}`}>{f.excludeLabel}</label>
+        <textarea
+          id={`exclude-${source.id}`}
+          rows={3}
+          value={exclude}
+          onChange={(event) => setExclude(event.target.value)}
+        />
+      </div>
+      <div className={styles.field}>
+        <label htmlFor={`include-${source.id}`}>{f.includeLabel}</label>
+        <textarea
+          id={`include-${source.id}`}
+          rows={3}
+          value={include}
+          onChange={(event) => setInclude(event.target.value)}
+        />
+      </div>
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => save({ enabled: source.filter.enabled, ...phrases() }, f.saved)}
+      >
+        {pending ? f.saving : f.save}
+      </button>
+      {message && (
+        <p role="status" className={message.kind === 'ok' ? styles.ok : styles.error}>
+          {message.text}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
 function SourceItem({ source, onChanged }: { source: Source; onChanged: () => void }) {
   const [pending, setPending] = useState<'run' | 'check' | 'toggle' | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
@@ -60,7 +154,7 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
           setMessage(
             r.status === 'failed' && r.error
               ? { kind: 'error', text: t.runFailed(withStatus(r.error.reason, r.error.httpStatus)) }
-              : { kind: 'ok', text: t.runDone(r.new, r.duplicates, r.failed) },
+              : { kind: 'ok', text: t.runDone(r.new, r.duplicates, r.failed, r.filtered) },
           );
         }
       } else {
@@ -89,7 +183,7 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
     setPending('toggle');
     setMessage(null);
     try {
-      await setSourceEnabled(source.id, !source.enabled);
+      await updateSource(source.id, { enabled: !source.enabled });
       onChanged();
     } catch {
       setMessage({ kind: 'error', text: t.toggleFailed });
@@ -106,7 +200,10 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
 
   return (
     <li className={styles.item}>
-      <h3>{source.name}</h3>
+      <h3>
+        {source.name}
+        {source.presetWithdrawn && <span className={styles.badge}>{t.withdrawn}</span>}
+      </h3>
       <dl className={styles.facts}>
         <dt>{t.access}</dt>
         <dd>
@@ -143,6 +240,7 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
           </>
         )}
       </dl>
+      <FilterEditor source={source} onChanged={onChanged} />
       <div className={styles.actions}>
         <button type="button" disabled={busy || !source.enabled} onClick={() => perform('run')}>
           {pending === 'run' ? t.running : t.run}

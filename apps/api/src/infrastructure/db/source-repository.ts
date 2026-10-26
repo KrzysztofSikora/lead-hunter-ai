@@ -15,6 +15,7 @@ function toRecord(row: Row): SourceRecord {
     configKey: row.configKey,
     presetId: row.presetId,
     enabled: row.enabled,
+    filterJson: row.filterJson,
     cursorJson: row.cursorJson,
     nextAllowedAt: row.nextAllowedAt,
     lastAttemptAt: row.lastAttemptAt,
@@ -58,6 +59,7 @@ export function createSourceRepository(db: BetterSQLite3Database): SourceReposit
           configJson: source.configJson,
           configKey: source.configKey,
           presetId: source.presetId,
+          filterJson: source.filterJson,
           enabled: true,
           createdAt: source.at,
           updatedAt: source.at,
@@ -67,10 +69,14 @@ export function createSourceRepository(db: BetterSQLite3Database): SourceReposit
         .get();
       return row ? toRecord(row) : undefined;
     },
-    setEnabled(id, enabled, at) {
+    update(id, patch, at) {
       const row = db
         .update(sources)
-        .set({ enabled, updatedAt: at })
+        .set({
+          ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
+          ...(patch.filterJson === undefined ? {} : { filterJson: patch.filterJson }),
+          updatedAt: at,
+        })
         .where(eq(sources.id, id))
         .returning()
         .get();

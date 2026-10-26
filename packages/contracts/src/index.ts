@@ -96,6 +96,7 @@ export {
   CreateSourceRequest,
   RssConfig,
   Source,
+  SourceFilter,
   SourceHealth,
   SourceList,
   SourcePreset,

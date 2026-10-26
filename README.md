@@ -153,7 +153,7 @@ nieudany, a `integrity` wypisuje `ok`.
 |---------|--------|--------|
 | Import ręczny | wklejony tekst; adres tylko zapisywany lub pobierany na polecenie | `IMPORT_MAX_TEXT_CHARS`, `FETCH_*` |
 | RSS: hnrss.org (HN) | `GET` kanału, robots.txt sprawdzany | `SOURCE_MIN_INTERVAL_MINUTES`, `SOURCE_MAX_ATTEMPTS` |
-| RSS: We Work Remotely | oficjalne kanały kategorii | jak wyżej |
+| RSS: Freelancer.com, Arduino Forum | kanały projektów i forum zleceń | jak wyżej |
 | RSS: kanał własny | adres podany przez operatora | jak wyżej |
 
 ## Rozwój
@@ -203,8 +203,10 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   historią przebiegów, przebieg przerwany awarią oznaczany jako nieudany; lejek (`/lejek`):
   statusy okazji, kontakt, wygrana i zapis płatności (kwoty w groszach, waluta).
 - **Źródła RSS/Atom:** widok *Źródła* (`/zrodla`): dodanie gotowego kanału jednym kliknięciem
-  (Hacker News „Seeking freelancer", We Work Remotely: programming, full-stack, back-end, devops)
-  albo dowolnego adresu RSS/Atom, włączanie i wyłączanie, **Uruchom teraz** i **Sprawdź**, status
+  (Hacker News „Seeking freelancer", Freelancer.com: nodejs, react, typescript, arduino,
+  raspberry-pi, iot, 3d-printing, pcb-layout, ai-automation, Arduino Forum „Jobs and Paid
+  Consultancy") albo dowolnego adresu RSS/Atom, filtr źródła (frazy do wykluczenia i wymagane,
+  wpis odrzucony przez filtr trafia do *Okazji* jako odrzucony z powodem), włączanie i wyłączanie, **Uruchom teraz** i **Sprawdź**, status
   ostatniej próby i błąd z powodem. Wpisy trafiają do *Okazji* z nazwą źródła, bez duplikatów po
   ponownym odczycie. Odstęp między przebiegami jednego źródła: `SOURCE_MIN_INTERVAL_MINUTES`
   (domyślnie 60), ponowienia przy 429/503: `SOURCE_MAX_ATTEMPTS` (domyślnie 3). Zasady dostępu,
@@ -217,7 +219,7 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   (patrz `.env.example`).
 - **Co wymaga ręcznej weryfikacji:** prawdziwe analizy Anthropic i OpenAI-compatible (czy schemat
   jest przyjęty, czy `json_object` i zużycie tokenów działają u danego dostawcy), wygląd
-  komunikatów o limicie kosztów na telefonie, prawdziwe kanały hnrss.org i We Work Remotely (adresy
+  komunikatów o limicie kosztów na telefonie, prawdziwe kanały hnrss.org, Freelancer.com i Arduino Forum (adresy
   presetów w `apps/api/src/modules/sources/presets.ts`, format wpisów, regulaminy; agent nie miał
   do nich dostępu), widok *Źródła* na telefonie, nagranie fixture'ów poleceniem
   `pnpm fixtures:record <id źródła>` (zapisuje do `apps/api/test/fixtures/feeds/` pierwsze 5
