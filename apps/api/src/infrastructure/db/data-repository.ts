@@ -57,6 +57,7 @@ export const EXPORT_COLUMNS: Record<string, { exported: string[]; withheld: stri
       'lastVerifiedAt',
       'jobRunId',
       'tenderJson',
+      'bountyJson',
     ],
     withheld: [],
   },
