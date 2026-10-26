@@ -183,6 +183,8 @@ decided up front.
 | D-22 | How does the card tell "the source states no value" from "we could not read one" (plan-review 2)? | `TenderFacts.valueState` (`stated`, `absent`, `unknown`; optional, missing = `unknown`). The BZP mapper reads the value from notice HTML, so a miss is always `unknown`; `absent` is for an API that reports no value as structured data (TED). Phase 4's card shows "nie podano" tagged "ze źródła" only for `absent`. | B: `estimatedValue: 'not_stated' \| null` (same idea, but breaks the `{ amountMinor … } \| null` shape the guard and tests use). | Source facts, model inferences and unknowns stay separate (CLAUDE.md). | cheap | agent |
 | D-23 | Which page limit for the tender APIs (plan-review 13; replaces the 8 MiB of D-20)? | 5 MiB per list request (`BZP_MAX_BYTES`), the largest `FETCH_MAX_BYTES` allows. Over it the run is an explicit `too_large`. The buyer-check change (a forged `Zamawiający:` line) is Phase 4's. | B: keep 8 MiB (more memory on the Pi for no measured need). | A page of 100 notices should fit; the human check shows the real size. | cheap | agent |
 | D-24 | What spacing does BZP get (plan-review 7)? | 2 100 ms between any two requests of the adapter, a health check included (one shared `lastRequestAt`): at most 28 requests in 60 s against the guaranteed 30. Tests assert every gap on the injected clock. | B: 2 000 ms (30 in 60 s, no margin; a check before a run makes 31). | Leaves room for the clock jitter and for a check next to a run. | cheap | agent |
+| D-25 | Why is `qu-sy` left out of the TED query (plan-review 11)? | Only `cn-standard`, `cn-social`, `cn-desg`, `subco`, `pin-cfc-standard`, `pin-cfc-social` are asked for; the mapper also ignores any other type. | B: include `qu-sy` (utilities qualification systems; a call to qualify, but not a request for an offer). | Keeps the card to notices where a vendor can bid. | cheap | agent |
+| D-26 | Where does the TED country allow-list live (plan-review 6)? | `TED_COUNTRY_CODES` (alpha-2 to alpha-3, EU and EEA) in `packages/contracts/src/sources.ts`; the shared `countries` schema refuses a code outside it, so PATCH and presets are validated before storing. `query.ts` reads the same table. | B: `adapter.validateConfig` inside `update` (no contract change, but the web editor could not validate). | The contract package may not import infrastructure; one table serves both layers. Tested: PATCH `countries: ['US']` is 400. | cheap | agent |
 
 ## Design
 
@@ -423,13 +425,15 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Source types, tender facts storage and the POST client
 - [x] Phase 2: e-Zamówienia BZP adapter (checkpoint)
-- [ ] Phase 3: TED search adapter
+- [x] Phase 3: TED search adapter
 - [ ] Phase 4: Public-tender classification and the card
 - [ ] Phase 5: Sources view tender config and source policy
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 2) One real BZP run: result, one sample signal against its notice page, no 403 or 429, the response shape against `bzp/map-notice.ts` (field names, `noticeType` spelling, whether `htmlBody` and the value are present, the notice page URL), the page size in bytes, and the ignored/kept counts in the log — run: `pnpm db:migrate && pnpm dev`, add "e-Zamówienia (BZP) — IT i oprogramowanie" in Sources and press run, or `pnpm discover` with only it enabled; correct `map-notice.ts` / `adapter.ts` if the shape differs — evidence: none (needs the real API; the planning and implementing sessions could not reach it). Until this is ticked, Phases 3-4 build on an unverified shape.
+
+- [ ] (Phase 3) One real TED run: result, one sample signal against its notice page, the response shape against `ted/map-notice.ts` and `ted/query.ts` (field names, the `buyer-country` alpha-3 filter and date syntax in the query, date/time forms, multilingual objects, value fields, the link), requests per run and the page size in bytes — run: `pnpm db:migrate && pnpm dev`, add "TED — przetargi IT w Polsce" in Sources and press run, or `pnpm discover` with only it enabled; correct `ted/map-notice.ts` / `ted/query.ts` if the shape differs — evidence: none (needs the real API; the implementing session could not reach it).
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -446,6 +450,11 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 - [minor] (Phase 1) `createSourceRuntime` and `buildTestApp` take an `adapters` override (by source
   type) so integration tests register a fake tender adapter; the `bzp`/`ted` entries of the real
   registry arrive with Phases 2-3. `EvidenceLevel` stays unchanged until Phase 4, as the phase list says.
+- [minor] (Phase 3) Plan-review 6 (country allow-list) is answered by D-26; plan-review 11 by D-25. Plan-review 4 (manual import before a tender signal) is answered by a test: the first source owns the opportunity, the tender notice becomes `REPEAT_IMPORT` evidence and the manual opportunity has no tender facts. It still needs the line in `docs/source-policy.md` (Phase 5).
+- [minor] (Phase 3) Plan says TED pages in `ITERATION` mode, cap 5. Code reads UTC-day slices like BZP (D-21), so a first run makes at least 4 requests; a full page without `iterationNextToken` is a truncated (`partial`) run, never complete. A TED 403 is `http_status` (D-18), a 429/503 backs off as in BZP.
+- [minor] (Phase 3) TED field names, date forms (`2026-11-24+01:00` plus a separate time field), the multilingual objects and the HTML link shape are `UNVERIFIED` and sit in `ted/map-notice.ts` (`TED_FIELDS`) and `ted/query.ts`. A link outside `ted.europa.eu` is ignored; the notice page is then built from the publication number. The value is read from the procedure field, else from a single lot; several lots without a procedure value give `unknown`, not a sum. A missing value field is `absent` (D-22). `procedure` carries the TED notice-type code, not a label.
+- [minor] (Phase 3) `source-filter.test.ts` pinned the preset list; it now lists `ted-pl-it`.
+- [FOLLOW-UP] (Phase 3) `ted-page.json` is synthetic (the API was unreachable); replace it with a trimmed real page after the human check (D-14).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

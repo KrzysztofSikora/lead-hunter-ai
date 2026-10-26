@@ -86,6 +86,11 @@ describe('tender config (S-18 D-7)', () => {
       false,
     );
     expect(TedConfig.safeParse({ cpvPrefixes: ['72'], countries: [] }).success).toBe(false);
+    // Plan-review 6: a well-formed code that TED cannot be asked for is refused before storing.
+    expect(TedConfig.safeParse({ cpvPrefixes: ['72'], countries: ['US'] }).success).toBe(false);
+    expect(
+      UpdateSourceRequest.safeParse({ tender: { cpvPrefixes: ['72'], countries: ['US'] } }).success,
+    ).toBe(false);
     expect(TedConfig.safeParse({ cpvPrefixes: ['72'], countries: ['PL', 'DE'] }).success).toBe(
       true,
     );

@@ -2,14 +2,20 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { getGlobalDispatcher, type MockAgent } from 'undici';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { rawSignals } from '../src/infrastructure/db/schema.js';
+import { opportunities, opportunityEvidence, rawSignals } from '../src/infrastructure/db/schema.js';
+import type { FeedItem, SourceAdapter, SourceAdapters } from '../src/modules/sources/ports.js';
 import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/app.js';
 
 const FIXTURE = readFileSync(
   fileURLToPath(new URL('./fixtures/tenders/bzp-page.json', import.meta.url)),
   'utf8',
 );
+const TED_FIXTURE = readFileSync(
+  fileURLToPath(new URL('./fixtures/tenders/ted-page.json', import.meta.url)),
+  'utf8',
+);
 const BZP = 'https://ezamowienia.gov.pl';
+const TED = 'https://api.ted.europa.eu';
 const HOUR = 3_600_000;
 
 type Answer = { status: number; body?: string; headers?: Record<string, string> };
@@ -37,7 +43,37 @@ beforeAll(() => {
     .persist();
 });
 
+/** The TED request log (parsed body) and the scripted answer per request. */
+const tedAsked: { query: string; token: string | undefined }[] = [];
+let tedAnswer: (query: string, token: string | undefined) => Answer = () => ({
+  status: 200,
+  body: '{"notices":[]}',
+});
+
+beforeAll(() => {
+  const agent = getGlobalDispatcher() as unknown as MockAgent;
+  agent
+    .get(TED)
+    .intercept({ path: '/v3/notices/search', method: 'POST' })
+    .reply((options) => {
+      const body = JSON.parse(String(options.body)) as {
+        query: string;
+        iterationNextToken?: string;
+      };
+      tedAsked.push({ query: body.query, token: body.iterationNextToken });
+      const reply = tedAnswer(body.query, body.iterationNextToken);
+      return {
+        statusCode: reply.status,
+        data: reply.body ?? '',
+        responseOptions: { headers: { 'content-type': 'application/json', ...reply.headers } },
+      };
+    })
+    .persist();
+});
+
 beforeEach(() => {
+  tedAsked.length = 0;
+  tedAnswer = () => ({ status: 200, body: '{"notices":[]}' });
   asked.length = 0;
   answer = () => ({ status: 200, body: '[]' });
 });
@@ -223,5 +259,191 @@ describe('BZP source through the source loop (S-18 FR-32 AC1)', () => {
       filter: { enabled: true, include: [], exclude: ['SEEKING WORK'] },
     });
     expect(await on.run()).toMatchObject({ new: 1, filtered: 1 });
+  });
+});
+
+describe('TED source through the source loop (S-18 FR-32 AC2)', () => {
+  async function setupTed(adapters?: Partial<SourceAdapters>) {
+    const clock = new FakeClock();
+    const built = await buildTestApp({
+      clock,
+      env: { LLM_PROVIDER: 'mock' },
+      ...(adapters ? { adapters } : {}),
+    });
+    const cookie = await loginAsOperator(built.app);
+    const call = (method: 'GET' | 'POST' | 'PATCH', url: string, payload?: object) =>
+      built.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    const created = await call('POST', '/api/sources', { preset: 'ted-pl-it' });
+    expect(created.statusCode).toBe(201);
+    const id = created.json().id as number;
+    const run = async () => (await call('POST', `/api/sources/${id}/run`)).json();
+    const rows = () => {
+      const { db } = openTestDb(built.dir);
+      return {
+        signals: db.select().from(rawSignals).all(),
+        opps: db.select().from(opportunities).all(),
+        evidence: db.select().from(opportunityEvidence).all(),
+      };
+    };
+    return { ...built, clock, call, id, run, rows, created: created.json(), cookie };
+  }
+
+  it('offers the preset with PL and the CPV prefixes, and adds it once', async () => {
+    const { call, created } = await setupTed();
+    expect(created).toMatchObject({
+      type: 'ted',
+      name: 'TED — przetargi IT w Polsce',
+      presetId: 'ted-pl-it',
+      url: 'https://api.ted.europa.eu/v3/notices/search',
+      tender: { cpvPrefixes: ['72', '48', '73'], countries: ['PL'] },
+    });
+    expect((await call('POST', '/api/sources', { preset: 'ted-pl-it' })).json()).toEqual({
+      error: 'exists',
+    });
+  });
+
+  it('sends the configured CPV prefixes and country, and stores buyer, deadline, URL and value only where stated', async () => {
+    tedAnswer = (query) => ({
+      status: 200,
+      body: query.includes('publication-date>=20260101') ? TED_FIXTURE : '{"notices":[]}',
+    });
+    const { run, rows, call, id } = await setupTed();
+    await call('PATCH', `/api/sources/${id}`, {
+      tender: { cpvPrefixes: ['72', '48'], countries: ['PL', 'DE'] },
+    });
+    expect(await run()).toMatchObject({ status: 'partial', new: 2, failed: 1 });
+    expect(tedAsked[0]?.query).toContain('classification-cpv IN (72* 48*)');
+    expect(tedAsked[0]?.query).toContain('buyer-country IN (POL DEU)');
+    const { signals } = rows();
+    expect(signals.every((s) => s.sourceType === 'ted')).toBe(true);
+    const tender = (number: string) =>
+      JSON.parse(signals.find((s) => s.externalId === number)?.tenderJson ?? 'null');
+    expect(tender('900001-2026')).toMatchObject({
+      buyer: 'DEMO Uniwersytet Przykładowy',
+      deadlineAt: '2026-11-24T09:30:00.000Z',
+      estimatedValue: { amountMinor: 25_000_050, currency: 'PLN' },
+    });
+    expect(tender('900002-2026').estimatedValue).toBeNull();
+    expect(signals.find((s) => s.externalId === '900001-2026')?.sourceUrl).toBe(
+      'https://ted.europa.eu/pl/notice/-/detail/900001-2026',
+    );
+  });
+
+  it('rejects a country TED cannot be asked for before it is stored', async () => {
+    const { call, id } = await setupTed();
+    const bad = await call('PATCH', `/api/sources/${id}`, {
+      tender: { cpvPrefixes: ['72'], countries: ['US'] },
+    });
+    expect(bad.statusCode).toBe(400);
+  });
+
+  it('shows 500 and 403 as explicit errors with the status', async () => {
+    const { run, clock } = await setupTed();
+    for (const status of [500, 403]) {
+      tedAnswer = () => ({ status });
+      expect(await run()).toMatchObject({
+        status: 'failed',
+        new: 0,
+        error: { reason: 'http_status', httpStatus: status },
+      });
+      clock.advance(2 * HOUR);
+    }
+  });
+
+  it('follows the iteration token and stops on the empty page', async () => {
+    const full = JSON.stringify({
+      notices: Array.from({ length: 100 }, (_, i) => ({
+        'publication-number': `${i}`,
+        'notice-type': 'can-standard',
+      })),
+      iterationNextToken: 'tok-1',
+    });
+    tedAnswer = (query, token) => {
+      if (!query.includes('publication-date>=20260101'))
+        return { status: 200, body: '{"notices":[]}' };
+      return { status: 200, body: token === undefined ? full : '{"notices":[]}' };
+    };
+    const { run } = await setupTed();
+    expect(await run()).toMatchObject({ status: 'ok', new: 0 });
+    const today = tedAsked.filter((r) => r.query.includes('publication-date>=20260101'));
+    expect(today.map((r) => r.token)).toEqual([undefined, 'tok-1']);
+  });
+
+  it('adds the TED notice as REPEAT_IMPORT evidence when a BZP signal has the same URL, and keeps two opportunities otherwise (D-16)', async () => {
+    const sameUrl = 'https://ted.europa.eu/pl/notice/-/detail/900001-2026';
+    const bzp: SourceAdapter = {
+      type: 'bzp',
+      validateConfig: (config) => ({ ok: true, config, key: 'bzp' }),
+      async discover() {
+        const first: FeedItem = {
+          key: 'DEMO-BZP-1',
+          url: sameUrl,
+          title: 'DEMO to samo ogłoszenie w BZP',
+          text: 'DEMO treść BZP',
+          publishedAt: null,
+        };
+        const other: FeedItem = {
+          key: 'DEMO-BZP-2',
+          url: 'https://ezamowienia.gov.pl/inne',
+          title: 'DEMO inne ogłoszenie',
+          text: 'DEMO inna treść',
+          publishedAt: null,
+        };
+        return { ok: true, items: [first, other], skipped: 0 };
+      },
+      async healthCheck() {
+        return { ok: true, items: [], skipped: 0 };
+      },
+    };
+    tedAnswer = (query) => ({
+      status: 200,
+      body: query.includes('publication-date>=20260101') ? TED_FIXTURE : '{"notices":[]}',
+    });
+    const { run, rows, call } = await setupTed({ bzp });
+    const bzpId = (await call('POST', '/api/sources', { preset: 'bzp-it' })).json().id as number;
+    await call('POST', `/api/sources/${bzpId}/run`);
+    expect(rows().opps).toHaveLength(2);
+
+    expect(await run()).toMatchObject({ new: 1, duplicates: 1 });
+    const after = rows();
+    // The BZP source owns the shared opportunity; the TED notice is evidence, not a second row.
+    expect(after.opps).toHaveLength(3);
+    expect(after.signals.filter((s) => s.sourceType === 'ted')).toHaveLength(1);
+    const repeat = after.evidence.filter((e) => e.evidenceType === 'REPEAT_IMPORT');
+    expect(repeat).toHaveLength(1);
+    expect(repeat[0]?.sourceUrl).toBe(sameUrl);
+  });
+
+  it('keeps the first source as the owner when a manual import came before (plan-review 4)', async () => {
+    const { run, rows, cookie, app } = await (async () => {
+      const t = await setupTed();
+      return t;
+    })();
+    tedAnswer = (query) => ({
+      status: 200,
+      body: query.includes('publication-date>=20260101') ? TED_FIXTURE : '{"notices":[]}',
+    });
+    const imported = await app.inject({
+      method: 'POST',
+      url: '/api/signals/import',
+      headers: { cookie },
+      payload: {
+        text: 'DEMO ręcznie wklejone ogłoszenie TED',
+        url: 'https://ted.europa.eu/pl/notice/-/detail/900001-2026',
+      },
+    });
+    expect(imported.statusCode).toBe(201);
+    await run();
+    const { signals, opps } = rows();
+    // First source decides: the opportunity stays a manual one (no tender facts), the TED notice
+    // is repeat evidence. Documented in docs/source-policy.md.
+    const manual = signals.filter((s) => s.sourceType.startsWith('manual'));
+    expect(manual).toHaveLength(1);
+    expect(manual[0]?.tenderJson).toBeNull();
+    // 900001 matched the manual import by URL and became evidence; only 900002 is a new signal.
+    expect(signals.filter((s) => s.sourceType === 'ted').map((s) => s.externalId)).toEqual([
+      '900002-2026',
+    ]);
+    expect(opps).toHaveLength(2);
   });
 });

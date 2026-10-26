@@ -67,6 +67,17 @@ export const PRESETS: readonly SourcePreset[] = [
     termsUrl: 'https://ezamowienia.gov.pl/pl/integracja/',
     filter: off(),
   },
+  {
+    id: 'ted-pl-it',
+    type: 'ted',
+    tender: { cpvPrefixes: TENDER_CPV, countries: ['PL'] },
+    name: 'TED — przetargi IT w Polsce',
+    url: 'https://api.ted.europa.eu/v3/notices/search',
+    accessNote:
+      'Oficjalne API wyszukiwania TED (Urząd Publikacji UE): ogłoszenia otwierające postępowanie, z wybranych kodów CPV i kraju zamawiającego. Wyszukiwanie jest anonimowe i bezpłatne, bez klucza; obowiązuje zasada uczciwego korzystania (do 700 zapytań na minutę). Nazwy pól odpowiedzi i licencja do weryfikacji (docs/source-policy.md).',
+    termsUrl: 'https://ted.europa.eu/en/legal-notice',
+    filter: off(),
+  },
 ];
 
 /**

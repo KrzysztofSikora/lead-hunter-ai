@@ -97,6 +97,7 @@ export {
   SourceList,
   SourcePreset,
   SourceRunResult,
+  TED_COUNTRY_CODES,
   TedConfig,
   TenderSettings,
   UpdateSourceRequest,

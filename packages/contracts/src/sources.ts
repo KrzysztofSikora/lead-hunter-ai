@@ -58,8 +58,53 @@ const cpvPrefixes = z
     message: 'Kod CPV występuje więcej niż raz.',
   });
 
+/**
+ * S-18 D-19, plan-review 6: the buyer countries TED can be asked for (EU and EEA, alpha-2 to the
+ * alpha-3 code its `buyer-country` field uses). The config is validated against this before it is
+ * stored, so a run never fails on a code the query cannot express.
+ */
+export const TED_COUNTRY_CODES: Readonly<Record<string, string>> = {
+  AT: 'AUT',
+  BE: 'BEL',
+  BG: 'BGR',
+  HR: 'HRV',
+  CY: 'CYP',
+  CZ: 'CZE',
+  DK: 'DNK',
+  EE: 'EST',
+  FI: 'FIN',
+  FR: 'FRA',
+  DE: 'DEU',
+  GR: 'GRC',
+  HU: 'HUN',
+  IE: 'IRL',
+  IT: 'ITA',
+  LV: 'LVA',
+  LT: 'LTU',
+  LU: 'LUX',
+  MT: 'MLT',
+  NL: 'NLD',
+  PL: 'POL',
+  PT: 'PRT',
+  RO: 'ROU',
+  SK: 'SVK',
+  SI: 'SVN',
+  ES: 'ESP',
+  SE: 'SWE',
+  IS: 'ISL',
+  LI: 'LIE',
+  NO: 'NOR',
+};
+
 const countries = z
-  .array(z.string().regex(/^[A-Z]{2}$/, { message: 'Kraj: dwuliterowy kod ISO, np. PL.' }))
+  .array(
+    z
+      .string()
+      .regex(/^[A-Z]{2}$/, { message: 'Kraj: dwuliterowy kod ISO, np. PL.' })
+      .refine((code) => Object.hasOwn(TED_COUNTRY_CODES, code), {
+        message: 'Kraj spoza UE i EOG nie jest obsługiwany przez TED.',
+      }),
+  )
   .min(1)
   .max(COUNTRIES_MAX)
   .refine((codes) => new Set(codes).size === codes.length, {

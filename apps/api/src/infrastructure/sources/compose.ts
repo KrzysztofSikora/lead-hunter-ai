@@ -16,6 +16,7 @@ import { createJobLock, type JobLockOptions } from '../scheduler/job-lock.js';
 import type { HttpClient } from './http/client.js';
 import { createRobotsCheck } from './manual/robots.js';
 import { createBzpAdapter } from './bzp/adapter.js';
+import { createTedAdapter } from './ted/adapter.js';
 import { createRssAdapter } from './rss/adapter.js';
 
 export interface SourceRuntimeDeps {
@@ -72,12 +73,19 @@ export function createSourceRuntime({
     ...(sleep ? { sleep } : {}),
     ...(logger ? { logger } : {}),
   });
+  const ted = createTedAdapter({
+    http,
+    clock,
+    timeoutMs: config.fetchTimeoutMs,
+    maxAttempts: config.sourceMaxAttempts,
+    maxTextChars: config.importMaxTextChars,
+    ...(sleep ? { sleep } : {}),
+    ...(logger ? { logger } : {}),
+  });
   const service = createSourceService({
     repository: createSourceRepository(db),
     signals: createSignalRepository(db),
-    // ted joins the registry with its adapter (S-18 Phase 3); until then a stored `ted` source
-    // fails with `internal`.
-    adapters: { rss, bzp, ...overrides } as SourceAdapters,
+    adapters: { rss, bzp, ted, ...overrides } as SourceAdapters,
     clock,
     minIntervalMs: config.sourceMinIntervalMinutes * 60_000,
     ...(onSignalCreated ? { onSignalCreated } : {}),
