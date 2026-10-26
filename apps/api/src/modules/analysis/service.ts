@@ -3,6 +3,7 @@ import {
   type AnalysisActivity,
   type AnalysisReasonCode,
   type AnalysisServiceStatus,
+  BountyFacts,
   TenderFacts,
   OpportunityAnalysis,
   ScoreBreakdown,
@@ -117,6 +118,17 @@ function tenderOf(json: string | null): TenderFacts | null {
   }
 }
 
+/** S-19 D-2: invalid stored facts read as absent. */
+function bountyOf(json: string | null): BountyFacts | null {
+  if (json === null) return null;
+  try {
+    const parsed = BountyFacts.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 /** D-9: after these the whole provider is unusable for now, so the drain stops instead of failing the queue. */
 const PROVIDER_WIDE: ReadonlySet<ProviderError['kind']> = new Set([
   'auth',
@@ -187,6 +199,7 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     const guarded = guardAnalysis(answer, row.text, {
       sourceType: row.sourceType,
       tender: tenderOf(row.tenderJson),
+      bounty: bountyOf(row.bountyJson),
     });
     // The guard edits text; what is stored must still satisfy the contract (read side parses it).
     const checked = OpportunityAnalysis.safeParse(guarded.result);

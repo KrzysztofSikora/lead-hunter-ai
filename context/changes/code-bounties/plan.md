@@ -215,6 +215,7 @@ third-party users:
 | D-20 | How does `create` get the profile for the default languages? | `SourceDeps` gains an optional `profile: { get(): OperatorProfile }`. `compose.ts`, `server.ts` and `buildTestApp` pass the existing reader. The CLI (`discover`) passes none, because it never creates sources. Without a reader, or with no match, `languages: []` (one search with no language filter). | B: send the languages from the web view on create (the client then decides a default the server should own). | The reader exists and the dependency stays optional. | cheap | agent |
 | D-21 | Does the card show bounty facts? | No new block. The card already shows the source type label, the issue link and the budget with its "ze źródła" quote from `amountMaxMinor`. `SourceFacts` is unchanged. | B: a "Nagroda" block like S-18's tender block (more UI, but the same facts as the budget line). | Smallest change that meets the ACs. A block can come later without a data change. | cheap | agent |
 | D-22 | Does the analysis prompt change? | No. There is no new enum value, and the source text already says "nagroda"/labels. `PROMPT_VERSION` stays `analysis-2`. | B: a bounty rule in the prompt (needs a version bump and re-analysis for nothing the guard does not already enforce). | The guard is deterministic and decides the budget and the level. | cheap | agent |
+| D-23 | Does a `paid` label or a repository name count as a hiring cue (plan-review 1)? | No. For `github`/`opire` the guard runs the cue check on the text without the adapter's own lines (`Etykiety`, `Repozytorium`, `Język (wyszukiwanie)`, `Utworzono`, `Nagroda (Opire)`). A stated reward still counts, and so does any cue the author wrote in the title or body. | B: keep the labelled lines in the check (a `paid` label then keeps `DIRECT_REQUEST` with no amount, against D-10). C: a separate body argument to the guard (cleaner signature, more plumbing). | Labels and names are metadata, and a decorative label must not pass as an offer to pay. One regex in the guard. | cheap | agent |
 
 ## Design
 
@@ -550,7 +551,7 @@ Unchanged `SourceFailureReason` values:
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Source types, bounty facts storage and the token header
-- [ ] Phase 2: Reward parsing and the bounty guard rules
+- [x] Phase 2: Reward parsing and the bounty guard rules
 - [ ] Phase 3: GitHub search adapter and preset (checkpoint)
 - [ ] Phase 4: Opire adapter and preset
 - [ ] Phase 5: Sources view editor, source policy and test plan
@@ -572,6 +573,15 @@ Unchanged `SourceFailureReason` values:
   the adapter and the refine cannot disagree. `buildTestApp` gained an optional `sourceLogger`
   to assert the `bounty_invalid` warn line. `SOURCE_ENDPOINTS` holds the Opire URL
   `https://api.opire.dev/rewards`, `UNVERIFIED` until the Phase 4 human check.
+
+- [minor] (Phase 2) `parseReward` has no 60-character quote check (D-7): the amount cap (10⁹ units)
+  already bounds the quote to about 25 characters, so the check was unreachable and only added
+  mutants. The `Bounty` contract still caps the quote at 200.
+- [REVIEW] (Phase 2) `reward.ts` is a third mutation target, against the test plan's "only two
+  modules" user decision (plan-review 8). It parses untrusted text into the amount that decides
+  the level and the budget. `context/test-plan.md` lists it; drop the row to undo.
+- [minor] (Phase 2) `GuardOrigin.bounty` is optional, so callers without it (RSS, manual, BZP,
+  TED) are unchanged without edits.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

@@ -98,13 +98,14 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 - `pnpm docker:build` = `docker build -t lead-hunter-ai:local .`.
 
 ## Mutation targets
-Only two modules, where a weak test would let a costly bug through (user decision: mutation
+Only three modules, where a weak test would let a costly bug through (user decision: mutation
 testing only where needed).
 
 | Module | Why | Target score | CI (report / break at N%) |
 |--------|-----|--------------|---------------------------|
 | `apps/api/src/modules/scoring/rubric.ts`, `score.ts` | the number the operator acts on; caps and sums (TR-05) | 80 % | report |
 | `apps/api/src/infrastructure/sources/http/address-guard.ts` | SSRF blocklist and redirect checks (TR-03) | 90 % | report |
+| `apps/api/src/infrastructure/sources/github/reward.ts` | the amount that becomes a signal's budget and a `DIRECT_REQUEST` (S-19 D-7; added by that change as a `[REVIEW]` deviation from the two-module decision) | 80 % | report |
 
 File names are the intended layout; the plan of each slice may rename them and must then update
 this table.

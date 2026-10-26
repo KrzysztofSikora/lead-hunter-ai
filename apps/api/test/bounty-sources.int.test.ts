@@ -1,6 +1,12 @@
 import type { BountyFacts } from '@lead-hunter/contracts';
+import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { rawSignals, sources } from '../src/infrastructure/db/schema.js';
+import {
+  opportunities,
+  opportunityEvidence,
+  rawSignals,
+  sources,
+} from '../src/infrastructure/db/schema.js';
 import type {
   AdapterOutcome,
   ConfigCheck,
@@ -193,5 +199,41 @@ describe('bounty sources in the source loop (S-19 Phase 1)', () => {
     clock.advance(2 * 3_600_000);
     const check = await call('POST', `/api/sources/${id}/check`);
     expect(check.json()).toMatchObject({ ok: false, error: { reason: 'internal' } });
+  });
+});
+
+describe('analysis of bounty signals (S-19 Phase 2)', () => {
+  it('sets the budget from the stated reward only, and keeps none otherwise', async () => {
+    const { call, db, addSource, github, runner } = await setup();
+    const id = addSource('github', GITHUB_CONFIG);
+    const text = (key: string, line: string) =>
+      `DEMO ${key}: TypeScript parser crashes on empty input. Szukam programisty, zapłacę za poprawkę. ${line}`;
+    github.state.outcome = {
+      ok: true,
+      items: [
+        { ...item('github:demo-org/demo-repo#7', facts()), text: text('with', 'Bounty: $150') },
+        {
+          ...item('github:demo-org/demo-repo#8', facts({ issueNumber: 8, reward: null })),
+          text: text('without', 'Mówią o $500 gdzieś indziej.'),
+        },
+      ],
+      skipped: 0,
+    };
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({ new: 2 });
+    await runner.drain();
+
+    const rows = db()
+      .select({
+        key: rawSignals.externalId,
+        max: opportunities.amountMaxMinor,
+        currency: opportunities.amountCurrency,
+      })
+      .from(opportunityEvidence)
+      .innerJoin(rawSignals, eq(rawSignals.id, opportunityEvidence.rawSignalId))
+      .innerJoin(opportunities, eq(opportunities.id, opportunityEvidence.opportunityId))
+      .all();
+    const by = (n: number) => rows.find((r) => r.key?.endsWith(`#${n}`));
+    expect(by(7)).toMatchObject({ max: 15_000, currency: 'USD' });
+    expect(by(8)).toMatchObject({ max: null, currency: null });
   });
 });

@@ -1,4 +1,9 @@
-import type { OpportunityAnalysis, SourceType, TenderFacts } from '@lead-hunter/contracts';
+import type {
+  BountyFacts,
+  OpportunityAnalysis,
+  SourceType,
+  TenderFacts,
+} from '@lead-hunter/contracts';
 import { hasHiringCue } from './cues.js';
 
 export interface GuardedAnalysis {
@@ -12,7 +17,17 @@ const squash = (value: string): string => value.replace(/\s+/g, ' ').trim().toLo
 export interface GuardOrigin {
   sourceType: SourceType;
   tender: TenderFacts | null;
+  /** S-19 D-10: stored facts of a GitHub or Opire signal; absent for every other caller. */
+  bounty?: BountyFacts | null;
 }
+
+const BOUNTY_SOURCES: ReadonlySet<SourceType> = new Set(['github', 'opire']);
+const isBounty = (origin?: GuardOrigin): boolean =>
+  origin !== undefined && BOUNTY_SOURCES.has(origin.sourceType);
+
+/** Lines the adapter wrote itself: labels and names are not the author's offer to pay (D-23). */
+const ADAPTER_LINE =
+  /^(?:Etykiety|Repozytorium|Język \(wyszukiwanie\)|Utworzono|Nagroda \(Opire\)):.*$/gmu;
 
 const TENDER_SOURCES: ReadonlySet<SourceType> = new Set(['bzp', 'ted']);
 const isTender = (origin?: GuardOrigin): boolean =>
@@ -135,7 +150,27 @@ function guardAgainstSource(
     notes.push('Poziom dowodu PUBLIC_TENDER zmieniony na DIRECT_REQUEST: źródło to nie przetarg.');
     evidenceLevel = 'DIRECT_REQUEST';
   }
-  const hiring = tender || hasHiringCue(sourceText);
+  const bounty = isBounty(origin);
+  if (bounty) {
+    // D-10: the issue's stated reward decides the budget, whatever the model answered.
+    const reward = origin!.bounty?.reward ?? null;
+    if (reward) {
+      sourceBudget = {
+        minMinor: reward.amountMinor,
+        maxMinor: reward.amountMinor,
+        currency: reward.currency,
+        quote: reward.quote,
+      };
+    } else {
+      if (result.sourceBudget) notes.push('Usunięto budżet: zgłoszenie nie podaje nagrody.');
+      sourceBudget = null;
+    }
+  }
+  const hiring =
+    tender ||
+    (bounty
+      ? origin!.bounty?.reward != null || hasHiringCue(sourceText.replace(ADAPTER_LINE, ''))
+      : hasHiringCue(sourceText));
   if (evidenceLevel === 'DIRECT_REQUEST' && !hiring) {
     notes.push(
       'Poziom dowodu obniżony do EXPLICIT_PROBLEM: w tekście brak zlecenia lub płatności.',
