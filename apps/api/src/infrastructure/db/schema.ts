@@ -343,3 +343,24 @@ export const offerDrafts = sqliteTable(
     index('offer_drafts_created_at_idx').on(table.createdAt),
   ],
 );
+
+/**
+ * S-15 D-1: the billed usage of deleted analyses and drafts, so the monthly cap and the daily
+ * limits stay correct after a delete. Holds no source content and no link to the deleted row.
+ */
+export const deletedUsage = sqliteTable(
+  'deleted_usage',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    /** `analysis` or `offer_draft`. */
+    kind: text('kind').notNull(),
+    /** The deleted row's own time. */
+    createdAt: integer('created_at').notNull(),
+    costMicroUsd: integer('cost_micro_usd'),
+    /** 1 when the row counted toward the daily limit. */
+    counted: integer('counted').notNull(),
+    /** 1 when the row was a billed answer of unknown cost. */
+    unknownCost: integer('unknown_cost').notNull(),
+  },
+  (table) => [index('deleted_usage_kind_created_idx').on(table.kind, table.createdAt)],
+);

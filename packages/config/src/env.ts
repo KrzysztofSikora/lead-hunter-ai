@@ -1,3 +1,4 @@
+import { join, resolve } from 'node:path';
 import { z } from 'zod';
 import { DEFAULT_LLM_PRICES, parseLlmPrices, type ModelPrice } from './llm-prices.js';
 
@@ -29,6 +30,9 @@ export const ENV_VARIABLES = [
   'SOURCE_MIN_INTERVAL_MINUTES',
   'SOURCE_MAX_ATTEMPTS',
   'DISCOVERY_TIMES',
+  'BACKUP_DIR',
+  'BACKUP_KEEP',
+  'RETENTION_DAYS',
   'GITHUB_TOKEN',
 ] as const;
 
@@ -107,6 +111,9 @@ export const EnvSchema = z
         if (message) ctx.addIssue({ code: 'custom', message });
       }),
     ),
+    BACKUP_DIR: optional(z.string().trim().min(1)),
+    BACKUP_KEEP: optional(z.coerce.number().int().min(1).max(365)),
+    RETENTION_DAYS: optional(z.coerce.number().int().min(7).max(3650)),
     GITHUB_TOKEN: optional(z.string().trim().min(1)),
   })
   .superRefine((env, ctx) => {
@@ -181,6 +188,12 @@ export interface Config {
   sourceMaxAttempts: number;
   /** Daily discovery slots as `HH:MM` in Europe/Warsaw, sorted (S-12 D-6). */
   discoveryTimes: string[];
+  /** Absolute directory of the database copies (S-15 D-7); default `<DATA_DIR>/backups`. */
+  backupDir: string;
+  /** Newest copies kept by the rotation (S-15 D-6). */
+  backupKeep: number;
+  /** Days a REJECTED or EXPIRED opportunity stays unchanged before the daily job deletes it (S-15 D-4). */
+  retentionDays: number;
   /** S-19 D-9: optional read-only token for api.github.com; raises the search limit. Secret. */
   github: { token?: string };
 }
@@ -213,6 +226,8 @@ const EXPECTED: Record<string, string> = {
   FETCH_MAX_BYTES: 'oczekiwano liczby całkowitej 65536–5242880',
   SOURCE_MIN_INTERVAL_MINUTES: 'oczekiwano liczby całkowitej 60–1440',
   SOURCE_MAX_ATTEMPTS: 'oczekiwano liczby całkowitej 1–5',
+  BACKUP_KEEP: 'oczekiwano liczby całkowitej 1–365',
+  RETENTION_DAYS: 'oczekiwano liczby całkowitej 7–3650',
   LLM_PROVIDER: 'oczekiwano: mock, anthropic lub openai-compatible',
   LLM_MONTHLY_BUDGET_USD: 'oczekiwano liczby 0.01–100000 (USD)',
   LLM_PAID: 'oczekiwano true lub false',
@@ -274,6 +289,9 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
           .map((t) => t.trim())
           .sort()
       : DEFAULT_DISCOVERY_TIMES,
+    backupDir: resolve(v.BACKUP_DIR ?? join(v.DATA_DIR ?? './data', 'backups')),
+    backupKeep: v.BACKUP_KEEP ?? 14,
+    retentionDays: v.RETENTION_DAYS ?? 90,
     github: v.GITHUB_TOKEN ? { token: v.GITHUB_TOKEN } : {},
     ...(llm ? { llm } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),

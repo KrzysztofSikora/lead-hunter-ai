@@ -1,6 +1,6 @@
 import { PASSWORD_HASH_PATTERN } from '@lead-hunter/config';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { hostname, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,6 +59,28 @@ describe('command-line entry points', () => {
     const r = run('src/cli/migrate.ts', {});
     expect(r.status).toBe(0);
     expect(existsSync(join(dataDir, 'lead-hunter.db'))).toBe(true);
+  });
+
+  it('backup prints the file it wrote and rotates', () => {
+    expect(run('src/cli/migrate.ts', {}).status).toBe(0);
+    const r = run('src/cli/backup.ts', {});
+    expect(r.status).toBe(0);
+    expect(r.stdout).toMatch(/lead-hunter-\d{8}T\d{6}Z\.db \(\d+ B\)\n$/);
+    expect(readdirSync(join(dataDir, 'backups'))).toHaveLength(1);
+  });
+
+  it('backup exits 1 with a message when the directory cannot be created', () => {
+    writeFileSync(join(dataDir, 'blocker'), 'x');
+    const r = run('src/cli/backup.ts', { BACKUP_DIR: join(dataDir, 'blocker', 'sub') });
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('kopia zapasowa nie powiodła się');
+  });
+
+  it('backup exits 1 and creates nothing when there is no database', () => {
+    const r = run('src/cli/backup.ts', {});
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain('brak bazy');
+    expect(existsSync(join(dataDir, 'lead-hunter.db'))).toBe(false);
   });
 
   it('the server refuses an invalid PORT and names it', () => {

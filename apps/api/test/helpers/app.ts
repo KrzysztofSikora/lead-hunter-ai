@@ -15,6 +15,8 @@ import {
   llmRunnerDeps,
   offerDrafterDeps,
 } from '../../src/infrastructure/llm/create-provider.js';
+import { createDataRepository } from '../../src/infrastructure/db/data-repository.js';
+import { createDataService } from '../../src/modules/ownership/service.js';
 import { createOfferService } from '../../src/modules/offers/service.js';
 import type { OfferDrafter } from '../../src/modules/offers/ports.js';
 import { createOpportunityService } from '../../src/modules/opportunities/service.js';
@@ -226,6 +228,7 @@ export async function buildTestApp(
     insights: { repository: createInsightsRepository(db), clock },
     analysis: runner,
     offers,
+    data: createDataService({ repository: createDataRepository(db), clock }),
     sources: sourceRuntime.service,
     jobs: sourceRuntime.jobs,
     schedule: { times: config.discoveryTimes, nextRunAt: () => null },

@@ -27,6 +27,7 @@ export {
   SourceBudget,
 } from './analysis.js';
 export type { AnalysedResult, InsufficientDataResult } from './analysis.js';
+export { DataExport } from './data.js';
 export { HealthResponse } from './health.js';
 export { ApiError, LoginRequest, SessionResponse, ThrottledError } from './auth.js';
 export {

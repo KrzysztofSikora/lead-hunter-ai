@@ -6,7 +6,8 @@ import type {
   OfferSource,
   OfferSourceReader,
 } from '../../modules/offers/ports.js';
-import { analyses, offerDrafts, opportunities, rawSignals } from './schema.js';
+import { deletedCountSince } from './analysis-repository.js';
+import { analyses, deletedUsage, offerDrafts, opportunities, rawSignals } from './schema.js';
 
 type Stored = typeof offerDrafts.$inferSelect;
 
@@ -22,17 +23,42 @@ export function createOfferDraftRepository(db: BetterSQLite3Database): OfferDraf
 
   return {
     insert(draft, at) {
-      return db
-        .insert(offerDrafts)
-        .values({
-          ...draft,
-          analysed: draft.analysed ? 1 : 0,
-          createdAt: at,
-          updatedAt: at,
-          statusChangedAt: at,
-        })
-        .returning({ id: offerDrafts.id })
-        .get().id;
+      return db.transaction((tx) => {
+        const owner = tx
+          .select({ id: opportunities.id })
+          .from(opportunities)
+          .where(eq(opportunities.id, draft.opportunityId))
+          .get();
+        // S-15 D-2: deleted during the provider call; the billed answer still counts.
+        if (!owner) {
+          tx.insert(deletedUsage)
+            .values({
+              kind: 'offer_draft',
+              createdAt: at,
+              costMicroUsd: draft.costMicroUsd,
+              counted: 1,
+              unknownCost:
+                draft.status !== 'FAILED' &&
+                draft.costMicroUsd === null &&
+                draft.provider !== 'mock'
+                  ? 1
+                  : 0,
+            })
+            .run();
+          return null;
+        }
+        return tx
+          .insert(offerDrafts)
+          .values({
+            ...draft,
+            analysed: draft.analysed ? 1 : 0,
+            createdAt: at,
+            updatedAt: at,
+            statusChangedAt: at,
+          })
+          .returning({ id: offerDrafts.id })
+          .get().id;
+      });
     },
     get(id) {
       const row = db.select().from(offerDrafts).where(eq(offerDrafts.id, id)).get();
@@ -49,10 +75,10 @@ export function createOfferDraftRepository(db: BetterSQLite3Database): OfferDraf
       return row ? toOfferDraftRow(row) : undefined;
     },
     countSince(at) {
-      return (
+      const stored =
         db.select({ value: count() }).from(offerDrafts).where(gte(offerDrafts.createdAt, at)).get()
-          ?.value ?? 0
-      );
+          ?.value ?? 0;
+      return stored + deletedCountSince(db, 'offer_draft', at);
     },
     update(id, expected, changes, at) {
       const moved = changes.status !== undefined && changes.status !== expected;

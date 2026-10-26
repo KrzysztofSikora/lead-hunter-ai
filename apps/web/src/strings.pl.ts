@@ -469,6 +469,13 @@ export const strings = {
     },
   },
   opportunity: {
+    deleteOpportunity: 'Usuń okazję',
+    deleteConfirm: 'Tak, usuń na zawsze',
+    deleteCancel: 'Anuluj',
+    deleteWarning:
+      'Okazja zniknie razem ze źródłem, analizami, szkicami, historią i płatnościami. Tego nie można cofnąć.',
+    deleting: 'Usuwanie…',
+    deleteFailed: 'Nie udało się usunąć okazji.',
     retryAnalysis: 'Ponów analizę',
     retryingAnalysis: 'Ponawianie…',
     retryAnalysisFailed: 'Nie udało się ponowić analizy.',
@@ -761,6 +768,10 @@ export const strings = {
     },
   },
   profile: {
+    yourData: 'Twoje dane',
+    yourDataHint:
+      'Jeden plik JSON z profilem, źródłami (bez haseł i kluczy), sygnałami, okazjami, analizami, szkicami, historią i płatnościami.',
+    exportData: 'Eksportuj dane (JSON)',
     title: 'Profil operatora',
     loading: 'Wczytuję profil…',
     loadFailed: 'Nie udało się wczytać profilu.',

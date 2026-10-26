@@ -6,7 +6,7 @@ import type {
   WaitingOpportunity,
 } from '../../modules/analysis/ports.js';
 import { moveFromNew, recordSystemMove, statusOf } from './system-move.js';
-import { analyses, offerDrafts, opportunities, rawSignals } from './schema.js';
+import { analyses, deletedUsage, offerDrafts, opportunities, rawSignals } from './schema.js';
 
 const selection = {
   id: opportunities.id,
@@ -27,6 +27,27 @@ const waiting = and(
   isNotNull(opportunities.prefilterAt),
   isNull(opportunities.prefilterRule),
 );
+
+/** S-15 D-1: deleted rows that counted toward a daily limit. */
+export function deletedCountSince(
+  db: BetterSQLite3Database,
+  kind: 'analysis' | 'offer_draft',
+  at: number,
+): number {
+  return (
+    db
+      .select({ value: count() })
+      .from(deletedUsage)
+      .where(
+        and(
+          eq(deletedUsage.kind, kind),
+          gte(deletedUsage.createdAt, at),
+          eq(deletedUsage.counted, 1),
+        ),
+      )
+      .get()?.value ?? 0
+  );
+}
 
 export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRepository {
   const joined = () =>
@@ -74,13 +95,13 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
         .all() as WaitingOpportunity[];
     },
     countSince(at) {
-      return (
+      const stored =
         db
           .select({ value: count() })
           .from(analyses)
           .where(and(gte(analyses.createdAt, at), isNull(analyses.reusedFromAnalysisId)))
-          .get()?.value ?? 0
-      );
+          .get()?.value ?? 0;
+      return stored + deletedCountSince(db, 'analysis', at);
     },
     /** D-8: analyses and offer drafts share one monthly cap. */
     spentSince(at) {
@@ -100,9 +121,20 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
         .from(offerDrafts)
         .where(gte(offerDrafts.createdAt, at))
         .get();
+      const deleted = db
+        .select({
+          microUsd: sql<number>`COALESCE(SUM(${deletedUsage.costMicroUsd}), 0)`,
+          unknownCount: sql<number>`COALESCE(SUM(${deletedUsage.unknownCost}), 0)`,
+        })
+        .from(deletedUsage)
+        .where(gte(deletedUsage.createdAt, at))
+        .get();
       return {
-        microUsd: (analysed?.microUsd ?? 0) + (drafted?.microUsd ?? 0),
-        unknownCount: (analysed?.unknownCount ?? 0) + (drafted?.unknownCount ?? 0),
+        microUsd: (analysed?.microUsd ?? 0) + (drafted?.microUsd ?? 0) + (deleted?.microUsd ?? 0),
+        unknownCount:
+          (analysed?.unknownCount ?? 0) +
+          (drafted?.unknownCount ?? 0) +
+          (deleted?.unknownCount ?? 0),
       };
     },
     findReusable(opportunityId, promptVersion, schemaVersion) {
@@ -195,6 +227,24 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
     saveComplete(analysis) {
       db.transaction((tx) => {
         const before = statusOf(tx, analysis.opportunityId);
+        // S-15 D-2: deleted during the provider call; the billed answer still counts.
+        if (before === undefined) {
+          tx.insert(deletedUsage)
+            .values({
+              kind: 'analysis',
+              createdAt: analysis.at,
+              costMicroUsd: analysis.costMicroUsd,
+              counted: analysis.reusedFromAnalysisId === null ? 1 : 0,
+              unknownCost:
+                analysis.costMicroUsd === null &&
+                analysis.provider !== 'mock' &&
+                analysis.reusedFromAnalysisId === null
+                  ? 1
+                  : 0,
+            })
+            .run();
+          return;
+        }
         tx.insert(analyses)
           .values({
             opportunityId: analysis.opportunityId,
@@ -259,6 +309,18 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
     },
     saveFailed(analysis) {
       db.transaction((tx) => {
+        if (statusOf(tx, analysis.opportunityId) === undefined) {
+          tx.insert(deletedUsage)
+            .values({
+              kind: 'analysis',
+              createdAt: analysis.at,
+              costMicroUsd: analysis.costMicroUsd ?? null,
+              counted: 1,
+              unknownCost: 0,
+            })
+            .run();
+          return;
+        }
         tx.insert(analyses)
           .values({
             opportunityId: analysis.opportunityId,

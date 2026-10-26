@@ -71,7 +71,7 @@ docker compose up -d --build
 ```
 
 Dane w `./data` zostają. Migracje bazy uruchamiają się przy starcie aplikacji. Przed
-aktualizacją zrób kopię (niżej).
+aktualizacją zrób kopię (*Kopia zapasowa i przywracanie*, niżej).
 
 ### Dostęp zdalny (Tailscale)
 
@@ -89,19 +89,44 @@ serwer widzi adres bramy mostu, nie loopback, więc ciasteczko sesji nie dostaje
 (decyzja D-6 w `context/changes/operator-login/plan.md`). Łącze w tailnecie jest szyfrowane
 (WireGuard); nie wystawiaj portu 8080 poza tailnet.
 
-### Kopia zapasowa (tymczasowo, do slice'a S-15)
+### Kopia zapasowa i przywracanie
 
-Zimna kopia jest spójna. Katalog kopii jest w `data/backups/` (poza repozytorium, w `.gitignore`):
+Aplikacja robi kopię bazy codziennie o 03:30 (Europe/Warsaw) i zostawia najnowsze
+`BACKUP_KEEP` kopii (domyślnie 14) w `BACKUP_DIR` (domyślnie `data/backups/`, poza repozytorium).
+Kopia to spójny plik SQLite (`lead-hunter-RRRRMMDDTGGMMSSZ.db`, czas UTC), sprawdzony
+`PRAGMA quick_check`; powstaje przy działającej aplikacji, bez zatrzymywania. Po udanej kopii
+okazje `REJECTED` i `EXPIRED` bez płatności, nieruszane dłużej niż `RETENTION_DAYS` (domyślnie 90),
+są usuwane, a ich liczba trafia do logu. Gdy kopia się nie uda, nic nie jest usuwane.
+
+Kopię na żądanie (np. przed aktualizacją) robi polecenie:
+
+```sh
+docker compose exec app node apps/api/dist/cli/backup.js   # w repozytorium: pnpm backup
+ls -l data/backups/
+```
+
+Kopie leżą na tej samej karcie SD co baza, więc przegrywają razem z nią. Skopiuj
+`data/backups/` poza Raspberry Pi (np. `scp -r pi:lead-hunter-ai/data/backups ~/kopie/`).
+
+Przywracanie wybranej kopii:
 
 ```sh
 docker compose stop
-d="data/backups/$(date +%F-%H%M)" && mkdir -p "$d" && cp data/lead-hunter.db* "$d"/
+mkdir data/before-restore-$(date +%F) && mv data/lead-hunter.db* data/before-restore-$(date +%F)/
+cp data/backups/lead-hunter-<RRRRMMDDTGGMMSSZ>.db data/lead-hunter.db
 docker compose start
 ```
 
-Przywrócenie: `docker compose stop`, skopiuj pliki `lead-hunter.db*` z wybranego katalogu do
-`data/`, `docker compose start`. Polecenie kopii i przywracania dojdzie ze slice'em S-15 i
-zastąpi tę sekcję.
+Pliki `-wal` i `-shm` muszą zniknąć z `data/` (robi to `mv`), inaczej stary dziennik zostałby
+nałożony na przywróconą bazę. Migracje uruchamiają się przy starcie, więc kopia ze starszej
+wersji aplikacji też działa. Sprawdź `docker compose ps` (healthy) i panel. Katalog
+`before-restore-*` możesz usunąć, gdy wszystko się zgadza. Ten sam przebieg (kopia, przywrócenie
+na tym samym woluminie, odczyt danych) wykonuje `pnpm docker:smoke`.
+
+Własne dane: `DELETE /api/opportunities/:id` (przycisk *Usuń okazję* na karcie) usuwa okazję
+z sygnałem, dowodami, analizami, szkicami, historią i płatnościami; wydatki miesiąca na model
+zostają. Link *Eksportuj dane (JSON)* w widoku *Profil* pobiera całość jednym plikiem (bez
+sekretów i bez sesji).
 
 ### Bez internetu
 
@@ -170,7 +195,7 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
 
 ## Co działa / Co wymaga kluczy / Co wymaga ręcznej weryfikacji
 
-- **Co działa:** serwer, `GET /api/health`, migracje Drizzle, OpenAPI poza produkcją, redakcja
+- **Co działa:** kopia zapasowa (`pnpm backup`, codziennie o 03:30, rotacja `BACKUP_KEEP`), przywracanie z kopii, usuwanie okazji, eksport JSON, retencja zamkniętych okazji (`RETENTION_DAYS`); serwer, `GET /api/health`, migracje Drizzle, OpenAPI poza produkcją, redakcja
   sekretów w logach, polska powłoka UI, `pnpm discover` (uruchamia raz każde włączone źródło; bez źródeł pisze `brak skonfigurowanych źródeł`; gdy trwa inny przebieg, pisze `przebieg w toku` i kończy się kodem 1; blokada po awarii CLI w osobnym kontenerze `docker compose run` zwalnia się po 2 minutach); logowanie operatora
   (hasło w `OPERATOR_PASSWORD_HASH`, sesja w ciasteczku `HttpOnly` + `SameSite=Strict` ważna 30 dni
   bez aktywności, wylogowanie, limit 5 prób na 15 minut); każdy `/api/*` poza health i logowaniem
@@ -218,7 +243,7 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   serwer OpenAI-compatible (`LLM_BASE_URL`, `LLM_MODEL`, klucz opcjonalny); skrzynka IMAP ze
   slice'em S-11. Zmienne analizy: `LLM_*`, `ANALYSIS_DAILY_LIMIT`, `PREFILTER_MAX_AGE_DAYS`
   (patrz `.env.example`).
-- **Co wymaga ręcznej weryfikacji:** prawdziwe analizy Anthropic i OpenAI-compatible (czy schemat
+- **Co wymaga ręcznej weryfikacji:** kopia i przywracanie na Raspberry Pi (kroki w *Kopia zapasowa i przywracanie*; własność pliku kopii, `docker compose ps` po przywróceniu), prawdziwe analizy Anthropic i OpenAI-compatible (czy schemat
   jest przyjęty, czy `json_object` i zużycie tokenów działają u danego dostawcy), wygląd
   komunikatów o limicie kosztów na telefonie, prawdziwe kanały hnrss.org, Freelancer.com i Arduino Forum (adresy
   presetów w `apps/api/src/modules/sources/presets.ts`, format wpisów, regulaminy; agent nie miał

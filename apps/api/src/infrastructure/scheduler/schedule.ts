@@ -12,6 +12,8 @@ export interface SchedulerOptions {
   /** D-5: the slot as UTC ms rounded to the nearest minute, so an early or late timer gives one key. */
   onSlot(slotMs: number): void;
   analysisTick(): void;
+  /** Daily at 03:30 Europe/Warsaw (S-15): outside the 02:xx change hour, so exactly once a day. */
+  maintenance?(): void;
   onError?(error: unknown): void;
   tickMs?: number;
   clock?: Clock;
@@ -67,6 +69,7 @@ export function startScheduler({
   times,
   onSlot,
   analysisTick,
+  maintenance,
   onError,
   tickMs = ANALYSIS_TICK_MS,
   clock = { now: () => new Date() },
@@ -80,6 +83,12 @@ export function startScheduler({
       () => onSlot(Math.round(clock.now().getTime() / MINUTE_MS) * MINUTE_MS),
     );
   });
+  // Not in `jobs`: `nextRunAt` is the next discovery slot only.
+  const maintenanceJob = maintenance
+    ? new Cron('30 3 * * *', { timezone: TIMEZONE, protect: true, catch: fail, unref: true }, () =>
+        maintenance(),
+      )
+    : undefined;
   const timer = setInterval(() => {
     try {
       analysisTick();
@@ -100,6 +109,7 @@ export function startScheduler({
     stop() {
       clearInterval(timer);
       for (const job of jobs) job.stop();
+      maintenanceJob?.stop();
     },
   };
 }

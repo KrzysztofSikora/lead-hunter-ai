@@ -16,6 +16,9 @@ import {
   llmRunnerDeps,
   offerDrafterDeps,
 } from './infrastructure/llm/create-provider.js';
+import { createDataRepository } from './infrastructure/db/data-repository.js';
+import { createSqliteBackupStore } from './infrastructure/backup/sqlite-backup.js';
+import { createDataService } from './modules/ownership/service.js';
 import { createOfferService } from './modules/offers/service.js';
 import { createOpportunityService } from './modules/opportunities/service.js';
 import {
@@ -139,6 +142,14 @@ async function main(): Promise<void> {
     dailyLimit: config.offerDraftDailyLimit,
     ...offerDrafterDeps(config.llm),
   });
+  const data = createDataService({
+    repository: createDataRepository(db),
+    clock,
+    backups: createSqliteBackupStore(sqlite, config.backupDir),
+    backupKeep: config.backupKeep,
+    retentionDays: config.retentionDays,
+    logger: { info: (message) => logInfo(message), error: (message) => logger.error(message) },
+  });
   // The list shows the next slot; the scheduler starts after the app, so it is read lazily.
   const running: { scheduler?: Scheduler } = {};
   const app = await buildApp({
@@ -164,6 +175,7 @@ async function main(): Promise<void> {
     insights: { repository: createInsightsRepository(db), clock },
     analysis: runner,
     offers,
+    data,
     sources: sourceRuntime.service,
     jobs: sourceRuntime.jobs,
     schedule: {
@@ -217,6 +229,8 @@ async function main(): Promise<void> {
     },
     // D-4: work held back by the daily limit resumes on a later tick.
     analysisTick: () => runner.kick(),
+    // S-15 D-5: runDaily never rejects, so the floating promise is safe.
+    maintenance: () => void data.runDaily(),
     onError: (error) =>
       logger.error(`scheduler error: ${error instanceof Error ? error.message : 'error'}`),
   });

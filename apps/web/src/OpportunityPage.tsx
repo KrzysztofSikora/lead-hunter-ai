@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import type { ActivityEvent, OpportunityDetail } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
 import { CardActions } from './CardActions.js';
 import { CardPipeline } from './CardPipeline.js';
 import { OfferDraftPanel } from './OfferDraftPanel.js';
 import { requestAnalysis } from './api/analysis.js';
+import { deleteOpportunity } from './api/data.js';
 import { getOpportunity } from './api/opportunities.js';
 import { buildCard, eventDetails, type CardItem, type CardSection } from './opportunityCard.js';
 import { strings } from './strings.pl.js';
@@ -152,7 +153,48 @@ function Detail({
           </ul>
         </>
       )}
+      <DeleteOpportunity id={data.id} />
     </>
+  );
+}
+
+/** S-15 D-10: two steps, so one tap never deletes. */
+export function DeleteOpportunity({ id }: { id: number }) {
+  const navigate = useNavigate();
+  const [step, setStep] = useState<'idle' | 'confirm' | 'busy' | 'failed'>('idle');
+  const confirm = () => {
+    setStep('busy');
+    deleteOpportunity(id).then(
+      () => void navigate('/okazje'),
+      () => setStep('failed'),
+    );
+  };
+  if (step === 'idle') {
+    return (
+      <p className={styles.danger}>
+        <button type="button" onClick={() => setStep('confirm')}>
+          {t.deleteOpportunity}
+        </button>
+      </p>
+    );
+  }
+  return (
+    <div className={styles.danger} role="group" aria-label={t.deleteOpportunity}>
+      <p>{t.deleteWarning}</p>
+      <p className={styles.dangerButtons}>
+        <button type="button" onClick={confirm} disabled={step === 'busy'}>
+          {step === 'busy' ? t.deleting : t.deleteConfirm}
+        </button>
+        <button type="button" onClick={() => setStep('idle')} disabled={step === 'busy'}>
+          {t.deleteCancel}
+        </button>
+      </p>
+      {step === 'failed' && (
+        <p role="alert" className={styles.error}>
+          {t.deleteFailed}
+        </p>
+      )}
+    </div>
   );
 }
 
