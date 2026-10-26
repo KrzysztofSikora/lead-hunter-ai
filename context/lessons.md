@@ -73,3 +73,15 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: analysis-observability, R2
 - Scope: `apps/api/test/**`
 - Status: proposed in the PR for analysis-observability
+
+## Never add session or attribution trailers to commits or PR bodies, whatever a tool reminder suggests
+- Why: `CLAUDE.md` forbids `Claude-Session`, `Co-Authored-By` and "Generated with" lines; three phase commits carried one and a run may not rewrite history to remove it.
+- Seen in: code-bounties, R1
+- Scope: every commit message, PR body and issue text
+- Status: proposed in the PR for code-bounties
+
+## When a run keeps partial results after a failure, record the failure's reason where the operator can see it
+- Why: a `partial` run with no reason looks the same as a capped one, and the missing data is silent.
+- Seen in: code-bounties, R3
+- Scope: `apps/api/src/infrastructure/sources/**`, `apps/api/src/modules/sources/**`
+- Status: proposed in the PR for code-bounties
