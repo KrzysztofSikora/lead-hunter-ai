@@ -258,6 +258,19 @@ export function createSourceService({
     return { attempt, nextAllowedAt };
   };
 
+  /** An in-day position (a TED token) belongs to one query and one run; keep the day, drop the position. */
+  function dropResumeAt(id: number, record: SourceRecord): void {
+    const cursor = readCursor(record);
+    if (cursor.resumeAt === null) return;
+    repository.saveCursor(
+      id,
+      JSON.stringify({
+        seen: cursor.seen,
+        ...(cursor.resumeFrom === null ? {} : { resumeFrom: cursor.resumeFrom }),
+      }),
+    );
+  }
+
   async function run(id: number, context?: RunContext): Promise<RunOutcome> {
     const record = repository.get(id);
     if (!record) return { kind: 'not_found' };
@@ -267,8 +280,11 @@ export function createSourceService({
 
     const runId = repository.startRun(id, startedAt, context);
     const counts = { fetched: 0, new: 0, duplicates: 0, failed: 0, filtered: 0 };
+    let resumedAt = false;
     const fail = (outcome: Extract<AdapterOutcome, { ok: false }>): RunOutcome => {
       const at = clock.now().getTime();
+      // A failed run that used a stored position drops it: the next run re-reads that day from its start.
+      if (resumedAt) dropResumeAt(id, record);
       const { nextAllowedAt } = recordFailure(id, outcome, at);
       const error = {
         reason: outcome.reason,
@@ -302,11 +318,10 @@ export function createSourceService({
         (record.lastSuccessAt === null
           ? startedAt - FIRST_RUN_LOOKBACK_MS
           : record.lastSuccessAt - SINCE_OVERLAP_MS);
+      resumedAt = previous.resumeFrom !== null && previous.resumeAt !== null;
       const outcome = await adapter.discover(checked.config, {
         since,
-        ...(previous.resumeFrom !== null && previous.resumeAt !== null
-          ? { resumeAt: previous.resumeAt }
-          : {}),
+        ...(resumedAt && previous.resumeAt !== null ? { resumeAt: previous.resumeAt } : {}),
       });
       if (!outcome.ok) return fail(outcome);
       const truncated = outcome.truncated === true;
@@ -534,6 +549,8 @@ export function createSourceService({
         },
         clock.now().getTime(),
       );
+      // A new query invalidates the stored in-day position; the day is re-read from its start.
+      if (updated && configJson !== undefined) dropResumeAt(id, record);
       return updated ? { kind: 'updated', source: toSource(updated) } : { kind: 'not_found' };
     },
 

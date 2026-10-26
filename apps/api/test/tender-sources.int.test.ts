@@ -42,12 +42,14 @@ function fakeTenderAdapter(type: 'bzp' | 'ted') {
   const state = {
     outcome: { ok: true, items: [], skipped: 0 } as AdapterOutcome,
     since: [] as number[],
+    resumeAt: [] as (string | undefined)[],
   };
   const adapter: SourceAdapter = {
     type,
     validateConfig: (config): ConfigCheck => ({ ok: true, config, key: type }),
     async discover(_config: unknown, context: DiscoverContext) {
       state.since.push(context.since);
+      state.resumeAt.push(context.resumeAt);
       return state.outcome;
     },
     async healthCheck() {
@@ -159,6 +161,76 @@ describe('tender sources in the source loop (S-18 Phase 1)', () => {
     clock.advance(2 * HOUR);
     await call('POST', `/api/sources/${id}/run`);
     expect(bzp.state.since).toEqual([first - 3 * DAY, first - DAY]);
+  });
+
+  describe('the in-day position in the cursor (R4, R5)', () => {
+    const capped = (resumeAt?: string): AdapterOutcome => ({
+      ok: true,
+      items: [],
+      skipped: 0,
+      truncated: true,
+      resumeFrom: Date.parse('2026-10-24T00:00:00Z'),
+      ...(resumeAt === undefined ? {} : { resumeAt }),
+    });
+
+    it('stores resumeAt with resumeFrom, passes both to the next run and clears them when it completes', async () => {
+      const { call, clock, addSource, ted } = await setup();
+      const id = addSource('ted', { cpvPrefixes: ['72'], countries: ['PL'] });
+      ted.state.outcome = capped('p11');
+      await call('POST', `/api/sources/${id}/run`);
+      ted.state.outcome = { ok: true, items: [], skipped: 0 };
+      clock.advance(2 * HOUR);
+      await call('POST', `/api/sources/${id}/run`);
+      clock.advance(2 * HOUR);
+      await call('POST', `/api/sources/${id}/run`);
+      expect(ted.state.since[1]).toBe(Date.parse('2026-10-24T00:00:00Z'));
+      expect(ted.state.resumeAt).toEqual([undefined, 'p11', undefined]);
+      expect(ted.state.since[2]).not.toBe(ted.state.since[1]);
+    });
+
+    it('does not store a position without resumeFrom or one that is too long', async () => {
+      const { call, clock, addSource, ted } = await setup();
+      const id = addSource('ted', { cpvPrefixes: ['72'], countries: ['PL'] });
+      ted.state.outcome = { ok: true, items: [], skipped: 0, truncated: true, resumeAt: 'p1' };
+      await call('POST', `/api/sources/${id}/run`);
+      ted.state.outcome = capped('x'.repeat(2_001));
+      clock.advance(2 * HOUR);
+      await call('POST', `/api/sources/${id}/run`);
+      clock.advance(2 * HOUR);
+      await call('POST', `/api/sources/${id}/run`);
+      expect(ted.state.resumeAt).toEqual([undefined, undefined, undefined]);
+    });
+
+    it('drops the position when the tender settings change, keeping the day', async () => {
+      const { call, clock, addSource, ted } = await setup();
+      const id = addSource('ted', { cpvPrefixes: ['72'], countries: ['PL'] });
+      ted.state.outcome = capped('tok-old');
+      await call('POST', `/api/sources/${id}/run`);
+      expect(
+        (await call('PATCH', `/api/sources/${id}`, { tender: { cpvPrefixes: ['48'] } })).statusCode,
+      ).toBe(200);
+      ted.state.outcome = { ok: true, items: [], skipped: 0 };
+      clock.advance(2 * HOUR);
+      await call('POST', `/api/sources/${id}/run`);
+      expect(ted.state.resumeAt).toEqual([undefined, undefined]);
+      expect(ted.state.since[1]).toBe(Date.parse('2026-10-24T00:00:00Z'));
+    });
+
+    it('drops the position after a failed run that used it', async () => {
+      const { call, clock, addSource, ted } = await setup();
+      const id = addSource('ted', { cpvPrefixes: ['72'], countries: ['PL'] });
+      ted.state.outcome = capped('tok-old');
+      await call('POST', `/api/sources/${id}/run`);
+      ted.state.outcome = { ok: false, reason: 'http_status', httpStatus: 400 };
+      clock.advance(2 * HOUR);
+      await call('POST', `/api/sources/${id}/run`);
+      clock.advance(DAY);
+      await call('POST', `/api/sources/${id}/run`);
+      clock.advance(DAY);
+      await call('POST', `/api/sources/${id}/run`);
+      expect(ted.state.resumeAt).toEqual([undefined, 'tok-old', undefined, undefined]);
+      expect(ted.state.since[2]).toBe(Date.parse('2026-10-24T00:00:00Z'));
+    });
   });
 
   it('does not repeat a notice the cursor has seen', async () => {
