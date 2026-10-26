@@ -85,3 +85,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: code-bounties, R3
 - Scope: `apps/api/src/infrastructure/sources/**`, `apps/api/src/modules/sources/**`
 - Status: proposed in the PR for code-bounties
+
+## When a fix widens a condition beyond what the finding asked, check it against the costly decision that owns that behaviour
+- Why: a fix for 403 also swallowed 429 + `Retry-After`, changing the costly D-5 backoff under a `[minor]` deviation, and no test noticed.
+- Seen in: code-bounties, R7
+- Scope: `apps/api/src/infrastructure/sources/**`, any change with `costly` decisions
+- Status: proposed in the PR for code-bounties
