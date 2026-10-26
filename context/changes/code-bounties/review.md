@@ -138,7 +138,7 @@ Round 3 note: re-review after `/fix-review` (4ee6f1a, 93f6220, 19395f5). R2, R4,
 - Fix: after the amount, accept only the reward nouns (`bount(y|ies)`, `rewards?`, `nagrod…`), not `pay`/`paid`/`budget`/`płac…`/`płatn…`. These verbs and adjectives count only before the amount (`Paid: $50`, `Budget is $50`). Accept a bracketed title amount only at the start (`^\s*[[(]\s*$` on `head`). Add the four probes above as negatives, and keep `Bounty: $50 paid after merge` and `This issue has a $50 bounty` as positives (both give 50 USD today).
 - Effort: small
 - Lesson candidate: no (the look-alike lesson covers it)
-- Decision: open
+- Decision: fixed (1a88b29); the fixture title `DEMO [$200] ...` became `[$200] DEMO ...` because a bracket amount now counts only at the start
 
 ### R8: `OTHER_CODE` lets `USDC`, `USDT`, lowercase and bracketed codes through as USD
 - Severity: major
@@ -151,7 +151,7 @@ Round 3 note: re-review after `/fix-review` (4ee6f1a, 93f6220, 19395f5). R2, R4,
 - Fix: `/^\s?\(?(?!(?:USD|EUR|PLN)(?![\p{L}]))\p{L}{3,4}(?![\p{L}])/iu`, or refuse any letters right after the amount other than the known markers. Change the test to `Bounty: $200 USDC`, and add `$200 USDT`, `$200 aud` and `$200 (AUD)`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (1a88b29)
 
 ### R9: The mutation re-run on `reward.ts` has undecided survivors in the R1 code, and they show missing tests
 - Severity: major
@@ -164,7 +164,7 @@ Round 3 note: re-review after `/fix-review` (4ee6f1a, 93f6220, 19395f5). R2, R4,
 - Fix: add the three cases above, plus R8's, then re-run the mutation and give every survivor a decision row (`accept`/`equivalent`) in `mutation.md`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (1a88b29); survivors decided in `mutation.md`
 
 ### R10: The D-8 row still describes the old Opire failure rule
 - Severity: minor
@@ -173,4 +173,4 @@ Round 3 note: re-review after `/fix-review` (4ee6f1a, 93f6220, 19395f5). R2, R4,
 - Fix: update the D-8 bullet to the new rule ("any other failed check ends the loop; the run is `partial` and the answered keys are kept"), and change the deviation tag to `[REVIEW]`.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (plan.md D-8 row and [REVIEW] tag, triage commit)
