@@ -41,6 +41,7 @@ import { getGlobalDispatcher } from 'undici';
 import { createHttpClient } from '../../src/infrastructure/sources/http/client.js';
 import { createPageFetcher } from '../../src/infrastructure/sources/manual/page-fetcher.js';
 import { createRobotsCheck } from '../../src/infrastructure/sources/manual/robots.js';
+import type { SourceAdapters } from '../../src/modules/sources/ports.js';
 import { createSourceRuntime } from '../../src/infrastructure/sources/compose.js';
 import type { JobLock } from '../../src/modules/jobs/ports.js';
 import type { JobsService } from '../../src/modules/jobs/service.js';
@@ -112,6 +113,10 @@ export async function buildTestApp(
     sleep?: Sleep;
     /** Wraps the stored pause flag, to land a cancel at an exact point of the drain. */
     wrapRunnerState?: (real: RunnerState) => RunnerState;
+    /** S-19: source adapters by type, added to or replacing the real ones. */
+    adapters?: SourceAdapters;
+    /** Captures the source service's log lines. */
+    sourceLogger?: { info(message: string): void; warn(message: string): void };
   } = {},
 ): Promise<{
   app: FastifyInstance;
@@ -165,6 +170,8 @@ export async function buildTestApp(
     http,
     clock,
     sleep: async () => undefined,
+    ...(options.adapters ? { adapters: options.adapters } : {}),
+    ...(options.sourceLogger ? { logger: options.sourceLogger } : {}),
     ...(options.jobLock ? { jobLock: options.jobLock } : {}),
     ...(options.heartbeatMs === undefined ? {} : { heartbeatMs: options.heartbeatMs }),
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),

@@ -129,6 +129,8 @@ export const rawSignals = sqliteTable(
     lastVerifiedAt: integer('last_verified_at'),
     /** S-12 D-8: the source run that created the signal; null for imports and older rows. */
     jobRunId: integer('job_run_id').references(() => jobRuns.id),
+    /** S-19 D-2: `BountyFacts` JSON of a bounty signal; null for every other signal. */
+    bountyJson: text('bounty_json'),
   },
   (table) => [
     index('raw_signals_job_run_idx').on(table.jobRunId),

@@ -33,6 +33,11 @@ export interface GetOptions {
   accept: string;
   /** Runs before each hop, before a slot is taken. It may throw an `HttpFetchError` to refuse. */
   beforeHop?: (url: URL) => Promise<void>;
+  /**
+   * S-19 D-9: extra request headers (a token). Sent on the first hop and on same-origin
+   * redirects only; dropped when a redirect changes the origin.
+   */
+  headers?: Record<string, string>;
 }
 
 export interface HttpClient {
@@ -152,7 +157,11 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     | { redirect: string }
     | { redirect?: undefined; status: number; headers: HttpResponse['headers']; body: Uint8Array };
 
-  async function hop(url: URL, { signal, accept }: GetOptions): Promise<Hop> {
+  async function hop(
+    url: URL,
+    { signal, accept }: GetOptions,
+    extraHeaders: Record<string, string>,
+  ): Promise<Hop> {
     const release = await semaphore.acquire(signal);
     try {
       const response = await request(url, {
@@ -160,6 +169,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         method: 'GET',
         signal,
         headers: {
+          ...extraHeaders,
           'user-agent': options.userAgent,
           accept,
           'accept-encoding': 'identity',
@@ -186,12 +196,16 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
       } catch {
         throw new HttpFetchError('blocked_url');
       }
+      const origin = current.origin;
+      let extraHeaders = getOptions.headers ?? {};
       try {
         for (let redirects = 0; ; redirects += 1) {
           const failure = checkTarget(current, isAllowed);
           if (failure) throw new HttpFetchError(failure);
           await getOptions.beforeHop?.(current);
-          const result = await hop(current, getOptions);
+          // Once a redirect leaves the origin the headers are gone for good, even on a way back.
+          if (current.origin !== origin) extraHeaders = {};
+          const result = await hop(current, getOptions, extraHeaders);
           if (result.redirect === undefined) {
             return {
               status: result.status,

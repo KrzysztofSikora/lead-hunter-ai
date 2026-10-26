@@ -29,6 +29,7 @@ export const ENV_VARIABLES = [
   'SOURCE_MIN_INTERVAL_MINUTES',
   'SOURCE_MAX_ATTEMPTS',
   'DISCOVERY_TIMES',
+  'GITHUB_TOKEN',
 ] as const;
 
 /** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
@@ -100,6 +101,7 @@ export const EnvSchema = z
     FETCH_MAX_BYTES: optional(z.coerce.number().int().min(65_536).max(5_242_880)),
     SOURCE_MIN_INTERVAL_MINUTES: optional(z.coerce.number().int().min(60).max(1_440)),
     SOURCE_MAX_ATTEMPTS: optional(z.coerce.number().int().min(1).max(5)),
+    GITHUB_TOKEN: optional(z.string().trim().min(1)),
     DISCOVERY_TIMES: optional(
       z.string().superRefine((value, ctx) => {
         const message = discoveryTimesIssue(value);
@@ -179,6 +181,8 @@ export interface Config {
   sourceMaxAttempts: number;
   /** Daily discovery slots as `HH:MM` in Europe/Warsaw, sorted (S-12 D-6). */
   discoveryTimes: string[];
+  /** S-19 D-9: optional; raises GitHub's search limit. Secret: the key is called `token` so logs redact it. */
+  github?: { token: string };
 }
 
 export interface ConfigIssue {
@@ -271,6 +275,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
           .sort()
       : DEFAULT_DISCOVERY_TIMES,
     ...(llm ? { llm } : {}),
+    ...(v.GITHUB_TOKEN ? { github: { token: v.GITHUB_TOKEN } } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };
 }

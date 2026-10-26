@@ -168,6 +168,7 @@ endpoint as follows:
 | D-13 | robots.txt for the two APIs? | Not consulted, as in S-18 D-12. Access goes through a documented API (GitHub) or the platform's public API (Opire), and the policy says so | B: check robots.txt as for feeds (`api.github.com/robots.txt` disallows crawlers site-wide, which would block the official API) | PRD §5 asks for official or permitted access; the API is that access | cheap | agent |
 | D-14 | Which fixtures do the adapter tests use? | Synthetic responses in the documented (GitHub) and third-party-described (Opire) shapes, marked `DEMO`, in `apps/api/test/fixtures/bounties/`. GitHub: a page with a `$` label, a `[$200]` title, a reward line in the body, two different amounts, no reward, a PR item and a non-allowed language. Opire: a USD_CENT reward, an unknown unit, a closed issue, a 404 issue and a non-issue URL. Each file says `UNVERIFIED` until the human check replaces it with a trimmed real response (`DEMO` names) | B: wait for recordings (blocks the run) | Truth first: synthetic files are labelled as such | cheap | agent |
 | D-15 | Opire's response is an object, not an array, or the fields differ | `map-reward.ts` accepts an array, or an object with an array under `rewards` or `data`. Anything else → `invalid_feed`. A reward without a usable `url` → `skipped`. Every field is read in `map-reward.ts` only | B: array only (strict, but one wrapper change breaks the source) | A shape change is a one-file fix, and it never turns into silent "no results" | cheap | agent |
+| D-16 | Phase 1 registry shape and the plan-review fixes it carries (plan-review 1, 9, 10) | `SourceAdapters = Partial<Record<SourceKind, SourceAdapter>>`; a stored type with no adapter fails its run and its check with `internal` (tested). `AdapterOutcome.ok` gains `checkedKeys?: string[]`, which the service merges into the cursor, so Opire's closed issues are remembered (finding 1). The endpoint shown for a bounty source is a per-type constant in the service, used by `toSource` and `logHost` (finding 9) | B: `Record` with stub adapters (typechecks, but a stub hides the missing-adapter path) | Findings 1, 9 and 10 land in the port and service this phase touches anyway | cheap | agent |
 
 ## Design
 
@@ -436,7 +437,7 @@ guard (D-10).
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Generic source types, bounty facts storage and the token header
+- [x] Phase 1: Generic source types, bounty facts storage and the token header
 - [ ] Phase 2: Reward parsing and the bounty guard rules
 - [ ] Phase 3: GitHub search adapter and preset
 - [ ] Phase 4: Opire adapter and preset
@@ -447,6 +448,10 @@ guard (D-10).
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] Phase 1: `update` on the source service now returns `{ kind: 'updated' | 'not_found' | 'not_github_source' }` instead of `Source | undefined`; PATCH 400 is `validation_failed | not_github_source`. The weight of the change is in `routes.ts` and `service.ts` only.
+- [minor] Phase 1: `buildTestApp` gained `adapters` and `sourceLogger` options, and `createSourceRuntime` an `adapters` override, for the fake-adapter tests.
+- [REVIEW] Plan-review findings 2 (Opire `too_old`), 3 (mid-run failures keep earlier items), 4 (D-8 and D-5 are `costly`), 5 (closed rewards stay out of `skipped`), 6 (`per_page` 30), 7 (link-count `spam`), 8 (parser: `CA$`, `pay|paid|budget`) and 11 (done in Phase 1 contracts: query length is checked in `GithubSearchConfig`) are not yet in the plan text. Phases 2–4 apply them and add the Decisions rows then. D-8 and D-5 should be read as `costly`.
+- [REVIEW] The roadmap asks for adapter tests on recorded responses; D-14 uses synthetic fixtures because the sandbox proxy refuses the APIs. Recorded fixtures are owed through the Phase 3 and 4 human checks.
 - [FOLLOW-UP] Re-check stored bounty signals when their issue closes, and enrich a stored
   duplicate with a reward that a later source states (D-12 B).
 - [FOLLOW-UP] Read issue comments for bot-stated amounts (Algora), within the core rate limit.

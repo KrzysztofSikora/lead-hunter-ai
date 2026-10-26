@@ -21,6 +21,7 @@ const Refused = z.union([
   z.object({ error: z.literal('disabled') }).strict(),
 ]);
 const CreateRefused = z.object({ error: z.literal('exists') }).strict();
+const NotGithubSource = z.object({ error: z.literal('not_github_source') }).strict();
 const BadPreset = z.object({ error: z.literal('unknown_preset') }).strict();
 
 function refusal(refused: Refusal) {
@@ -81,12 +82,16 @@ export function registerSourceRoutes(
       schema: {
         params: IdParams,
         body: UpdateSourceRequest,
-        response: { 200: Source, 404: NotFound },
+        response: { 200: Source, 400: z.union([ValidationError, NotGithubSource]), 404: NotFound },
       },
     },
     async (request, reply) => {
-      const source = service.update(request.params.id, request.body);
-      return source ? source : reply.code(404).send({ error: 'not_found' });
+      const outcome = service.update(request.params.id, request.body);
+      if (outcome.kind === 'not_found') return reply.code(404).send({ error: 'not_found' });
+      if (outcome.kind === 'not_github_source') {
+        return reply.code(400).send({ error: 'not_github_source' });
+      }
+      return outcome.source;
     },
   );
 

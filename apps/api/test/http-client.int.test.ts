@@ -126,6 +126,54 @@ describe('guarded HTTP client (TR-03, FR-03 AC2/AC4)', () => {
     expect(Buffer.from(response.body).toString()).toBe('end');
   });
 
+  describe('extra headers (S-19 D-9)', () => {
+    const headers = { authorization: 'Bearer demo-token' };
+    const seen: { host: string | undefined; authorization: string | undefined }[] = [];
+    beforeEach(() => {
+      seen.length = 0;
+    });
+
+    it('sends them on the first hop and on a same-origin redirect', async () => {
+      handler = (req, res) => {
+        seen.push({ host: req.headers.host, authorization: req.headers.authorization });
+        return req.url === '/start' ? res.writeHead(301, { location: '/end' }).end() : res.end('x');
+      };
+      await get(permissiveClient(), `http://ok.test:${port}/start`, 5000, { headers });
+      expect(seen.map((hop) => hop.authorization)).toEqual([
+        'Bearer demo-token',
+        'Bearer demo-token',
+      ]);
+    });
+
+    it('drops them after a cross-origin redirect, also on the way back', async () => {
+      handler = (req, res) => {
+        seen.push({ host: req.headers.host, authorization: req.headers.authorization });
+        if (req.url === '/start') {
+          return res.writeHead(302, { location: `http://other.test:${port}/mid` }).end();
+        }
+        if (req.url === '/mid') {
+          return res.writeHead(302, { location: `http://ok.test:${port}/end` }).end();
+        }
+        return res.end('x');
+      };
+      await get(permissiveClient(), `http://ok.test:${port}/start`, 5000, { headers });
+      expect(seen.map((hop) => [hop.host, hop.authorization])).toEqual([
+        [`ok.test:${port}`, 'Bearer demo-token'],
+        [`other.test:${port}`, undefined],
+        [`ok.test:${port}`, undefined],
+      ]);
+    });
+
+    it('sends none when none were given', async () => {
+      handler = (req, res) => {
+        seen.push({ host: req.headers.host, authorization: req.headers.authorization });
+        res.end('x');
+      };
+      await get(permissiveClient(), `http://ok.test:${port}/`);
+      expect(seen[0]?.authorization).toBeUndefined();
+    });
+  });
+
   it('refuses a redirect to a blocked literal at the second hop', async () => {
     handler = (_req, res) =>
       res.writeHead(302, { location: `http://169.254.169.254/latest` }).end();

@@ -10,8 +10,37 @@ export { Category, Confidence, EvidenceLevel };
 export const DEFAULT_IMPORT_MAX_TEXT_CHARS = 20_000;
 
 /** S-11 adds `imap`. `manual_fetch`: the text came from a one-off page fetch. */
-export const SourceType = z.enum(['manual_text', 'manual_url', 'manual_fetch', 'rss']);
+export const SourceType = z.enum([
+  'manual_text',
+  'manual_url',
+  'manual_fetch',
+  'rss',
+  'github',
+  'opire',
+]);
 export type SourceType = z.infer<typeof SourceType>;
+
+/**
+ * S-19 D-2: what a bounty source states about an issue. The reward comes from the API or the
+ * deterministic parser, never from the model, and `quote` is the text it was read from.
+ */
+export const BountyFacts = z
+  .object({
+    platform: z.enum(['github', 'opire']),
+    repository: z.string().min(1).max(140),
+    issueNumber: z.number().int().min(1).max(1_000_000_000),
+    labels: z.array(z.string().min(1).max(50)).max(20),
+    reward: z
+      .object({
+        amountMinor: z.number().int().min(0).max(100_000_000_000),
+        currency: Currency,
+        quote: z.string().min(1).max(200),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+export type BountyFacts = z.infer<typeof BountyFacts>;
 
 /** Brief §10.1. */
 export const BusinessStatus = z.enum([

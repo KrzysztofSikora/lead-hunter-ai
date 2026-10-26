@@ -1,4 +1,4 @@
-import type { RssConfig, SourceFailureReason } from '@lead-hunter/contracts';
+import type { BountyFacts, SourceFailureReason, SourceKind } from '@lead-hunter/contracts';
 import type { JobTrigger } from '../jobs/ports.js';
 
 /** One entry of a feed, mapped to the fields of a raw signal (S-10 Design). */
@@ -9,10 +9,29 @@ export interface FeedItem {
   title: string;
   text: string;
   publishedAt: number | null;
+  /** S-19 D-2: set by the bounty adapters only; validated by the service before it is stored. */
+  bounty?: BountyFacts;
+}
+
+/** S-19 D-1, D-8: what the service tells an adapter about the run. */
+export interface DiscoverContext {
+  /** The cursor's item keys: what an earlier run already stored or checked. */
+  seen: ReadonlySet<string>;
 }
 
 export type AdapterOutcome =
-  | { ok: true; items: FeedItem[]; skipped: number }
+  | {
+      ok: true;
+      items: FeedItem[];
+      skipped: number;
+      /** The adapter stopped at its own cap; the run is `partial`. */
+      truncated?: true;
+      /**
+       * Plan-review 1: keys the adapter looked at and dropped on purpose (a closed issue), so the
+       * cursor remembers them and the next run spends its checks elsewhere.
+       */
+      checkedKeys?: string[];
+    }
   | {
       ok: false;
       reason: SourceFailureReason;
@@ -21,21 +40,27 @@ export type AdapterOutcome =
       retryAfterMs?: number;
     };
 
-export type ConfigCheck =
-  { ok: true; config: RssConfig; key: string } | { ok: false; issues: string[] };
+export type ConfigCheck<C = unknown> =
+  { ok: true; config: C; key: string } | { ok: false; issues: string[] };
 
-/** Brief §5.2. The cursor is applied by the service (D-3), so an adapter is fetch-and-map only. */
-export interface SourceAdapter {
-  type: 'rss';
-  validateConfig(config: unknown): ConfigCheck;
-  discover(config: RssConfig): Promise<AdapterOutcome>;
-  /** The same guarded fetch and parse; the caller stores nothing from it (D-9). */
-  healthCheck(config: RssConfig): Promise<AdapterOutcome>;
+/**
+ * Brief §5.2. The cursor is applied by the service (D-3), so an adapter is fetch-and-map only.
+ * S-19 D-1: generic over its config; the service picks the adapter by the source's type.
+ */
+export interface SourceAdapter<C = unknown> {
+  type: SourceKind;
+  validateConfig(config: unknown): ConfigCheck<C>;
+  discover(config: C, context: DiscoverContext): Promise<AdapterOutcome>;
+  /** One request; the caller stores nothing from it (D-9). */
+  healthCheck(config: C): Promise<AdapterOutcome>;
 }
+
+/** One adapter per type; a type without one fails its run with `internal`. */
+export type SourceAdapters = Partial<Record<SourceKind, SourceAdapter>>;
 
 export interface SourceRecord {
   id: number;
-  type: 'rss';
+  type: SourceKind;
   name: string;
   configJson: string;
   configKey: string;
@@ -52,6 +77,7 @@ export interface SourceRecord {
 }
 
 export interface NewSource {
+  type: SourceKind;
   name: string;
   configJson: string;
   configKey: string;
@@ -90,7 +116,7 @@ export interface SourceRepository {
   insert(source: NewSource): SourceRecord | undefined;
   update(
     id: number,
-    patch: { enabled?: boolean; filterJson?: string },
+    patch: { enabled?: boolean; filterJson?: string; configJson?: string },
     at: number,
   ): SourceRecord | undefined;
   /** D-5: one atomic step; a run also pushes `next_allowed_at` forward by `intervalMs`. */

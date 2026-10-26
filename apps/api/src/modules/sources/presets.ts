@@ -25,6 +25,7 @@ const FREELANCER_SKILLS: readonly [slug: string, label: string, keyword: string]
 export const PRESETS: readonly SourcePreset[] = [
   {
     id: 'hn-freelance',
+    type: 'rss',
     name: 'Hacker News — Seeking freelancer',
     url: 'https://hnrss.org/whoishiring/freelance',
     accessNote: `Kanał RSS serwisu hnrss.org (nieoficjalne lustro Hacker News): komentarze z miesięcznego wątku „Freelancer? Seeking freelancer?”. ${POLL_NOTE}`,
@@ -33,6 +34,7 @@ export const PRESETS: readonly SourcePreset[] = [
   },
   ...FREELANCER_SKILLS.map(([slug, label, keyword]): SourcePreset => ({
     id: `freelancer-${slug}`,
+    type: 'rss',
     name: `Freelancer.com — ${label}`,
     url: `https://www.freelancer.com/rss.xml?keyword=${encodeURIComponent(keyword)}`,
     accessNote: `Kanał RSS projektów Freelancer.com dla słowa kluczowego „${keyword}”: zlecenia, nie oferty pracy. ${POLL_NOTE} Adres i regulamin do weryfikacji.`,
@@ -41,6 +43,7 @@ export const PRESETS: readonly SourcePreset[] = [
   })),
   {
     id: 'arduino-jobs',
+    type: 'rss',
     name: 'Arduino Forum — Jobs and Paid Consultancy',
     url: 'https://forum.arduino.cc/c/community/jobs/42.rss',
     accessNote: `Kanał RSS kategorii „Jobs and Paid Consultancy” forum Arduino (Discourse): wątki ze zleceniami. ${POLL_NOTE} Adres i regulamin do weryfikacji.`,
@@ -56,6 +59,7 @@ export const PRESETS: readonly SourcePreset[] = [
 export const WITHDRAWN_PRESETS: readonly SourcePreset[] = [
   {
     id: 'hn-jobs-contract',
+    type: 'rss',
     name: 'Hacker News — Jobs (contract)',
     url: 'https://hnrss.org/jobs?q=contract',
     accessNote: `Kanał RSS serwisu hnrss.org: ogłoszenia z działu Jobs zawierające „contract”. ${POLL_NOTE}`,
@@ -69,6 +73,7 @@ export const WITHDRAWN_PRESETS: readonly SourcePreset[] = [
     ['wwr-devops', 'DevOps', 'remote-devops-sysadmin-jobs'],
   ].map(([id, label, slug]): SourcePreset => ({
     id: id ?? '',
+    type: 'rss',
     name: `We Work Remotely — ${label}`,
     url: `https://weworkremotely.com/categories/${slug}.rss`,
     accessNote: `Oficjalny kanał RSS kategorii We Work Remotely. ${POLL_NOTE}`,

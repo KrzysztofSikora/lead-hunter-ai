@@ -341,6 +341,8 @@ export const strings = {
       manual_url: 'Wklejony adres URL',
       manual_fetch: 'Pobrana strona (jednorazowo)',
       rss: 'Kanał RSS/Atom',
+      github: 'GitHub — zgłoszenia z nagrodą',
+      opire: 'Opire — nagroda za zgłoszenie',
     },
   },
   prefilterRules: {

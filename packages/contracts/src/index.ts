@@ -47,6 +47,7 @@ export {
   ActivityMetadata,
   AnalysisSummary,
   Availability,
+  BountyFacts,
   BusinessStatus,
   AnalysisStatus,
   Category,
@@ -94,9 +95,15 @@ export {
 } from './pipeline.js';
 export {
   CreateSourceRequest,
+  GITHUB_LANGUAGES,
+  GITHUB_QUERY_BASE,
+  GITHUB_QUERY_MAX_CHARS,
+  GithubSearchConfig,
+  OpireConfig,
   RssConfig,
   Source,
   SourceFilter,
+  SourceKind,
   SourceHealth,
   SourceList,
   SourcePreset,

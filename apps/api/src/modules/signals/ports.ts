@@ -18,6 +18,8 @@ export interface NewSignal {
   availability: Availability;
   lastVerifiedAt: number | null;
   jobRunId?: number | null;
+  /** S-19 D-2: validated `BountyFacts` JSON; null for any other signal. */
+  bountyJson?: string | null;
 }
 
 export interface NewEvidence {

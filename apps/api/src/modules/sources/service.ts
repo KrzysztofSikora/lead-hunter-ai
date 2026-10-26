@@ -1,7 +1,10 @@
 import {
+  BountyFacts,
+  GithubSearchConfig,
   SourceFilter,
   type CreateSourceRequest,
   type Source,
+  type SourceKind,
   type SourceHealth,
   type SourceList,
   type SourceRunResult,
@@ -17,7 +20,7 @@ import type {
   AdapterOutcome,
   AttemptOutcome,
   RunContext,
-  SourceAdapter,
+  SourceAdapters,
   SourceRecord,
   SourceRepository,
 } from './ports.js';
@@ -33,7 +36,8 @@ export const MAX_SOURCE_BACKOFF_MS = 7 * 24 * 3_600_000;
 export interface SourceDeps {
   repository: SourceRepository;
   signals: SignalRepository;
-  adapter: SourceAdapter;
+  /** S-19 D-1: one adapter per source type; a type without one fails with `internal`. */
+  adapters: SourceAdapters;
   clock: Clock;
   minIntervalMs: number;
   /** Called after a run stored new signals, so analysis starts without waiting for its timer. */
@@ -44,6 +48,9 @@ export interface SourceDeps {
 
 export type Refusal =
   { kind: 'not_found' } | { kind: 'disabled' } | { kind: 'too_soon'; nextAllowedAt: string };
+
+export type UpdateOutcome =
+  { kind: 'updated'; source: Source } | { kind: 'not_found' } | { kind: 'not_github_source' };
 
 export type CreateOutcome =
   | { kind: 'created'; source: Source }
@@ -58,7 +65,7 @@ export interface SourceService {
   list(): SourceList;
   create(request: CreateSourceRequest): CreateOutcome;
   /** D-13: `filter` replaces the whole filter; it is validated before it is stored. */
-  update(id: number, patch: UpdateSourceRequest): Source | undefined;
+  update(id: number, patch: UpdateSourceRequest): UpdateOutcome;
   run(id: number, context?: RunContext): Promise<RunOutcome>;
   check(id: number): Promise<CheckOutcome>;
   /**
@@ -72,12 +79,30 @@ export interface SourceService {
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 
+/** Plan-review 9: the endpoint a bounty source reads, shown in place of a feed URL. */
+const ENDPOINTS: Partial<Record<SourceKind, string>> = {
+  github: 'https://api.github.com/search/issues',
+  opire: 'https://api.opire.dev/rewards',
+};
+
 function parseConfigUrl(record: SourceRecord): string {
+  const endpoint = ENDPOINTS[record.type];
+  if (endpoint !== undefined) return endpoint;
   try {
     const config = JSON.parse(record.configJson) as { url?: unknown };
     return typeof config.url === 'string' ? config.url : '';
   } catch {
     return '';
+  }
+}
+
+function readGithub(record: SourceRecord): GithubSearchConfig | null {
+  if (record.type !== 'github') return null;
+  try {
+    const parsed = GithubSearchConfig.safeParse(JSON.parse(record.configJson));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
   }
 }
 
@@ -96,7 +121,7 @@ function readSeen(record: SourceRecord): string[] {
 export function createSourceService({
   repository,
   signals,
-  adapter,
+  adapters,
   clock,
   minIntervalMs,
   onSignalCreated,
@@ -116,6 +141,7 @@ export function createSourceService({
       termsUrl: preset?.termsUrl ?? null,
       enabled: record.enabled,
       filter: readFilter(record.filterJson).filter,
+      github: readGithub(record),
       presetWithdrawn: preset !== undefined && offered === undefined,
       lastAttemptAt: record.lastAttemptAt === null ? null : iso(record.lastAttemptAt),
       lastSuccessAt: record.lastSuccessAt === null ? null : iso(record.lastSuccessAt),
@@ -163,6 +189,19 @@ export function createSourceService({
     return { attempt, nextAllowedAt };
   };
 
+  /** Lesson: validate before storing. An invalid fact is dropped, the signal is kept. */
+  const readBounty = (
+    item: { bounty?: unknown },
+    id: number,
+    record: SourceRecord,
+  ): string | null => {
+    if (item.bounty === undefined) return null;
+    const parsed = BountyFacts.safeParse(item.bounty);
+    if (parsed.success) return JSON.stringify(parsed.data);
+    logger?.warn(`source ${id} ${logHost(record)}: bounty_facts_invalid`);
+    return null;
+  };
+
   async function run(id: number, context?: RunContext): Promise<RunOutcome> {
     const record = repository.get(id);
     if (!record) return { kind: 'not_found' };
@@ -193,17 +232,19 @@ export function createSourceService({
     };
 
     try {
+      const adapter = adapters[record.type];
+      if (!adapter) return fail({ ok: false, reason: 'internal' });
       const config = JSON.parse(record.configJson) as unknown;
       const checked = adapter.validateConfig(config);
       if (!checked.ok) return fail({ ok: false, reason: 'internal' });
-      const outcome = await adapter.discover(checked.config);
+      const seen = new Set(readSeen(record));
+      const outcome = await adapter.discover(checked.config, { seen });
       if (!outcome.ok) return fail(outcome);
 
       const stored = readFilter(record.filterJson);
       if (stored.invalid) logger?.warn(`source ${id} ${logHost(record)}: source_filter_invalid`);
       const filter = stored.filter;
-      const seen = new Set(readSeen(record));
-      const remembered: string[] = [];
+      const remembered: string[] = outcome.checkedKeys ? [...outcome.checkedKeys] : [];
       counts.fetched = outcome.items.length + outcome.skipped;
       counts.failed = outcome.skipped;
       for (const item of outcome.items) {
@@ -222,12 +263,13 @@ export function createSourceService({
             }
           }
           const at = clock.now().getTime();
+          const bounty = readBounty(item, id, record);
           const verdict = filter.enabled
             ? applySourceFilter(filter, item.title, snippet)
             : ({ pass: true } as const);
           const result = signals.transaction((tx) => {
             const ingested = ingest(tx, {
-              sourceType: 'rss',
+              sourceType: record.type,
               sourceId: id,
               externalId: item.key,
               sourceUrl: item.url,
@@ -239,6 +281,7 @@ export function createSourceService({
               at,
               sourceFact: snippet !== '' ? snippet : (item.url ?? ''),
               jobRunId: runId,
+              bountyJson: bounty,
             });
             // D-4: only a new opportunity is rejected; a duplicate keeps whatever status it has.
             if (ingested.result === 'created' && !verdict.pass) {
@@ -262,7 +305,7 @@ export function createSourceService({
       repository.saveCursor(id, JSON.stringify({ seen: kept }));
 
       const finishedAt = clock.now().getTime();
-      const status = counts.failed > 0 ? 'partial' : 'ok';
+      const status = counts.failed > 0 || outcome.truncated ? 'partial' : 'ok';
       repository.finishRun(runId, { status, at: finishedAt, ...counts });
       repository.finishAttempt(id, { ok: true }, finishedAt);
       logger?.info(
@@ -295,10 +338,12 @@ export function createSourceService({
 
     let outcome: AdapterOutcome;
     try {
-      const checked = adapter.validateConfig(JSON.parse(record.configJson) as unknown);
-      outcome = checked.ok
-        ? await adapter.healthCheck(checked.config)
-        : { ok: false, reason: 'internal' };
+      const adapter = adapters[record.type];
+      const checked = adapter?.validateConfig(JSON.parse(record.configJson) as unknown);
+      outcome =
+        adapter && checked?.ok
+          ? await adapter.healthCheck(checked.config)
+          : { ok: false, reason: 'internal' };
     } catch {
       outcome = { ok: false, reason: 'internal' };
     }
@@ -346,9 +391,12 @@ export function createSourceService({
       } else {
         ({ name, url } = request);
       }
+      const adapter = adapters.rss;
+      if (!adapter) return { kind: 'invalid', issues: ['Źródła RSS są niedostępne.'] };
       const checked = adapter.validateConfig({ url });
       if (!checked.ok) return { kind: 'invalid', issues: checked.issues };
       const inserted = repository.insert({
+        type: 'rss',
         name,
         configJson: JSON.stringify(checked.config),
         configKey: checked.key,
@@ -362,15 +410,23 @@ export function createSourceService({
     update(id, patch) {
       // Lesson: validate before storing, not only on read.
       const filter = patch.filter === undefined ? undefined : SourceFilter.parse(patch.filter);
+      const github =
+        patch.github === undefined ? undefined : GithubSearchConfig.parse(patch.github);
+      if (github !== undefined) {
+        const existing = repository.get(id);
+        if (!existing) return { kind: 'not_found' };
+        if (existing.type !== 'github') return { kind: 'not_github_source' };
+      }
       const updated = repository.update(
         id,
         {
           ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
           ...(filter === undefined ? {} : { filterJson: JSON.stringify(filter) }),
+          ...(github === undefined ? {} : { configJson: JSON.stringify(github) }),
         },
         clock.now().getTime(),
       );
-      return updated ? toSource(updated) : undefined;
+      return updated ? { kind: 'updated', source: toSource(updated) } : { kind: 'not_found' };
     },
 
     run,

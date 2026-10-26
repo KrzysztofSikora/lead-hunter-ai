@@ -66,6 +66,12 @@ describe('loadConfig', () => {
     });
   });
 
+  it('reads GITHUB_TOKEN when present and omits it when absent or empty (S-19 D-9)', () => {
+    expect(loadConfig({ GITHUB_TOKEN: '  ghp_demo  ' }).github).toEqual({ token: 'ghp_demo' });
+    expect(loadConfig({})).not.toHaveProperty('github');
+    expect(loadConfig({ GITHUB_TOKEN: '' })).not.toHaveProperty('github');
+  });
+
   it('treats an empty string as unset', () => {
     const config = loadConfig({ PORT: '', HOST: '', LOG_LEVEL: '', OPERATOR_PASSWORD_HASH: '' });
     expect(config.port).toBe(8080);
