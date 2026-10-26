@@ -33,7 +33,8 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 /**
- * D-5: an exhausted limit (403 or 429 with `x-ratelimit-remaining: 0`) waits for `retry-after`, else
+ * D-5: an exhausted limit (403 or 429 with `x-ratelimit-remaining: 0`, or a secondary 403 with
+ * `retry-after`) is reported with `retry-after`, else
  * for the reset time, bounded to now…now + 1 h so a hostile header cannot park the source.
  */
 export function limitWaitMs(
@@ -76,11 +77,12 @@ export function createGithubApi({
           };
         }
         const now = clock.now().getTime();
-        // A primary limit sends `x-ratelimit-remaining: 0`; a secondary one a `retry-after`.
+        // A primary limit sends `x-ratelimit-remaining: 0`; a secondary one a 403 with `retry-after`.
+        // A 429 with only `retry-after` is a short wait and goes through the D-5 backoff below.
         const exhausted =
           (response.status === 403 || response.status === 429) &&
           (first(response.headers['x-ratelimit-remaining']) === '0' ||
-            first(response.headers['retry-after']) !== undefined);
+            (response.status === 403 && first(response.headers['retry-after']) !== undefined));
         if (exhausted) {
           const wait = limitWaitMs(response.headers, now);
           return {

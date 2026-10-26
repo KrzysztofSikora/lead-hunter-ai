@@ -451,6 +451,22 @@ describe('GitHub search source (S-19 D-3, D-4, D-5, FR-33 AC1)', () => {
     expect(githubSeen).toHaveLength(1);
   });
 
+  it('retries a 429 with a short retry-after after that wait (D-5)', async () => {
+    githubAnswer = (q, index) =>
+      index === 0
+        ? { status: 429, body: '{}', headers: { 'retry-after': '5' } }
+        : { status: 200, body: q.includes('language:JavaScript') ? JS_PAGE : TS_PAGE };
+    const { add, call, sleeps } = await github();
+    const { id } = await add();
+
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+      status: 'partial',
+      new: 6,
+    });
+    expect(githubSeen).toHaveLength(3);
+    expect(sleeps[0]).toBe(5_000);
+  });
+
   it('fails explicitly: 500, bad JSON, wrong shape, and stores nothing', async () => {
     const { add, call, db, clock } = await github();
     const { id } = await add();
