@@ -1,7 +1,15 @@
 # Review: data-ownership-backup
 
-Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (83 files, 1116 tests), image not run (environment: no Docker daemon in this sandbox), image smoke not run (needs the image), e2e not run (environment: Playwright Chromium not installed), mutation n/a (S-15 is not a mutation target) · Round: 2
+Verdict: APPROVE
+Gates: typecheck ok, lint ok, unit tests ok (83 files, 1117 tests), image not run (environment: no Docker daemon in this sandbox), image smoke not run (needs the image), e2e not run (environment: Playwright Chromium not installed), mutation n/a (S-15 is not a mutation target) · Round: 3
+
+Re-review after the second `/fix-review` (commits `7bfdb9f`, `795a8a9`).
+
+- R5 is fixed as described: `deleteClosedBefore` now also skips a row with an `offer_drafts` row whose `updated_at >= before`. Both write paths set that column (`insert` sets `createdAt`/`updatedAt` to `at`; `update` sets `updatedAt: at`, including status moves from `act`). A `FAILED` draft also keeps the row, which is the conservative side of D-4. The new test (`retention.int.test.ts`, "keeps a closed row an offer draft was generated for within the period") goes through `POST /api/opportunities/:id/offer-drafts` one day earlier and asserts that only the drafted row survives. That is the round-2 probe turned into a test. The plan's *Risks* line now names offer drafts.
+- I checked the other tables that point to `opportunities`. `payments` is already excluded. `analyses` writes move `opportunities.updated_at` (`analysis-repository.ts:75`, `:189`, `:281`, `:298`). `opportunity_evidence`/`signal_identities` hold source merges. `insertEvidence` (`signal-repository.ts:67`) does not move `updated_at`, but it is source input, not operator input, so D-4's "sooner than the operator expects" does not cover it. Nothing else writes per-opportunity operator data, so the R1 lesson is now met.
+- R2 is still deferred (`[FOLLOW-UP]` in *Deviations*); it is minor. No new findings this round.
+
+Round 2 notes (kept for history):
 
 Re-review after `/fix-review` (commits `eccd401`, `66796f8`, `18fa4c3`, `5fa91c0`).
 
@@ -16,7 +24,7 @@ Extra check this round: a throwaway vitest probe, removed afterwards and not com
 | File | Status | Note |
 |------|--------|------|
 | `apps/api/src/infrastructure/db/schema.ts`, `migrations/0013_old_pride.sql`, `meta/*` | done | `deleted_usage` plus its index; additive |
-| `apps/api/src/infrastructure/db/data-repository.ts` | done | Delete, retention and export. Round 2 adds the `NOTE`/`WORK` guard (R1); drafts are still not considered (R5) |
+| `apps/api/src/infrastructure/db/data-repository.ts` | done | Delete, retention and export. Round 2 adds the `NOTE`/`WORK` guard (R1), round 3 the offer-draft guard (R5) |
 | `apps/api/src/infrastructure/db/analysis-repository.ts` | done | Sums from `deleted_usage`; D-2 paths |
 | `apps/api/src/infrastructure/db/offer-draft-repository.ts`, `modules/offers/{ports,service}.ts` | done | `insert` returns `number \| null`; both paths answer `not_found` |
 | `apps/api/src/modules/data/{ports,service,routes}.ts` | done | |
@@ -31,7 +39,7 @@ Extra check this round: a throwaway vitest probe, removed afterwards and not com
 | `CLAUDE.md` | done | |
 | `README.md` | done | |
 | `scripts/container-smoke.sh` | done | Restores in place (logged); still never executed (`[REVIEW]` line) |
-| `apps/api/test/{data-delete,data-export,backup,retention,restore}.int.test.ts`, `cli.int.test.ts` | done | Round 2 adds the note-retention test and the missing-database CLI test |
+| `apps/api/test/{data-delete,data-export,backup,retention,restore}.int.test.ts`, `cli.int.test.ts` | done | Round 2 adds the note-retention test and the missing-database CLI test; round 3 the draft-retention test |
 | `apps/api/test/helpers/app.ts`, `apps/api/test/offer-draft-repository.int.test.ts` | unplanned | Test wiring; trivial |
 | `.gitignore` | unplanned | Logged under *Deviations* |
 | `context/roadmap.md`, `context/lessons.md` | unplanned | Status column; proposed lesson from R1 |
@@ -39,13 +47,13 @@ Extra check this round: a throwaway vitest probe, removed afterwards and not com
 ## Areas
 | Area | Result | One-line reason |
 |------|--------|-----------------|
-| Correctness | concern | Retention still deletes a closed row whose offer draft was generated or edited within the period (R5) |
+| Correctness | ok | Retention now judges the last change by `updated_at`, notes, work entries and offer drafts (R1, R5 fixed) |
 | Design | ok | Clean ports, and one `remove` routine serves both delete and retention |
 | Safety | ok | The export leaves out secrets (TR-12 test), and the backup CLI no longer touches the schema |
-| Tests | concern | Late-save cost paths untested (R2, deferred); no retention test for draft activity (R5) |
+| Tests | concern | Late-save cost paths untested (R2, deferred, minor); retention covers notes and drafts |
 | Simplicity | concern | The unknown-cost rule exists in five places (R2, deferred) |
 | Plan fidelity | ok | The R3 *Risks* line was added; the R4 change is recorded through this review |
-| Agent decisions | ok | D-1 and D-8 each live in one place; D-4's "last change" now covers notes and work but not drafts (R5) |
+| Agent decisions | ok | D-1 and D-8 each live in one place; D-4's "last change" covers notes, work and drafts |
 
 ## Findings
 ### R1: Retention ignores notes and work entries, so it deletes rows the operator just touched
