@@ -48,7 +48,7 @@ Extra checks this review ran: `pnpm build`, then the built `node apps/api/dist/c
 - Fix: Treat the newest operator event as a change. Either add `NOT EXISTS (SELECT 1 FROM activity_events WHERE opportunity_id = o.id AND occurred_at >= before)` to the retention query, or bump `updated_at` in `addNote`/`addWork`. The second is simpler, but it changes the meaning of `updated_at` for the list sort, if anything sorts by it. Add a retention test row: rejected 91 days ago, note 1 day ago → kept.
 - Effort: small
 - Lesson candidate: When a rule judges "last change" by one column, list every write path to the record and test the ones that do not move that column
-- Decision: open
+- Decision: fixed (eccd401) + lesson proposed
 
 ### R2: The spend rule is copied into five places, and the late-save paths that carry cost are untested
 - Severity: minor
@@ -61,7 +61,7 @@ Extra checks this review ran: `pnpm build`, then the built `node apps/api/dist/c
 - Fix: Extract the two flags into one helper per kind, for example `usageFlags(row)` used by both TypeScript paths. Keep the SQL CASE beside it, and add a test that compares the helper with `spentSince` on the same rows. Extend the D-2 test with a paid provider (non-zero cost and a `null` cost) and a failing analysis, and assert `spentSince` before and after.
 - Effort: medium
 - Lesson candidate: no
-- Decision: open
+- Decision: deferred (medium effort and touches S-05/S-07 code; FOLLOW-UP in plan.md)
 
 ### R3: Plan-review #8 left unanswered: deletes and retention change past insights and run counts, and retained items can return as `NEW`
 - Severity: minor
@@ -70,7 +70,7 @@ Extra checks this review ran: `pnpm build`, then the built `node apps/api/dist/c
 - Fix: Add the *Risks* line, so the PR decision on D-3/D-4 covers it.
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (Risks line added in plan.md)
 
 ### R4: The backup command migrates the live database before copying it
 - Severity: minor
@@ -79,4 +79,4 @@ Extra checks this review ran: `pnpm build`, then the built `node apps/api/dist/c
 - Fix: Drop `runMigrations` from the backup CLI. Let it copy the file as it is, and fail clearly if the database does not exist. A copy of an older schema is migrated at restore time anyway (`restore.int.test.ts`).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (66796f8)

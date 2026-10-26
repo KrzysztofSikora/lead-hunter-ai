@@ -258,7 +258,11 @@ The operator owns their data and can get it back after a failure:
 - `db.backup()` restarts when another connection writes during the copy; on a busy DB a copy can
   take longer, but the 03:30 slot is idle.
 - Retention deletes what the operator never looked at again; D-4 keeps rows with payments and
-  judges by the last change.
+  judges by the last change (the newest `updated_at`, or a note or work entry, review R1).
+- Deleting or retaining rows also removes their history: insights read `activity_events` for
+  `REJECTED` moves and per-run outcomes join `raw_signals → opportunities`, so both shrink. With
+  D-3 an item removed by retention that a source lists again comes back as `NEW`. The decision on
+  D-3/D-4 at the PR covers both effects.
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
@@ -293,6 +297,8 @@ The operator owns their data and can get it back after a failure:
 - [minor] Plan-review #6: `runDaily()` never rejects (tested with a throwing store); the scheduler's maintenance cron is kept out of `nextRunAt()`, which stays the next discovery slot.
 - [minor] The CLI test for the failing directory uses a path below a regular file, since a read-only directory does not fail for root.
 - [minor] Phase 4: `deleteClosedBefore` reuses the phase 1 `remove` routine inside its own batch transaction; the existing `backup.int.test.ts` `runDaily` test now expects the second (retention) log line.
+
+- [FOLLOW-UP] Review R2: the unknown-cost/counted rule exists as SQL in `spentSince` and `remove`, and as TypeScript in `saveComplete`, `saveFailed` and the draft `insert`. Extract one helper per kind and add tests for a deleted opportunity with a failing analysis and with a paid provider (non-zero and `null` cost), asserting `spentSince` before and after. Medium effort; touches S-05/S-07 code.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
