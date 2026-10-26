@@ -3,7 +3,12 @@ import { fileURLToPath } from 'node:url';
 import { eq } from 'drizzle-orm';
 import { getGlobalDispatcher, type MockAgent } from 'undici';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { opportunities, rawSignals, sources } from '../src/infrastructure/db/schema.js';
+import {
+  opportunities,
+  opportunityEvidence,
+  rawSignals,
+  sources,
+} from '../src/infrastructure/db/schema.js';
 import type {
   AdapterOutcome,
   DiscoverContext,
@@ -150,7 +155,8 @@ describe('generic source types and bounty facts (S-19 D-1, D-2)', () => {
 
   it('fails a run explicitly when no adapter is registered for the stored type', async () => {
     const { call, addSource, db, clock } = await setup();
-    const id = addSource('opire', {}, 'opire');
+    const id = addSource('opire' as 'rss', {}, 'unregistered');
+    db().update(sources).set({ type: 'unregistered' }).where(eq(sources.id, id)).run();
 
     const run = await call('POST', `/api/sources/${id}/run`);
     expect(run.json()).toMatchObject({ status: 'failed', error: { reason: 'internal' } });
@@ -539,5 +545,319 @@ describe('GitHub search source (S-19 D-3, D-4, D-5, FR-33 AC1)', () => {
     expect((await call('POST', `/api/sources/${id}/check`)).json()).toMatchObject({ ok: true });
     expect(githubSeen).toHaveLength(1);
     expect(db().select().from(rawSignals).all()).toEqual([]);
+  });
+});
+
+// ---- Opire source (Phase 4) -----------------------------------------------------------------
+
+const OPIRE = 'https://api.opire.dev';
+const OPIRE_PAGE = fixture('opire-rewards.json');
+const issueFixture = (n: number): string => fixture(`github-issue-${n}.json`);
+
+interface OpireSeen {
+  path: string;
+  authorization: string | undefined;
+  host: 'opire' | 'github';
+}
+let opireSeen: OpireSeen[] = [];
+let opireAnswer: () => Answer = () => ({ status: 200, body: OPIRE_PAGE });
+const defaultIssueAnswer = (number: number): Answer => {
+  if (number === 31 || number === 32 || number === 33)
+    return { status: 200, body: issueFixture(number) };
+  if (number >= 100) {
+    return {
+      status: 200,
+      body: JSON.stringify({
+        html_url: `https://github.com/demo-org/demo-api/issues/${number}`,
+        number,
+        title: `DEMO: TypeScript issue ${number}`,
+        body: 'TypeScript help wanted.',
+        state: 'open',
+        labels: [{ name: 'bounty' }],
+      }),
+    };
+  }
+  return { status: 404, body: '{"message":"Not Found"}' };
+};
+
+let issueAnswer: (number: number) => Answer = defaultIssueAnswer;
+
+beforeAll(() => {
+  const agent = getGlobalDispatcher() as unknown as MockAgent;
+  const reply =
+    (host: 'opire' | 'github', answer: (path: string) => Answer) =>
+    (opts: { path: string; headers?: unknown }) => {
+      const headers = opts.headers as Record<string, string> | undefined;
+      opireSeen.push({
+        path: opts.path,
+        authorization: headers?.authorization ?? headers?.Authorization,
+        host,
+      });
+      const result = answer(opts.path);
+      return {
+        statusCode: result.status,
+        data: result.body ?? '',
+        responseOptions: { headers: result.headers ?? { 'content-type': 'application/json' } },
+      };
+    };
+  agent
+    .get(OPIRE)
+    .intercept({ path: '/rewards' })
+    .reply(reply('opire', () => opireAnswer()))
+    .persist();
+  agent
+    .get(GITHUB)
+    .intercept({ path: (path: string) => path.startsWith('/repos/demo-org/demo-api/issues/') })
+    .reply(reply('github', (path) => issueAnswer(Number(path.split('/').pop()))))
+    .persist();
+  agent
+    .get(GITHUB)
+    .intercept({ path: (path: string) => path.startsWith('/repos/demo-org/demo-ui/issues/') })
+    .reply(
+      reply('github', (path) => ({
+        status: 200,
+        body: JSON.stringify({
+          html_url: `https://github.com/demo-org/demo-ui/issues/${path.split('/').pop()}`,
+          title: 'DEMO: broken layout on small screens',
+          body: 'Layout breaks under 320px.',
+          state: 'open',
+          labels: [{ name: 'bounty' }],
+        }),
+      })),
+    )
+    .persist();
+});
+
+beforeEach(() => {
+  opireSeen = [];
+  opireAnswer = () => ({ status: 200, body: OPIRE_PAGE });
+  issueAnswer = defaultIssueAnswer;
+});
+
+describe('Opire source (S-19 D-8, D-15, FR-33 AC2)', () => {
+  async function opire(env: Record<string, string> = {}) {
+    const sleeps: number[] = [];
+    const clock = new FakeClock();
+    const lines: string[] = [];
+    const built = await buildTestApp({
+      clock,
+      env: { LLM_PROVIDER: 'mock', ...env },
+      sourceSleep: async (ms) => {
+        sleeps.push(ms);
+      },
+      sourceLogger: { info: (m) => lines.push(m), warn: (m) => lines.push(m) },
+    });
+    const cookie = await loginAsOperator(built.app);
+    const call = (method: 'GET' | 'POST' | 'PATCH' | 'PUT', url: string, payload?: object) =>
+      built.app.inject({ method, url, headers: { cookie }, ...(payload ? { payload } : {}) });
+    await call(
+      'PUT',
+      '/api/profile',
+      profile({ skills: ['TypeScript'], preferredTechnologies: [] }),
+    );
+    const db = () => openTestDb(built.dir).db;
+    const add = async (preset = 'opire-rewards') => {
+      const created = await call('POST', '/api/sources', { preset });
+      return { created, id: created.json().id as number };
+    };
+    const run = async (id: number) => (await call('POST', `/api/sources/${id}/run`)).json();
+    const githubCalls = () => opireSeen.filter((r) => r.host === 'github');
+    return { ...built, clock, call, db, add, run, sleeps, lines, githubCalls };
+  }
+
+  it('adds the preset once, with no config of its own', async () => {
+    const { add, call } = await opire();
+    const { created } = await add();
+    expect(created.statusCode).toBe(201);
+    expect(created.json()).toMatchObject({
+      type: 'opire',
+      name: 'Opire — nagrody za zgłoszenia',
+      presetId: 'opire-rewards',
+    });
+    expect((await call('POST', '/api/sources', { preset: 'opire-rewards' })).statusCode).toBe(409);
+  });
+
+  it('stores an open issue linked to GitHub with the reward, and skips closed, missing and foreign ones', async () => {
+    const { add, run, db, lines, githubCalls } = await opire();
+    const { id } = await add();
+
+    expect(await run(id)).toMatchObject({ status: 'partial', fetched: 3, new: 2, failed: 1 });
+
+    const rows = db().select().from(rawSignals).where(eq(rawSignals.sourceId, id)).all();
+    expect(rows.map((row) => row.sourceUrl).sort()).toEqual([
+      'https://github.com/demo-org/demo-api/issues/31',
+      'https://github.com/demo-org/demo-api/issues/32',
+    ]);
+    expect(rows.every((row) => row.sourceType === 'opire')).toBe(true);
+    const byUrl = Object.fromEntries(
+      rows.map((row) => [row.sourceUrl, JSON.parse(row.bountyJson ?? 'null')]),
+    );
+    expect(byUrl['https://github.com/demo-org/demo-api/issues/31']).toMatchObject({
+      platform: 'opire',
+      repository: 'demo-org/demo-api',
+      issueNumber: 31,
+      reward: { amountMinor: 15_000, currency: 'USD', quote: 'Nagroda (Opire): 150.00 USD' },
+    });
+    // An unknown unit is an unknown reward, never a guessed one.
+    expect(byUrl['https://github.com/demo-org/demo-api/issues/32'].reward).toBeNull();
+    expect(rows.find((row) => row.sourceUrl?.endsWith('/31'))?.snippet).toContain(
+      'Nagroda (Opire): 150.00 USD',
+    );
+    expect(githubCalls().map((r) => r.path)).toEqual([
+      '/repos/demo-org/demo-api/issues/31',
+      '/repos/demo-org/demo-api/issues/32',
+      '/repos/demo-org/demo-api/issues/33',
+      '/repos/demo-org/demo-api/issues/34',
+    ]);
+    expect(lines).toContain('opire: closed 1 missing 1 checked 4');
+  });
+
+  it('does not check known or closed rewards again on the next run', async () => {
+    const { add, run, clock, githubCalls } = await opire();
+    const { id } = await add();
+    await run(id);
+    opireSeen = [];
+    clock.advance(HOUR + 60_000);
+
+    expect(await run(id)).toMatchObject({ status: 'partial', new: 0, failed: 1 });
+    expect(githubCalls()).toHaveLength(0);
+    expect(opireSeen.filter((r) => r.host === 'opire')).toHaveLength(1);
+  });
+
+  it('checks at most 20 new rewards and finishes the rest on the next run', async () => {
+    const many = Array.from({ length: 25 }, (_, i) => ({
+      url: `https://github.com/demo-org/demo-api/issues/${100 + i}`,
+      pendingPrice: { value: 1_000, unit: 'USD_CENT' },
+    }));
+    opireAnswer = () => ({ status: 200, body: JSON.stringify({ rewards: many }) });
+    const { add, run, clock, githubCalls, sleeps } = await opire();
+    const { id } = await add();
+
+    expect(await run(id)).toMatchObject({ status: 'partial', new: 20, failed: 0 });
+    expect(githubCalls()).toHaveLength(20);
+    expect(sleeps).toEqual(Array(19).fill(1_000));
+
+    opireSeen = [];
+    clock.advance(HOUR + 60_000);
+    expect(await run(id)).toMatchObject({ status: 'ok', new: 5, duplicates: 0 });
+    expect(githubCalls()).toHaveLength(5);
+  });
+
+  it('ends the run as rate_limited when a check is, and stores nothing', async () => {
+    issueAnswer = () => ({
+      status: 403,
+      body: '{}',
+      headers: { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '9999999999' },
+    });
+    const { add, run, db, githubCalls } = await opire();
+    const { id } = await add();
+
+    expect(await run(id)).toMatchObject({
+      status: 'failed',
+      error: { reason: 'rate_limited', httpStatus: 403 },
+    });
+    expect(githubCalls()).toHaveLength(1);
+    expect(db().select().from(rawSignals).all()).toEqual([]);
+  });
+
+  it('fails explicitly on an HTTP error, bad JSON and a wrong shape', async () => {
+    const { add, run, clock } = await opire();
+    const { id } = await add();
+    const cases: [Answer, object][] = [
+      [
+        { status: 500, body: '{}' },
+        { reason: 'http_status', httpStatus: 500 },
+      ],
+      [
+        { status: 429, body: '{}' },
+        { reason: 'rate_limited', httpStatus: 429 },
+      ],
+      [{ status: 200, body: '<html>' }, { reason: 'invalid_feed' }],
+      [{ status: 200, body: '{"rewards": 3}' }, { reason: 'invalid_feed' }],
+    ];
+    for (const [answer, error] of cases) {
+      opireAnswer = () => answer;
+      expect(await run(id)).toMatchObject({ status: 'failed', error });
+      clock.advance(HOUR + 60_000);
+    }
+  });
+
+  it('never sends the GitHub token to Opire, and keeps it out of what can be read', async () => {
+    const built = await opire({ GITHUB_TOKEN: TOKEN });
+    const { id } = await built.add();
+    await built.run(id);
+
+    const toOpire = opireSeen.filter((r) => r.host === 'opire');
+    expect(toOpire).toHaveLength(1);
+    expect(toOpire[0]?.authorization).toBeUndefined();
+    expect(built.githubCalls().every((r) => r.authorization === `Bearer ${TOKEN}`)).toBe(true);
+    expect(built.githubCalls().length).toBeGreaterThan(0);
+    const places = [
+      JSON.stringify((await built.call('GET', '/api/sources')).json()),
+      JSON.stringify(built.db().select().from(rawSignals).all()),
+      built.lines.join('\n'),
+    ];
+    for (const place of places) expect(place).not.toContain(TOKEN);
+  });
+
+  it('checks the connection with the rewards request only', async () => {
+    const { add, call, db, githubCalls } = await opire();
+    const { id } = await add();
+    expect((await call('POST', `/api/sources/${id}/check`)).json()).toMatchObject({ ok: true });
+    expect(opireSeen.map((r) => r.host)).toEqual(['opire']);
+    expect(githubCalls()).toHaveLength(0);
+    expect(db().select().from(rawSignals).all()).toEqual([]);
+  });
+
+  describe('the same issue from GitHub search and from Opire (D-12)', () => {
+    // demo-ui/14 is in the TypeScript search page without a reward.
+    const overlap = JSON.stringify([
+      {
+        url: 'https://github.com/demo-org/demo-ui/issues/14',
+        pendingPrice: { value: 7_500, unit: 'USD_CENT' },
+      },
+    ]);
+    const rewardOf = (rows: { bountyJson: string | null }[]) =>
+      rows.map((row) => JSON.parse(row.bountyJson ?? 'null')?.reward?.amountMinor ?? null);
+
+    it('GitHub first: one opportunity, repeat evidence, the reward stays unknown', async () => {
+      opireAnswer = () => ({ status: 200, body: overlap });
+      const { add, run, db, clock } = await opire();
+      const github = await add('github-bounties');
+      const opireSource = await add();
+      await run(github.id);
+      clock.advance(1);
+      expect(await run(opireSource.id)).toMatchObject({ new: 0, duplicates: 1 });
+
+      const rows = db()
+        .select()
+        .from(rawSignals)
+        .all()
+        .filter((row) => row.sourceUrl === 'https://github.com/demo-org/demo-ui/issues/14');
+      expect(rows).toHaveLength(1);
+      expect(rewardOf(rows)).toEqual([null]);
+      const evidence = db().select().from(opportunityEvidence).all();
+      expect(evidence.filter((e) => e.evidenceType === 'REPEAT_IMPORT')).toHaveLength(1);
+    });
+
+    it('Opire first: the reward is kept, and the later search adds repeat evidence', async () => {
+      opireAnswer = () => ({ status: 200, body: overlap });
+      const { add, run, db, clock } = await opire();
+      const github = await add('github-bounties');
+      const opireSource = await add();
+      expect(await run(opireSource.id)).toMatchObject({ new: 1 });
+      clock.advance(1);
+      await run(github.id);
+
+      const rows = db()
+        .select()
+        .from(rawSignals)
+        .all()
+        .filter((row) => row.sourceUrl === 'https://github.com/demo-org/demo-ui/issues/14');
+      expect(rows).toHaveLength(1);
+      expect(rewardOf(rows)).toEqual([7_500]);
+      const evidence = db().select().from(opportunityEvidence).all();
+      expect(evidence.filter((e) => e.evidenceType === 'REPEAT_IMPORT')).toHaveLength(1);
+    });
   });
 });

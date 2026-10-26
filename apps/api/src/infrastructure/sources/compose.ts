@@ -17,6 +17,7 @@ import { createJobLock, type JobLockOptions } from '../scheduler/job-lock.js';
 import type { HttpClient } from './http/client.js';
 import { createRobotsCheck } from './manual/robots.js';
 import { createGithubAdapter } from './github/adapter.js';
+import { createOpireAdapter } from './opire/adapter.js';
 import { createRssAdapter } from './rss/adapter.js';
 
 export interface SourceRuntimeDeps {
@@ -81,10 +82,20 @@ export function createSourceRuntime({
     ...(sleep ? { sleep } : {}),
     ...(logger ? { logger } : {}),
   });
+  const opire = createOpireAdapter({
+    http,
+    clock,
+    timeoutMs: config.fetchTimeoutMs,
+    maxAttempts: config.sourceMaxAttempts,
+    maxTextChars: config.importMaxTextChars,
+    token: config.github?.token,
+    ...(sleep ? { sleep } : {}),
+    ...(logger ? { logger } : {}),
+  });
   const service = createSourceService({
     repository: createSourceRepository(db),
     signals: createSignalRepository(db),
-    adapters: { rss: adapter, github, ...adapters },
+    adapters: { rss: adapter, github, opire, ...adapters },
     ...(profile ? { profile } : {}),
     clock,
     minIntervalMs: config.sourceMinIntervalMinutes * 60_000,

@@ -446,13 +446,14 @@ guard (D-10).
 - [x] Phase 1: Generic source types, bounty facts storage and the token header
 - [x] Phase 2: Reward parsing and the bounty guard rules
 - [x] Phase 3: GitHub search adapter and preset
-- [ ] Phase 4: Opire adapter and preset
+- [x] Phase 4: Opire adapter and preset
 - [ ] Phase 5: Sources view editor, source policy and test plan
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 3) One real run of the GitHub preset without a token: record the run result and the request count, and compare one signal with its issue page — run: add the preset in the Sources view, enable only it, `pnpm discover` — evidence: none (the sandbox proxy refuses api.github.com); save to `evidence/github-run.txt` without token or personal data
 - [ ] (Phase 3) Then one run with a read-only, public-data `GITHUB_TOKEN` in `.env`: check that no 403 occurs and that the response fits the size limit — run: `pnpm discover` — evidence: none (same file)
+- [ ] (Phase 4) One real run of the Opire preset: record the real response shape against `map-reward.ts` (field names, envelope, unit), the counts of open, closed and skipped rewards, and one signal compared with its issue; replace the synthetic fixture with a trimmed real one if the shape differs — run: add the preset in the Sources view, enable only it, `pnpm discover` — evidence: none (the sandbox proxy refuses api.opire.dev); save to `evidence/opire-run.txt`
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -465,6 +466,10 @@ guard (D-10).
 - [minor] Phase 3 (plan-review 6, D-4): `per_page` is 30, not 50, so a page with full bodies stays under the 1 MiB response limit (an oversize page is already an explicit `too_large`).
 - [minor] Phase 3: a search item that is not a GitHub issue URL counts as `skipped` (run `partial`); a pull request is dropped silently, since `is:issue` should not return one.
 - [minor] Phase 3: the existing "no adapter registered" test uses `opire`, which Phase 4 registers; Phase 4 must switch that test to another unregistered kind or a stubbed registry.
+- [minor] Phase 4: the old "no adapter registered" test used `opire`; it now stores a source of type `unregistered` (the column is free text) and expects `internal`.
+- [minor] Phase 4: rewards already in the cursor are left out of the outcome (not returned as items), so the second run's `fetched` counts only unseen and skipped rewards; no GitHub check is made for them.
+- [minor] Phase 4: a failed check that is neither 404/410 nor rate-limited (e.g. 500) counts as `skipped` and is not remembered, so the run is `partial` and the reward is checked again next run. A `rate_limited` check fails the whole run (D-8), dropping items found before it; they come back next run because nothing was remembered.
+- [minor] Phase 4: the Opire list request maps 429 to `rate_limited` and other non-2xx to `http_status`, without the GitHub helper's backoff (one request per run).
 - [FOLLOW-UP] Re-check stored bounty signals when their issue closes, and enrich a stored
   duplicate with a reward that a later source states (D-12 B).
 - [FOLLOW-UP] Read issue comments for bot-stated amounts (Algora), within the core rate limit.

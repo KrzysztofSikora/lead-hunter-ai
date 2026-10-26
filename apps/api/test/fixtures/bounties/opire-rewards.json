@@ -1,0 +1,29 @@
+[
+  {
+    "_comment": "DEMO — synthetic, UNVERIFIED shape of GET /rewards until a recorded response replaces it (S-19 D-14).",
+    "url": "https://github.com/demo-org/demo-api/issues/31",
+    "title": "DEMO open reward",
+    "pendingPrice": { "value": 15000, "unit": "USD_CENT" },
+    "organization": { "name": "demo-org" }
+  },
+  {
+    "url": "https://github.com/demo-org/demo-api/issues/32",
+    "title": "DEMO unknown unit",
+    "pendingPrice": { "value": 15000, "unit": "EUR_CENT" }
+  },
+  {
+    "url": "https://github.com/demo-org/demo-api/issues/33",
+    "title": "DEMO closed issue",
+    "pendingPrice": { "value": 5000, "unit": "USD_CENT" }
+  },
+  {
+    "url": "https://github.com/demo-org/demo-api/issues/34",
+    "title": "DEMO missing issue",
+    "pendingPrice": { "value": 5000, "unit": "USD_CENT" }
+  },
+  {
+    "url": "https://example.com/not-an-issue",
+    "title": "DEMO not a GitHub issue",
+    "pendingPrice": { "value": 5000, "unit": "USD_CENT" }
+  }
+]

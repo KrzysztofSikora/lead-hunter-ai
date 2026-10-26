@@ -63,6 +63,16 @@ export const PRESETS: readonly SourcePreset[] = [
     termsUrl: 'https://docs.github.com/en/site-policy/github-terms/github-terms-of-service',
     filter: off(),
   },
+  {
+    id: 'opire-rewards',
+    type: 'opire',
+    name: 'Opire — nagrody za zgłoszenia',
+    url: 'https://api.opire.dev/rewards',
+    accessNote:
+      'Publiczne API Opire: aktywne nagrody za zgłoszenia GitHub. Dla każdej nowej nagrody jedno zapytanie do API GitHub sprawdza, czy zgłoszenie jest nadal otwarte (najwyżej 20 na przebieg); zamknięte są pomijane. Kształt odpowiedzi i regulamin do weryfikacji.',
+    termsUrl: 'https://opire.dev',
+    filter: off(),
+  },
 ];
 
 /**

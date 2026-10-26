@@ -1,0 +1,10 @@
+{
+  "_comment": "DEMO — synthetic, UNVERIFIED (S-19 D-14).",
+  "html_url": "https://github.com/demo-org/demo-api/issues/31",
+  "number": 31,
+  "title": "DEMO: sync client TypeScript retry",
+  "body": "The TypeScript sync client gives up after one failure.",
+  "state": "open",
+  "created_at": "2026-09-10T10:00:00Z",
+  "labels": [{ "name": "bounty" }]
+}
