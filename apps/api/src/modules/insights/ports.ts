@@ -27,6 +27,12 @@ export interface PaymentFact extends Attribution {
   amountMinor: number;
 }
 
+/** A `WORK` entry: time spent and/or a cost entered on an opportunity (D-6). */
+export interface WorkFact {
+  minutes: number | null;
+  cost: { currency: Currency; amountMinor: number } | null;
+}
+
 export interface InsightsRepository {
   /** Every operator status change, oldest first: a contact's cohort needs the first one (D-4). */
   operatorStatusEvents(): StatusEventFact[];
@@ -34,4 +40,6 @@ export interface InsightsRepository {
   sentDrafts(from: number, to: number): SentDraftFact[];
   /** Payments made in `[from, to)`. */
   payments(from: number, to: number): PaymentFact[];
+  /** Work entries made in `[from, to)`. */
+  workEntries(from: number, to: number): WorkFact[];
 }

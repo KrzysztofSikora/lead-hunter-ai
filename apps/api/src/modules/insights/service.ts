@@ -80,6 +80,7 @@ export function createInsightsService(deps: InsightsDeps) {
         events: repository.operatorStatusEvents(),
         sentDrafts: repository.sentDrafts(from, to),
         payments: repository.payments(from, to),
+        work: repository.workEntries(from, to),
       });
       return Insights.parse({
         period: { ...period, current: period.from <= today && today <= period.to },

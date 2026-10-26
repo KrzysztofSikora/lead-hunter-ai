@@ -294,4 +294,73 @@ describe('GET /api/insights (FR-19)', () => {
     expect(after.totals.transitions).toBe(3);
     expect(after.bySource).toHaveLength(1);
   });
+
+  it('shows time and costs only when entered, and the result only for currencies with costs (AC3)', async () => {
+    const t = await setup();
+    const feed = t.addSource('Feed A');
+    const first = t.seed(feed, 'DIRECT_GIG');
+    const second = t.seed(feed, 'DIRECT_GIG');
+    const work = (id: number, payload: object) =>
+      t.call('POST', `/api/opportunities/${id}/work`, payload);
+
+    expect((await t.insights('?month=2026-10')).work).toEqual({
+      minutes: null,
+      costs: [],
+      net: [],
+    });
+    await t.pay(first, 100_000, 'PLN', '2026-10-26');
+    await t.pay(second, 30_000, 'EUR', '2026-10-26');
+    await t.pay(second, 7_000, 'USD', '2026-10-26');
+    // Payments alone enter no cost: nothing is made up (AC3).
+    expect((await t.insights('?month=2026-10')).work).toEqual({
+      minutes: null,
+      costs: [],
+      net: [],
+    });
+
+    t.clock.advance(1000);
+    expect(
+      (await work(first, { minutes: 90, cost: { amountMinor: 12_000, currency: 'PLN' } }))
+        .statusCode,
+    ).toBe(200);
+    t.clock.advance(1000);
+    const detail = await work(second, {
+      cost: { amountMinor: 5_000, currency: 'EUR' },
+      note: 'DEMO dojazd',
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(detail.json<OpportunityDetail>().activity[0]).toMatchObject({
+      type: 'WORK',
+      actor: 'operator',
+      note: 'DEMO dojazd',
+      work: { minutes: null, cost: { amountMinor: 5_000, currency: 'EUR' } },
+      toStatus: null,
+    });
+
+    const month = await t.insights('?month=2026-10');
+    expect(month.work).toEqual({
+      minutes: 90,
+      costs: [
+        { currency: 'EUR', totalMinor: 5_000 },
+        { currency: 'PLN', totalMinor: 12_000 },
+      ],
+      net: [
+        { currency: 'EUR', totalMinor: 25_000 },
+        { currency: 'PLN', totalMinor: 88_000 },
+      ],
+    });
+    // Work entries are not funnel events (D-2), and a week without entries stays empty.
+    expect(month.totals.transitions).toBe(0);
+    expect((await t.insights('?week=2026-W43')).work.minutes).toBeNull();
+
+    for (const payload of [
+      {},
+      { minutes: 0 },
+      { note: 'x' },
+      { cost: { amountMinor: 0, currency: 'PLN' } },
+    ]) {
+      expect((await work(first, payload)).statusCode).toBe(400);
+    }
+    expect((await work(9999, { minutes: 5 })).statusCode).toBe(404);
+  });
 });

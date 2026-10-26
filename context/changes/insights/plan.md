@@ -235,7 +235,7 @@ Observably true when done:
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Insights API for weeks and months
-- [ ] Phase 2: Time and cost entries
+- [x] Phase 2: Time and cost entries
 - [ ] Phase 3: Wyniki view
 - [ ] Phase 4: Time and cost form on the card, docs
 
@@ -248,6 +248,8 @@ Observably true when done:
 - [minor] (Phase 1) `isoWeeksInYear` lives in `packages/contracts/src/insights.ts` (the query schema needs it to refuse `2027-W53`) and `warsaw-day.ts` re-exports it; `addCalendarDays` was added to `warsaw-day.ts` for the period bounds.
 - [minor] (Phase 1) Plan-review 7: the five integration cases are three `it` blocks (empty and 400s; the week main path with month bounds, offers sent, system rejection; primary source and `WON → LOST`). The ISO-week helper rows stay because a year end is where the week number and week-year disagree with the calendar (2026-W53, 2027-W01). The `SENT_MANUALLY` draft is produced in the main-path case, which answers plan-review 1 for the API; the Phase 3 e2e step should also assert `offersSent` 1.
 - [minor] (Phase 1) Plan-review 6: payments are dated by advancing the fake clock (31 October, then 1 November) because a future `paidOn` is refused.
+- [minor] (Phase 2) Plan-review 3: `apps/web/src/opportunityCard.test.ts` gets `work: null` on its `ActivityEvent` literal (the new required field); no assertion changed.
+- [minor] (Phase 2) `WorkCost` is defined once in `status.ts` and reused by `ActivityMetadata` and `WorkRequest`; an unreadable `WORK` metadata row counts as no entry. The `OpportunityPage` history label for `WORK` stays in Phase 4 (plan-review 4).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

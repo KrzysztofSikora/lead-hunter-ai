@@ -85,6 +85,8 @@ export {
   PaymentRequest,
   RejectionReason,
   StatusChangeRequest,
+  WorkCost,
+  WorkRequest,
 } from './status.js';
 export type { MoveCheck } from './status.js';
 export {

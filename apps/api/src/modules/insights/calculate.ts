@@ -6,7 +6,13 @@ import {
   type Insights,
   type InsightsMetrics,
 } from '@lead-hunter/contracts';
-import type { Attribution, PaymentFact, SentDraftFact, StatusEventFact } from './ports.js';
+import type {
+  Attribution,
+  PaymentFact,
+  SentDraftFact,
+  StatusEventFact,
+  WorkFact,
+} from './ports.js';
 
 export interface InsightsFacts {
   /** `[from, to)` in UTC epoch ms. */
@@ -16,6 +22,7 @@ export interface InsightsFacts {
   events: StatusEventFact[];
   sentDrafts: SentDraftFact[];
   payments: PaymentFact[];
+  work: WorkFact[];
 }
 
 type Calculated = Pick<Insights, 'totals' | 'transitionsTo' | 'bySource' | 'byCategory' | 'work'>;
@@ -138,6 +145,24 @@ export function calculateInsights(facts: InsightsFacts): Calculated {
     byCategory: categories
       .map((category) => ({ category, metrics: metrics((a) => a.category === category) }))
       .filter((g) => hasData(g.metrics)),
-    work: { minutes: null, costs: [], net: [] },
+    work: workOf(facts),
+  };
+}
+
+/** D-10: only what was entered; `net` only for currencies with an entered cost. */
+function workOf(facts: InsightsFacts): Calculated['work'] {
+  const entered = facts.work.flatMap((w) => (w.minutes === null ? [] : [w.minutes]));
+  const costs = byCurrency(
+    facts.work.flatMap((w) => (w.cost === null ? [] : [w.cost])),
+    (c) => c.amountMinor,
+  );
+  const paid = byCurrency(facts.payments, (p) => p.amountMinor);
+  return {
+    minutes: entered.length === 0 ? null : entered.reduce((a, b) => a + b, 0),
+    costs,
+    net: costs.map(({ currency, totalMinor }) => ({
+      currency,
+      totalMinor: (paid.find((p) => p.currency === currency)?.totalMinor ?? 0) - totalMinor,
+    })),
   };
 }

@@ -100,6 +100,29 @@ export function createInsightsRepository(db: BetterSQLite3Database): InsightsRep
         .all()
         .map((row) => ({ ...attributionOf(row), opportunityId: row.opportunityId }));
     },
+    workEntries(from, to) {
+      return db
+        .select({ metadataJson: activityEvents.metadataJson })
+        .from(activityEvents)
+        .where(
+          and(
+            eq(activityEvents.type, 'WORK'),
+            gte(activityEvents.occurredAt, from),
+            lt(activityEvents.occurredAt, to),
+          ),
+        )
+        .all()
+        .flatMap((row) => {
+          try {
+            const parsed = ActivityMetadata.safeParse(JSON.parse(row.metadataJson ?? ''));
+            return parsed.success
+              ? [{ minutes: parsed.data.minutes ?? null, cost: parsed.data.cost ?? null }]
+              : [];
+          } catch {
+            return [];
+          }
+        });
+    },
     payments(from, to) {
       return db
         .select({

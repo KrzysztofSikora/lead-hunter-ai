@@ -277,6 +277,7 @@ describe('eventDetails', () => {
     contract: null,
     followUpOn: null,
     followUpCleared: false,
+    work: null,
     occurredAt: NOW,
   };
 

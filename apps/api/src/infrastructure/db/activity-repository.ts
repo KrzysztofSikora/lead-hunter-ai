@@ -73,6 +73,27 @@ export function createActivityRepository(db: BetterSQLite3Database): ActivityRep
         return 'changed';
       });
     },
+    addWork(id, metadata, note, at) {
+      return db.transaction((tx) => {
+        const exists = tx
+          .select({ id: opportunities.id })
+          .from(opportunities)
+          .where(eq(opportunities.id, id))
+          .get();
+        if (!exists) return false;
+        tx.insert(activityEvents)
+          .values({
+            opportunityId: id,
+            type: 'WORK',
+            actor: 'operator',
+            note,
+            metadataJson: metadata,
+            occurredAt: at,
+          })
+          .run();
+        return true;
+      });
+    },
     addNote(id, text, at) {
       return db.transaction((tx) => {
         const exists = tx
