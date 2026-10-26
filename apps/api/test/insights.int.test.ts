@@ -3,8 +3,8 @@ import type { Insights, OpportunityDetail } from '@lead-hunter/contracts';
 import {
   activityEvents,
   opportunities,
+  opportunityEvidence,
   rawSignals,
-  signalIdentities,
   sources,
 } from '../src/infrastructure/db/schema.js';
 import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/app.js';
@@ -267,24 +267,24 @@ describe('GET /api/insights (FR-19)', () => {
     const feedA = t.addSource('Feed A');
     const feedB = t.addSource('Feed B');
     const id = t.seed(feedA, 'DIRECT_GIG');
-    // Feed B saw the same item later; it attaches to the opportunity of Feed A.
+    // Feed B saw the same item later; it attaches through opportunity_evidence, as in ingest.
     t.db
-      .insert(signalIdentities)
+      .insert(opportunityEvidence)
       .values({
-        kind: 'canonical_url',
-        value: 'https://example.invalid/b',
         opportunityId: id,
-        createdAt: 1,
+        rawSignalId: t.signal(feedB),
+        evidenceType: 'REPEAT_IMPORT',
+        sourceFact: 'DEMO',
+        extractedAt: 1,
       })
       .run();
-    t.signal(feedB);
 
     await t.move(id, 'CONTACTED');
     await t.move(id, 'WON');
     expect((await t.insights()).totals.wins).toBe(1);
 
-    const corrected = await t.insights();
-    expect(corrected.bySource.map((g) => g.source)).toEqual([
+    const before = await t.insights();
+    expect(before.bySource.map((g) => g.source)).toEqual([
       { kind: 'source', id: feedA, name: 'Feed A', type: 'rss' },
     ]);
 
@@ -293,6 +293,7 @@ describe('GET /api/insights (FR-19)', () => {
     expect(after.totals.wins).toBe(0);
     expect(after.totals.transitions).toBe(3);
     expect(after.bySource).toHaveLength(1);
+    expect(after.bySource[0]?.metrics.transitions).toBe(after.totals.transitions);
   });
 
   it('shows time and costs only when entered, and the result only for currencies with costs (AC3)', async () => {
