@@ -3,6 +3,7 @@ import {
   type AnalysisActivity,
   type AnalysisReasonCode,
   type AnalysisServiceStatus,
+  TenderFacts,
   OpportunityAnalysis,
   ScoreBreakdown,
   type BusinessStatus,
@@ -105,6 +106,17 @@ const moveFor = (rule: PrefilterRule | null): BusinessStatus | null => {
 
 const REASON_MAX = 300;
 
+/** S-18 D-2: invalid stored facts read as absent, as on the card. */
+function tenderOf(json: string | null): TenderFacts | null {
+  if (json === null) return null;
+  try {
+    const parsed = TenderFacts.safeParse(JSON.parse(json));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 /** D-9: after these the whole provider is unusable for now, so the drain stops instead of failing the queue. */
 const PROVIDER_WIDE: ReadonlySet<ProviderError['kind']> = new Set([
   'auth',
@@ -172,7 +184,10 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     answer: OpportunityAnalysis,
   ): string | null {
     const profile = deps.profile.get();
-    const guarded = guardAnalysis(answer, row.text);
+    const guarded = guardAnalysis(answer, row.text, {
+      sourceType: row.sourceType,
+      tender: tenderOf(row.tenderJson),
+    });
     // The guard edits text; what is stored must still satisfy the contract (read side parses it).
     const checked = OpportunityAnalysis.safeParse(guarded.result);
     if (!checked.success) return 'invalid_output: guard';

@@ -129,6 +129,8 @@ export const rawSignals = sqliteTable(
     lastVerifiedAt: integer('last_verified_at'),
     /** S-12 D-8: the source run that created the signal; null for imports and older rows. */
     jobRunId: integer('job_run_id').references(() => jobRuns.id),
+    /** S-18 D-2: `TenderFacts` JSON for a tender notice; null for every other signal. */
+    tenderJson: text('tender_json'),
   },
   (table) => [
     index('raw_signals_job_run_idx').on(table.jobRunId),

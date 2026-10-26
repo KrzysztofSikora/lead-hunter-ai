@@ -54,6 +54,33 @@ export async function updateSource(id: number, patch: UpdateSourceRequest): Prom
   return Source.parse(await response.json());
 }
 
+export type TenderOutcome =
+  | Done<Source>
+  | { ok: false; refused: 'invalid'; fields: FieldError[] }
+  | { ok: false; refused: 'not_tender_source' };
+
+/** S-18 D-7: saves the CPV prefixes (and TED countries); the server's issues come back as fields. */
+export async function updateTender(
+  id: number,
+  tender: NonNullable<UpdateSourceRequest['tender']>,
+): Promise<TenderOutcome> {
+  const response = await apiFetch(`/api/sources/${id}`, {
+    method: 'PATCH',
+    headers: json,
+    body: JSON.stringify({ tender }),
+  });
+  if (response.ok) return { ok: true, value: Source.parse(await response.json()) };
+  if (response.status === 400) {
+    const body = await response.json().catch(() => null);
+    const parsed = ValidationError.safeParse(body);
+    if (parsed.success) return { ok: false, refused: 'invalid', fields: parsed.data.fields };
+    if ((body as { error?: string } | null)?.error === 'not_tender_source') {
+      return { ok: false, refused: 'not_tender_source' };
+    }
+  }
+  throw new Error(`update tender failed: ${response.status}`);
+}
+
 async function act<T>(
   id: number,
   action: 'run' | 'check',

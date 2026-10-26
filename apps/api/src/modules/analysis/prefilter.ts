@@ -65,6 +65,8 @@ const STOP_WORDS = {
   ],
 } as const;
 
+const isTenderSource = (type: SourceType): boolean => type === 'bzp' || type === 'ted';
+
 /** Stop-word counts; null when neither language reaches the minimum or they tie. */
 export function detectLanguage(text: string): 'pl' | 'en' | null {
   const words = text.toLowerCase().match(/[\p{L}]+/gu) ?? [];
@@ -115,7 +117,11 @@ export function prefilter(
   if (matchTerms(text, profile.excludedCategories).length > 0) {
     return outcome('excluded_category');
   }
-  if (matches === 0 && !signal.sourceType.startsWith('manual_')) {
+  // S-18 D-13: the CPV prefixes already select a tender's domain; the notice's title rarely
+  // names a profile technology.
+  const selectedElsewhere =
+    signal.sourceType.startsWith('manual_') || isTenderSource(signal.sourceType);
+  if (matches === 0 && !selectedElsewhere) {
     return outcome('no_profile_match');
   }
   return outcome(null);

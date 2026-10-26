@@ -19,6 +19,7 @@ export const DEMAND_POINTS: Readonly<
   Record<EvidenceLevel, { confirmed: number; unconfirmed: number }>
 > = {
   DIRECT_REQUEST: { confirmed: 30, unconfirmed: 22 },
+  PUBLIC_TENDER: { confirmed: 30, unconfirmed: 22 },
   EXPLICIT_PROBLEM: { confirmed: 18, unconfirmed: 12 },
   INDIRECT_SIGNAL: { confirmed: 10, unconfirmed: 6 },
   SPECULATIVE: { confirmed: 6, unconfirmed: 3 },

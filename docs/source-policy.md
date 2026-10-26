@@ -70,6 +70,80 @@ ręczną kontrolę (patrz `context/changes/rss-sources/plan.md`, *Human checks*)
 - **Regulamin:** operator sprawdza, czy serwis zezwala na odczyt kanału; aplikacja tego nie
   weryfikuje.
 
+### API: e-Zamówienia, Biuletyn Zamówień Publicznych (`bzp-it`)
+- **Dostęp:** publiczne API `GET https://ezamowienia.gov.pl/mo-board/api/v1/notice`; odczyt
+  ogłoszeń krajowych jest publiczny i bezpłatny, bez klucza i zgłoszenia integracji
+  (<https://ezamowienia.gov.pl/pl/integracja/>). Pytamy tylko o ogłoszenia o zamówieniu
+  (`ContractNotice`), plasterkami po jednej dobie UTC, a prefiksy CPV z konfiguracji źródła
+  (domyślnie 72, 48, 73; edytor w widoku Źródła) dopasowujemy po stronie klienta.
+- **Regulamin:** Zarządzenie nr 1/2023 z załącznikami
+  (<https://media.ezamowienia.gov.pl/pod/2023/02/Regulamin-korzystania-z-API-1.pdf>) i regulamin
+  platformy (<https://ezamowienia.gov.pl/pl/regulamin/>). `DO WERYFIKACJI` przez operatora:
+  aktualne brzmienie obu dokumentów; licencja na treść ogłoszeń (nie znaleziono wyraźnej, podstawą
+  jest ustawa o otwartych danych i ponownym wykorzystywaniu informacji sektora publicznego).
+- **Limity:** gwarantowane 30 zapytań na minutę na adres IP; po przekroczeniu API odpowiada
+  `403`, nie `429`. Odstęp między zapytaniami adaptera to co najmniej 2 100 ms (także przy
+  **Sprawdź**), czyli najwyżej 28 zapytań na minutę; `403` kończy przebieg jako `rate_limited`
+  (z kodem HTTP 403) i kolejna próba czeka co najmniej odstęp źródła, `429`/`503` mają wspólne
+  ponowienia. Strona ma 100 ogłoszeń (maksimum spada z 500 na 100 od 2027-01-11), najwyżej 10
+  stron na przebieg; ucięty przebieg jest `partial`, a kolejny wznawia od pierwszej
+  niedokończonej doby, więc ogłoszenia nie przepadają po cichu.
+- **robots.txt:** nie sprawdzamy (D-12 zmiany `public-tenders`). Dostęp idzie przez udokumentowane
+  API, które wydawca udostępnia do odczytu maszynowego; jego warunki są w regulaminie powyżej.
+  Dla kanałów RSS zasada się nie zmienia.
+- **Zapisujemy:** adres strony ogłoszenia, tytuł, opis (ogłoszenie bez znaczników, do 200 000
+  znaków wejścia), datę publikacji i termin składania ofert, nazwę zamawiającego, kody CPV,
+  szacunkową wartość tylko gdy odczyta ją wąski wzorzec (inaczej „nieznana", nigdy zgadywana),
+  skrót treści. Nie zapisujemy danych osób kontaktowych ani adresów e-mail. Fixture
+  `test/fixtures/tenders/bzp-page.json` jest syntetyczny i oznaczony `DEMO`.
+- **Pokrycie z TED:** to samo postępowanie może być w BZP i w TED pod różnymi adresami i
+  tekstami. Pierwsze źródło, które je zapisze, jest właścicielem okazji; drugie wchodzi jako
+  dowód `REPEAT_IMPORT`, gdy zgadza się adres lub skrót treści, a w przeciwnym razie zostaje
+  osobną okazją (brak dopasowania po numerze czy nazwie, by nie zlać różnych części). Ogłoszenia
+  poniżej progów unijnych są tylko w BZP, powyżej tylko w TED, więc nakładanie jest rzadkie.
+- **Import ręczny przed przebiegiem:** gdy operator wklei adres ogłoszenia, zanim źródło je
+  pobierze, okazja zostaje ręczna: bez poziomu `PUBLIC_TENDER` i bez terminu z ogłoszenia, a
+  ogłoszenie z API wchodzi jako dowód `REPEAT_IMPORT`. Pierwsze źródło decyduje.
+- **`DO WERYFIKACJI` (pierwszy przebieg na żywo):** nazwy parametrów (`NoticeType`,
+  `PublicationDateFrom/To`, `PageSize`, `PageNumber`), kształt odpowiedzi i pisownia `noticeType`,
+  czy `htmlBody` jest wypełnione i czy jest w nim wartość, adres publicznej strony ogłoszenia
+  (`mo-client-board/bzp/notice-details/id/<objectId>`), odczyt terminu bez strefy jako czasu
+  Europe/Warsaw, rozmiar strony w bajtach, brak `403`/`429`.
+
+### API: TED, Tenders Electronic Daily (`ted-pl-it`)
+- **Dostęp:** Search API v3 `POST https://api.ted.europa.eu/v3/notices/search`, anonimowo, bez
+  klucza (<https://docs.ted.europa.eu/api/latest/search.html>). Zapytanie: ogłoszenia
+  otwierające postępowanie (`cn-standard`, `cn-social`, `cn-desg`, `subco`, `pin-cfc-standard`,
+  `pin-cfc-social`; bez `qu-sy`, to nie wezwanie do składania ofert), kraj zamawiającego
+  (`buyer-country`, kody alfa-3 z tabeli UE i EOG; domyślnie `PL`) i prefiksy CPV z
+  konfiguracji źródła (domyślnie 72, 48, 73), plasterkami po jednej dobie UTC.
+- **Regulamin:** Decyzja Komisji 2011/833/UE; ogłoszenia można swobodnie ponownie wykorzystywać,
+  także komercyjnie (<https://ted.europa.eu/en/legal-notice>). `DO WERYFIKACJI` przez operatora:
+  aktualne brzmienie noty prawnej.
+- **Limity:** zasada uczciwego użycia 700 zapytań na minutę na adres IP
+  (<https://ted.europa.eu/en/news/fair-usage-policy-on-ted>); `DO WERYFIKACJI`, czy dotyczy też
+  API. Adapter zachowuje odstęp 2 000 ms, strona ma 100 ogłoszeń, najwyżej 5 stron na przebieg;
+  pełna strona bez tokenu kolejnej jest przebiegiem ściętym (`partial`), nigdy kompletnym.
+  `403` to `http_status` (bez ponowienia), `429`/`503` ponawiamy jak w BZP. Zapytanie to
+  `POST`, więc idzie przez ten sam chroniony klient HTTP (ochrona SSRF, bez przekierowań).
+- **robots.txt:** nie sprawdzamy, z tego samego powodu co w BZP.
+- **Zapisujemy:** adres strony ogłoszenia na `ted.europa.eu` (inny adres z odpowiedzi jest
+  ignorowany), tytuł, opis, datę publikacji i termin składania ofert, zamawiającego, kody CPV,
+  wartość szacunkową z pola postępowania lub z jednej części (kilka części bez wartości
+  postępowania daje „nieznana", nie sumę), kod typu ogłoszenia. Brak pola wartości w odpowiedzi
+  to „nie podano ze źródła". Fixture `test/fixtures/tenders/ted-page.json` jest syntetyczny.
+- **Pokrycie z BZP i import ręczny:** jak w BZP powyżej.
+- **`DO WERYFIKACJI` (pierwszy przebieg na żywo):** nazwy pól (`TED_FIELDS` w
+  `ted/map-notice.ts`), filtr `buyer-country` w alfa-3 i składnia dat w `ted/query.ts`, formy
+  daty i godziny (`2026-11-24+01:00` z osobnym polem czasu), obiekty wielojęzyczne, pola
+  wartości, kształt odnośnika HTML, liczba zapytań na przebieg i rozmiar strony.
+
+### Baza Konkurencyjności (tylko import ręczny)
+- **Dostęp:** brak udokumentowanego publicznego API w serwisie ani w regulaminie
+  (<https://bazakonkurencyjnosci.funduszeeuropejskie.gov.pl/>). Nie ma adaptera: operator wkleja
+  adres lub tekst zapytania ofertowego przez import ręczny (zasady jak wyżej).
+- **Regulamin:** `DO WERYFIKACJI` przez operatora; aplikacja niczego stamtąd nie pobiera sama.
+
 ## Filtr źródła
 
 Każde źródło ma filtr: frazy do odrzucenia (`exclude`), frazy wymagane (`include`) i przełącznik.

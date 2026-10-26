@@ -17,6 +17,7 @@ const selection = {
   businessStatus: opportunities.businessStatus,
   force: sql<number>`${opportunities.analysisForce} <> 0`.mapWith(Boolean),
   publishedAt: rawSignals.publishedAt,
+  tenderJson: rawSignals.tenderJson,
 };
 
 /** Passed the pre-filter and still waiting for an analysis. */

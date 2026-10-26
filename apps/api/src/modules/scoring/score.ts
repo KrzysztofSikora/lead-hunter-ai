@@ -16,7 +16,9 @@ export function confidenceFor(analysis: AnalysedResult): Confidence {
     return 'LOW';
   }
   const direct =
-    analysis.evidenceLevel === 'DIRECT_REQUEST' || analysis.evidenceLevel === 'EXPLICIT_PROBLEM';
+    analysis.evidenceLevel === 'DIRECT_REQUEST' ||
+    analysis.evidenceLevel === 'PUBLIC_TENDER' ||
+    analysis.evidenceLevel === 'EXPLICIT_PROBLEM';
   if (direct && analysis.buyerConfirmed && analysis.unknowns.length <= HIGH_MAX_UNKNOWNS) {
     return 'HIGH';
   }

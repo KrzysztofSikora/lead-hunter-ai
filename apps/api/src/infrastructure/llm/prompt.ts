@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { OpportunityAnalysis } from '@lead-hunter/contracts';
 import type { AnalysisInput } from '../../modules/analysis/ports.js';
 
-export const PROMPT_VERSION = 'analysis-1';
+export const PROMPT_VERSION = 'analysis-2';
 
 /** Fixed text, never interpolated with source content (D-6). */
 export const SYSTEM_PROMPT = `You analyse one business opportunity found in a public source for a freelance software and electronics contractor.
@@ -12,6 +12,7 @@ Rules:
 - Use only facts present in <source_data>. Put facts in "sourceFacts" as verbatim quotes; put your own conclusions in "inferences"; put what is not known in "unknowns".
 - Set "sourceBudget" only when the source states an amount, and then quote the exact text in "quote". Amounts are integers in minor units (1.50 PLN = 150).
 - Never invent a URL, e-mail address, phone number, person or company. If a buyer or company is not named in the source, set "buyerOrAudience" to null or describe the audience and set "buyerConfirmed" to false.
+- A notice whose "sourceType" is "bzp" or "ted" is a public tender: set "evidenceLevel" to "PUBLIC_TENDER". Its buyer is the contracting authority named in the notice.
 - <profile> describes the contractor; use it to judge fit, never copy it as a fact about the source.
 - If the source is too thin to judge, answer with verdict "INSUFFICIENT_DATA".
 - Answer with one JSON object that matches the JSON schema below and nothing else: no prose, no code fence.

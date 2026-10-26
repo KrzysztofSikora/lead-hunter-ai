@@ -58,6 +58,7 @@ const columns = {
   fetchedAt: rawSignals.fetchedAt,
   availability: rawSignals.availability,
   lastVerifiedAt: rawSignals.lastVerifiedAt,
+  tenderJson: rawSignals.tenderJson,
   prefilterRule: opportunities.prefilterRule,
   prefilterMatches: opportunities.prefilterMatches,
   prefilterPhrase: opportunities.prefilterPhrase,

@@ -47,15 +47,98 @@ export const SourceFilter = z
   .strict();
 export type SourceFilter = z.infer<typeof SourceFilter>;
 
+const CPV_PREFIX_MAX = 20;
+const COUNTRIES_MAX = 10;
+
+const cpvPrefixes = z
+  .array(z.string().regex(/^\d{2,8}$/, { message: 'Kod CPV: od 2 do 8 cyfr.' }))
+  .min(1)
+  .max(CPV_PREFIX_MAX)
+  .refine((codes) => new Set(codes).size === codes.length, {
+    message: 'Kod CPV występuje więcej niż raz.',
+  });
+
+/**
+ * S-18 D-19, plan-review 6: the buyer countries TED can be asked for (EU and EEA, alpha-2 to the
+ * alpha-3 code its `buyer-country` field uses). The config is validated against this before it is
+ * stored, so a run never fails on a code the query cannot express.
+ */
+export const TED_COUNTRY_CODES: Readonly<Record<string, string>> = {
+  AT: 'AUT',
+  BE: 'BEL',
+  BG: 'BGR',
+  HR: 'HRV',
+  CY: 'CYP',
+  CZ: 'CZE',
+  DK: 'DNK',
+  EE: 'EST',
+  FI: 'FIN',
+  FR: 'FRA',
+  DE: 'DEU',
+  GR: 'GRC',
+  HU: 'HUN',
+  IE: 'IRL',
+  IT: 'ITA',
+  LV: 'LVA',
+  LT: 'LTU',
+  LU: 'LUX',
+  MT: 'MLT',
+  NL: 'NLD',
+  PL: 'POL',
+  PT: 'PRT',
+  RO: 'ROU',
+  SK: 'SVK',
+  SI: 'SVN',
+  ES: 'ESP',
+  SE: 'SWE',
+  IS: 'ISL',
+  LI: 'LIE',
+  NO: 'NOR',
+};
+
+const countries = z
+  .array(
+    z
+      .string()
+      .regex(/^[A-Z]{2}$/, { message: 'Kraj: dwuliterowy kod ISO, np. PL.' })
+      .refine((code) => Object.hasOwn(TED_COUNTRY_CODES, code), {
+        message: 'Kraj spoza UE i EOG nie jest obsługiwany przez TED.',
+      }),
+  )
+  .min(1)
+  .max(COUNTRIES_MAX)
+  .refine((codes) => new Set(codes).size === codes.length, {
+    message: 'Kraj występuje więcej niż raz.',
+  });
+
+/** S-18 D-7: the config of an e-Zamówienia (BZP) source. */
+export const BzpConfig = z.object({ cpvPrefixes }).strict();
+export type BzpConfig = z.infer<typeof BzpConfig>;
+
+/** S-18 D-7: the config of a TED source; `countries` are alpha-2 codes of the buyer's country. */
+export const TedConfig = z.object({ cpvPrefixes, countries }).strict();
+export type TedConfig = z.infer<typeof TedConfig>;
+
+/** S-18 D-7: what the Sources view edits; `countries` is null for BZP, which has none. */
+export const TenderSettings = z.object({ cpvPrefixes, countries: countries.nullable() }).strict();
+export type TenderSettings = z.infer<typeof TenderSettings>;
+
+export const SourceKind = z.enum(['rss', 'bzp', 'ted']);
+export type SourceKind = z.infer<typeof SourceKind>;
+
 /** D-11: a ready-made source the operator adds in one step. */
 export const SourcePreset = z
   .object({
     id: z.string(),
+    /** S-18: the source type the preset creates. */
+    type: SourceKind,
     name: z.string(),
     url: z.string(),
     accessNote: z.string(),
     termsUrl: z.string(),
     filter: SourceFilter,
+    /** S-18 D-7: default CPV prefixes and countries of a tender preset; null for a feed. */
+    tender: TenderSettings.nullable(),
   })
   .strict();
 export type SourcePreset = z.infer<typeof SourcePreset>;
@@ -64,7 +147,7 @@ export type SourcePreset = z.infer<typeof SourcePreset>;
 export const Source = z
   .object({
     id: z.number().int(),
-    type: z.literal('rss'),
+    type: SourceKind,
     name: z.string(),
     url: z.string(),
     presetId: z.string().nullable(),
@@ -73,6 +156,8 @@ export const Source = z
     enabled: z.boolean(),
     /** S-17 D-1: off and empty when none was stored. */
     filter: SourceFilter,
+    /** S-18 D-7: null for a feed. */
+    tender: TenderSettings.nullable(),
     /** S-17 D-7: the preset is no longer offered; the source keeps working. */
     presetWithdrawn: z.boolean(),
     lastAttemptAt: isoInstant.nullable(),
@@ -103,13 +188,18 @@ export const CreateSourceRequest = z.union([
 ]);
 export type CreateSourceRequest = z.infer<typeof CreateSourceRequest>;
 
-/** S-17 D-13: `filter` replaces the whole filter. */
+/** S-17 D-13: `filter` replaces the whole filter; S-18 D-7: `tender` the whole tender config. */
 export const UpdateSourceRequest = z
-  .object({ enabled: z.boolean().optional(), filter: SourceFilter.optional() })
+  .object({
+    enabled: z.boolean().optional(),
+    filter: SourceFilter.optional(),
+    tender: z.object({ cpvPrefixes, countries: countries.optional() }).strict().optional(),
+  })
   .strict()
-  .refine((body) => body.enabled !== undefined || body.filter !== undefined, {
-    message: 'Podaj enabled lub filter.',
-  });
+  .refine(
+    (body) => body.enabled !== undefined || body.filter !== undefined || body.tender !== undefined,
+    { message: 'Podaj enabled, filter lub tender.' },
+  );
 export type UpdateSourceRequest = z.infer<typeof UpdateSourceRequest>;
 
 /** D-10: the outcome of one run; `failed` counts entries that could not be mapped. */

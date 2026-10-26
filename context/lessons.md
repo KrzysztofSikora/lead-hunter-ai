@@ -73,3 +73,21 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: analysis-observability, R2
 - Scope: `apps/api/test/**`
 - Status: proposed in the PR for analysis-observability
+
+## A resume cursor must make progress on every run; test a unit of work larger than the per-run budget
+- Why: a cursor that restarts the capped unit re-reads it forever and never reaches later units.
+- Seen in: public-tenders, R1
+- Scope: `apps/api/src/infrastructure/sources/**`, `apps/api/src/modules/sources/service.ts`
+- Status: proposed in the PR for public-tenders
+
+## A pattern that extracts a source fact needs negative tests with the domain's look-alike phrasing
+- Why: threshold sentences ("nie przekracza kwoty ...") were read as an estimated value and shown as a source fact.
+- Seen in: public-tenders, R2
+- Scope: `apps/api/src/infrastructure/sources/**` text extraction
+- Status: proposed in the PR for public-tenders
+
+## Drop a stored opaque continuation token when its query changes and after a failed run that used it
+- Why: a token that belongs to one query, kept across a settings change or a failure, is sent again forever or skips notices silently.
+- Seen in: public-tenders, R4
+- Scope: `apps/api/src/modules/sources/service.ts`, `apps/api/src/infrastructure/sources/**`
+- Status: proposed in the PR for public-tenders

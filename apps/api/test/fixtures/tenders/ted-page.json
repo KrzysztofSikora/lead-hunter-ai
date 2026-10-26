@@ -1,0 +1,57 @@
+{
+  "_fixture": "DEMO, shape UNVERIFIED",
+  "totalNoticeCount": 5,
+  "iterationNextToken": null,
+  "notices": [
+    {
+      "publication-number": "900001-2026",
+      "notice-type": "cn-standard",
+      "notice-title": {
+        "pol": "DEMO Dostawa platformy analitycznej",
+        "eng": "DEMO Supply of an analytics platform"
+      },
+      "buyer-name": { "pol": ["DEMO Uniwersytet Przykładowy"] },
+      "buyer-country": ["POL"],
+      "classification-cpv": ["72000000", "48000000"],
+      "publication-date": "2026-10-20+02:00",
+      "deadline-receipt-tender-date-lot": ["2026-11-24+01:00"],
+      "deadline-receipt-tender-time-lot": ["10:30:00+01:00"],
+      "estimated-value-lot": [250000.5],
+      "estimated-value-cur-lot": ["PLN"],
+      "description-proc": { "pol": "<p>Opis &amp; zakres.</p>" },
+      "links": {
+        "html": {
+          "POL": "https://ted.europa.eu/pl/notice/-/detail/900001-2026",
+          "ENG": "https://ted.europa.eu/en/notice/-/detail/900001-2026"
+        }
+      }
+    },
+    {
+      "publication-number": "900002-2026",
+      "notice-type": "cn-social",
+      "notice-title": { "eng": "DEMO Software maintenance" },
+      "buyer-name": { "eng": ["DEMO City Office"] },
+      "buyer-country": ["POL"],
+      "classification-cpv": ["72200000"],
+      "publication-date": "2026-10-20+02:00",
+      "deadline-receipt-tender-date-lot": ["2026-11-30+01:00"],
+      "links": { "html": { "ENG": "https://evil.example/phish" } }
+    },
+    {
+      "publication-number": "900003-2026",
+      "notice-type": "can-standard",
+      "notice-title": { "pol": "DEMO Wynik" },
+      "classification-cpv": ["72000000"]
+    },
+    {
+      "publication-number": "900004-2026",
+      "notice-type": "cn-standard",
+      "notice-title": { "pol": "DEMO Meble biurowe" },
+      "classification-cpv": ["39000000"]
+    },
+    {
+      "notice-type": "cn-standard",
+      "classification-cpv": ["72000000"]
+    }
+  ]
+}

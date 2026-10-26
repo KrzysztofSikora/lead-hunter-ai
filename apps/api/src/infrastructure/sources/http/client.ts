@@ -33,10 +33,22 @@ export interface GetOptions {
   accept: string;
   /** Runs before each hop, before a slot is taken. It may throw an `HttpFetchError` to refuse. */
   beforeHop?: (url: URL) => Promise<void>;
+  /** S-18 D-20: a larger (or smaller) body limit than the client's, for one API request. */
+  maxBytes?: number;
+}
+
+/** S-18 D-11: a JSON POST (TED search). It follows no redirects: a 3xx comes back as a status. */
+export interface PostOptions {
+  signal: AbortSignal;
+  accept: string;
+  contentType: string;
+  body: string;
+  maxBytes?: number;
 }
 
 export interface HttpClient {
   get(url: string, options: GetOptions): Promise<HttpResponse>;
+  post(url: string, options: PostOptions): Promise<HttpResponse>;
 }
 
 export interface HttpClientOptions {
@@ -129,9 +141,10 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
   async function readBody(
     body: Dispatcher.ResponseData['body'],
     contentLength: string | undefined,
+    maxBytes: number,
   ): Promise<Uint8Array> {
     const declared = contentLength === undefined ? NaN : Number(contentLength);
-    if (Number.isFinite(declared) && declared > options.maxBytes) {
+    if (Number.isFinite(declared) && declared > maxBytes) {
       discard(body);
       throw new HttpFetchError('too_large');
     }
@@ -139,7 +152,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     let total = 0;
     for await (const chunk of body as AsyncIterable<Buffer>) {
       total += chunk.length;
-      if (total > options.maxBytes) {
+      if (total > maxBytes) {
         discard(body);
         throw new HttpFetchError('too_large');
       }
@@ -152,26 +165,42 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     | { redirect: string }
     | { redirect?: undefined; status: number; headers: HttpResponse['headers']; body: Uint8Array };
 
-  async function hop(url: URL, { signal, accept }: GetOptions): Promise<Hop> {
+  interface HopRequest {
+    signal: AbortSignal;
+    accept: string;
+    maxBytes?: number;
+    method?: 'GET' | 'POST';
+    contentType?: string;
+    body?: string;
+  }
+
+  async function hop(url: URL, input: HopRequest): Promise<Hop> {
+    const { signal, accept } = input;
     const release = await semaphore.acquire(signal);
     try {
       const response = await request(url, {
         dispatcher,
-        method: 'GET',
+        method: input.method ?? 'GET',
         signal,
         headers: {
           'user-agent': options.userAgent,
           accept,
           'accept-encoding': 'identity',
+          ...(input.contentType === undefined ? {} : { 'content-type': input.contentType }),
         },
+        ...(input.body === undefined ? {} : { body: input.body }),
       });
       const headers = response.headers as HttpResponse['headers'];
       const location = headerValue(headers.location);
-      if (REDIRECT_STATUSES.has(response.statusCode) && location) {
+      if (input.method !== 'POST' && REDIRECT_STATUSES.has(response.statusCode) && location) {
         discard(response.body);
         return { redirect: location };
       }
-      const body = await readBody(response.body, headerValue(headers['content-length']));
+      const body = await readBody(
+        response.body,
+        headerValue(headers['content-length']),
+        input.maxBytes ?? options.maxBytes,
+      );
       return { status: response.statusCode, headers, body };
     } finally {
       release();
@@ -191,7 +220,11 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
           const failure = checkTarget(current, isAllowed);
           if (failure) throw new HttpFetchError(failure);
           await getOptions.beforeHop?.(current);
-          const result = await hop(current, getOptions);
+          const result = await hop(current, {
+            signal: getOptions.signal,
+            accept: getOptions.accept,
+            ...(getOptions.maxBytes === undefined ? {} : { maxBytes: getOptions.maxBytes }),
+          });
           if (result.redirect === undefined) {
             return {
               status: result.status,
@@ -209,6 +242,28 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         }
       } catch (error) {
         throw mapError(error, getOptions.signal);
+      }
+    },
+    async post(rawUrl, postOptions) {
+      let target: URL;
+      try {
+        target = new URL(rawUrl);
+      } catch {
+        throw new HttpFetchError('blocked_url');
+      }
+      try {
+        const failure = checkTarget(target, isAllowed);
+        if (failure) throw new HttpFetchError(failure);
+        const result = await hop(target, { ...postOptions, method: 'POST' });
+        if (result.redirect !== undefined) throw new HttpFetchError('network');
+        return {
+          status: result.status,
+          headers: result.headers,
+          body: result.body,
+          url: target.href,
+        };
+      } catch (error) {
+        throw mapError(error, postOptions.signal);
       }
     },
   };

@@ -37,6 +37,8 @@ export interface OpportunityRow {
   fetchedAt: number;
   availability: Availability;
   lastVerifiedAt: number | null;
+  /** S-18 D-2: `TenderFacts` JSON, null for a signal that is not a tender notice. */
+  tenderJson: string | null;
   prefilterRule: PrefilterRule | null;
   prefilterMatches: number | null;
   prefilterPhrase: string | null;

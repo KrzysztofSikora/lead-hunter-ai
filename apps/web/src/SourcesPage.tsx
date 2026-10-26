@@ -5,6 +5,7 @@ import type {
   Source,
   SourceFilter,
   SourceList,
+  TenderSettings,
   SourcePreset,
 } from '@lead-hunter/contracts';
 import styles from './SourcesPage.module.css';
@@ -14,6 +15,7 @@ import {
   listSources,
   runSource,
   updateSource,
+  updateTender,
   type CreateOutcome,
   type Outcome,
 } from './api/sources.js';
@@ -138,6 +140,93 @@ function FilterEditor({ source, onChanged }: { source: Source; onChanged: () => 
   );
 }
 
+/** S-18 D-7: values separated by commas, semicolons or white space; blanks dropped. */
+function toCodes(text: string): string[] {
+  return text.split(/[\s,;]+/).filter((code) => code !== '');
+}
+
+/** S-18 D-7: CPV prefixes (and, for TED, countries) saved with the button; the server validates. */
+function TenderEditor({
+  source,
+  tender,
+  onChanged,
+}: {
+  source: Source;
+  tender: TenderSettings;
+  onChanged: () => void;
+}) {
+  const f = t.tender;
+  const [cpv, setCpv] = useState(tender.cpvPrefixes.join(', '));
+  const [countries, setCountries] = useState((tender.countries ?? []).join(', '));
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+  const hasCountries = tender.countries !== null;
+
+  async function save() {
+    setPending(true);
+    setMessage(null);
+    try {
+      const outcome = await updateTender(source.id, {
+        cpvPrefixes: toCodes(cpv),
+        ...(hasCountries ? { countries: toCodes(countries).map((c) => c.toUpperCase()) } : {}),
+      });
+      if (outcome.ok) {
+        setCpv(outcome.value.tender?.cpvPrefixes.join(', ') ?? cpv);
+        setCountries(outcome.value.tender?.countries?.join(', ') ?? countries);
+        setMessage({ kind: 'ok', text: f.saved });
+        onChanged();
+      } else if (outcome.refused === 'invalid') {
+        setMessage({
+          kind: 'error',
+          text: outcome.fields.map((field) => field.message).join(' ') || f.invalid,
+        });
+      } else {
+        setMessage({ kind: 'error', text: f.saveFailed });
+      }
+    } catch {
+      setMessage({ kind: 'error', text: f.saveFailed });
+    }
+    setPending(false);
+  }
+
+  return (
+    <fieldset className={styles.filter}>
+      <legend>{f.title}</legend>
+      <div className={styles.field}>
+        <label htmlFor={`cpv-${source.id}`}>{f.cpvLabel}</label>
+        <textarea
+          id={`cpv-${source.id}`}
+          rows={2}
+          value={cpv}
+          onChange={(event) => setCpv(event.target.value)}
+        />
+        <span className={styles.hint}>{f.cpvHint}</span>
+      </div>
+      {hasCountries && (
+        <div className={styles.field}>
+          <label htmlFor={`countries-${source.id}`}>{f.countriesLabel}</label>
+          <input
+            id={`countries-${source.id}`}
+            type="text"
+            autoComplete="off"
+            value={countries}
+            onChange={(event) => setCountries(event.target.value)}
+          />
+          <span className={styles.hint}>{f.countriesHint}</span>
+        </div>
+      )}
+      <button type="button" disabled={pending} onClick={save}>
+        {pending ? f.saving : f.save}
+      </button>
+      {message && (
+        <p role="status" className={message.kind === 'ok' ? styles.ok : styles.error}>
+          {message.text}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
 function SourceItem({ source, onChanged }: { source: Source; onChanged: () => void }) {
   const [pending, setPending] = useState<'run' | 'check' | 'toggle' | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
@@ -217,6 +306,12 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
             </>
           )}
         </dd>
+        {source.tender && (
+          <>
+            <dt>{t.endpoint}</dt>
+            <dd>{source.url}</dd>
+          </>
+        )}
         <dt>{t.enabled}</dt>
         <dd>{source.enabled ? 'tak' : 'nie'}</dd>
         <dt>{t.health}</dt>
@@ -240,6 +335,9 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
           </>
         )}
       </dl>
+      {source.tender && (
+        <TenderEditor source={source} tender={source.tender} onChanged={onChanged} />
+      )}
       <FilterEditor source={source} onChanged={onChanged} />
       <div className={styles.actions}>
         <button type="button" disabled={busy || !source.enabled} onClick={() => perform('run')}>

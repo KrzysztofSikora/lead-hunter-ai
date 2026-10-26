@@ -104,6 +104,8 @@ export interface WaitingOpportunity {
   text: string;
   url: string | null;
   sourceType: SourceType;
+  /** S-18 D-2: stored tender facts (JSON), parsed by the runner before the guard. */
+  tenderJson: string | null;
   businessStatus: BusinessStatus;
   /** D-10: the operator asked for a new provider call, so no stored result may be reused. */
   force: boolean;

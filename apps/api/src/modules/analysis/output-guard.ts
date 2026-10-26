@@ -1,4 +1,4 @@
-import type { OpportunityAnalysis } from '@lead-hunter/contracts';
+import type { OpportunityAnalysis, SourceType, TenderFacts } from '@lead-hunter/contracts';
 import { hasHiringCue } from './cues.js';
 
 export interface GuardedAnalysis {
@@ -7,6 +7,16 @@ export interface GuardedAnalysis {
 }
 
 const squash = (value: string): string => value.replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** S-18 D-3, D-6: what the guard knows about the signal beyond its text. */
+export interface GuardOrigin {
+  sourceType: SourceType;
+  tender: TenderFacts | null;
+}
+
+const TENDER_SOURCES: ReadonlySet<SourceType> = new Set(['bzp', 'ted']);
+const isTender = (origin?: GuardOrigin): boolean =>
+  origin !== undefined && TENDER_SOURCES.has(origin.sourceType);
 
 const PAID_CATEGORIES = new Set(['DIRECT_GIG', 'B2B_SUBCONTRACT']);
 
@@ -64,7 +74,11 @@ function quoteStates(budget: { minMinor: number; maxMinor: number; quote: string
  * D-14: provider-independent checks after schema validation. What the source did not say is
  * removed or downgraded, and every change is noted. Source text is only compared, never executed.
  */
-function guardAgainstSource(result: OpportunityAnalysis, sourceText: string): GuardedAnalysis {
+function guardAgainstSource(
+  result: OpportunityAnalysis,
+  sourceText: string,
+  origin?: GuardOrigin,
+): GuardedAnalysis {
   const notes: string[] = [];
   const haystack = squash(sourceText);
   const inSource = (value: string): boolean => {
@@ -98,7 +112,30 @@ function guardAgainstSource(result: OpportunityAnalysis, sourceText: string): Gu
   }
 
   let { evidenceLevel, category } = result;
-  const hiring = hasHiringCue(sourceText);
+  const tender = isTender(origin);
+  if (tender) {
+    // D-6: the notice's own value decides, whatever the model answered.
+    const stated = origin!.tender?.estimatedValue ?? null;
+    if (stated) {
+      sourceBudget = {
+        minMinor: stated.amountMinor,
+        maxMinor: stated.amountMinor,
+        currency: stated.currency,
+        quote: stated.quote,
+      };
+    } else {
+      if (result.sourceBudget) notes.push('Usunięto budżet: ogłoszenie nie podaje wartości.');
+      sourceBudget = null;
+    }
+    if (evidenceLevel !== 'PUBLIC_TENDER') {
+      notes.push(`Poziom dowodu ${evidenceLevel} zmieniony na PUBLIC_TENDER: źródło to przetarg.`);
+    }
+    evidenceLevel = 'PUBLIC_TENDER';
+  } else if (evidenceLevel === 'PUBLIC_TENDER') {
+    notes.push('Poziom dowodu PUBLIC_TENDER zmieniony na DIRECT_REQUEST: źródło to nie przetarg.');
+    evidenceLevel = 'DIRECT_REQUEST';
+  }
+  const hiring = tender || hasHiringCue(sourceText);
   if (evidenceLevel === 'DIRECT_REQUEST' && !hiring) {
     notes.push(
       'Poziom dowodu obniżony do EXPLICIT_PROBLEM: w tekście brak zlecenia lub płatności.',
@@ -164,8 +201,12 @@ export function removeInventedLinks(
  * text field (FR-08 AC4) and the buyer rule: a buyer or company the source does not name is a
  * model inference, never confirmed. Names in free prose are not detected.
  */
-export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): GuardedAnalysis {
-  const base = guardAgainstSource(result, sourceText);
+export function guardAnalysis(
+  result: OpportunityAnalysis,
+  sourceText: string,
+  origin?: GuardOrigin,
+): GuardedAnalysis {
+  const base = guardAgainstSource(result, sourceText, origin);
   const notes = [...base.notes];
   const sourceLower = sourceText.toLowerCase();
   const removed: string[] = [];
@@ -179,7 +220,9 @@ export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): 
 
   if (guarded.verdict === 'ANALYSED' && guarded.buyerConfirmed) {
     const buyer = guarded.buyerOrAudience;
-    if (buyer === null || !squash(sourceText).includes(squash(buyer))) {
+    // Plan-review 13: for a tender the buyer is the notice's own field, not a line in its text.
+    const known = isTender(origin) ? (origin!.tender?.buyer ?? null) : sourceText;
+    if (buyer === null || known === null || !squash(known).includes(squash(buyer))) {
       notes.push('Nabywcę oznaczono jako niepotwierdzonego: nie występuje w tekście źródła.');
       guarded = { ...guarded, buyerConfirmed: false };
     }
