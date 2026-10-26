@@ -1,5 +1,9 @@
-import { AnalysisActivity } from '@lead-hunter/contracts';
-import { describe, expect, it } from 'vitest';
+import { AnalysisActivity, AnalysisCancelResult } from '@lead-hunter/contracts';
+import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { getGlobalDispatcher, type MockAgent } from 'undici';
+import { afterAll, describe, expect, it } from 'vitest';
+import { OpenAiCompatibleProvider } from '../src/infrastructure/llm/openai-compatible.js';
 import { createAnalysisRepository } from '../src/infrastructure/db/analysis-repository.js';
 import { analyses } from '../src/infrastructure/db/schema.js';
 import { MockProvider } from '../src/infrastructure/llm/mock.js';
@@ -17,6 +21,7 @@ const BODY =
 
 interface Call {
   input: AnalysisInput;
+  signal: AbortSignal | undefined;
   resolve(): void;
   reject(error: unknown): void;
 }
@@ -32,10 +37,15 @@ class GatedProvider implements LlmProvider {
   readonly calls: Call[] = [];
   private readonly inner = new MockProvider();
 
-  analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
+  analyzeOpportunity(
+    input: AnalysisInput,
+    options?: { signal?: AbortSignal },
+  ): Promise<ProviderOutput> {
     return new Promise((resolve, reject) => {
+      options?.signal?.addEventListener('abort', () => reject(new ProviderError('cancelled')));
       this.calls.push({
         input,
+        signal: options?.signal,
         resolve: () => resolve(this.inner.analyzeOpportunity(input)),
         reject,
       });
@@ -48,9 +58,10 @@ function heldSleep() {
   const waits: { ms: number; release(): void }[] = [];
   return {
     waits,
-    sleep: (ms: number) =>
+    sleep: (ms: number, signal?: AbortSignal) =>
       new Promise<void>((resolve) => {
         waits.push({ ms, release: resolve });
+        signal?.addEventListener('abort', () => resolve());
       }),
   };
 }
@@ -87,8 +98,18 @@ async function setup(options: Parameters<typeof buildTestApp>[0] = {}) {
     expect(res.statusCode).toBe(200);
     return { raw: res.body, view: AnalysisActivity.parse(res.json()) };
   };
+  const send = (url: string) => built.app.inject({ method: 'POST', url, headers: { cookie } });
+  const cancel = async () => {
+    const res = await send('/api/analysis/cancel');
+    expect(res.statusCode).toBe(200);
+    return AnalysisCancelResult.parse(res.json());
+  };
+  const status = async () =>
+    (
+      await built.app.inject({ method: 'GET', url: '/api/analysis/status', headers: { cookie } })
+    ).json<{ paused: boolean; waiting: number }>();
   const rowCount = () => openTestDb(built.dir).db.select().from(analyses).all().length;
-  return { ...built, clock, cookie, post, activity, rowCount };
+  return { ...built, clock, cookie, post, activity, rowCount, send, cancel, status };
 }
 
 describe('analysis activity (FR-34 AC1, AC2, AC6)', () => {
@@ -237,5 +258,193 @@ describe('analysis activity (FR-34 AC1, AC2, AC6)', () => {
     t.clock.advance(7 * DAY + 1000);
     ({ view } = await t.activity());
     expect(view.history).toEqual([]);
+  });
+});
+
+const servers: Server[] = [];
+afterAll(() => {
+  for (const server of servers) server.close();
+});
+
+describe('cancel and the paused queue (FR-34 AC3, AC4)', () => {
+  const storedFor = (t: Awaited<ReturnType<typeof setup>>, id: number) => {
+    const { db } = openTestDb(t.dir);
+    const rows = db
+      .select()
+      .from(analyses)
+      .all()
+      .filter((row) => row.opportunityId === id);
+    return rows.map((row) => ({ status: row.status, error: row.error, cost: row.costMicroUsd }));
+  };
+
+  it('aborts the request in flight, keeps the opportunity and pauses the queue (AC3)', async () => {
+    const provider = new GatedProvider();
+    const t = await setup({ provider });
+    const first = await t.post(`DEMO pierwsze. ${BODY}`);
+    const second = await t.post(`DEMO drugie. ${BODY}`);
+    t.runner.kick();
+    await until(() => provider.calls.length === 1);
+
+    expect(await t.cancel()).toEqual({ cancelled: true, paused: true });
+    expect(provider.calls[0]!.signal?.aborted).toBe(true);
+    await t.runner.idle();
+
+    expect(provider.calls).toHaveLength(1);
+    expect(storedFor(t, first)).toEqual([{ status: 'FAILED', error: 'cancelled', cost: null }]);
+    expect(storedFor(t, second)).toEqual([]);
+    const { view, raw } = await t.activity();
+    expect(view.paused).toBe(true);
+    expect(view.active).toBeNull();
+    expect(view.history[0]).toMatchObject({
+      opportunityId: first,
+      outcome: 'cancelled',
+      reason: 'cancelled',
+    });
+    expect(view.queued.items.map((item) => item.opportunityId)).toEqual([second]);
+    expect(raw).not.toContain('"error"');
+    expect((await t.status()).paused).toBe(true);
+
+    // Neither a scheduler kick nor a new import calls the provider while paused.
+    t.runner.kick();
+    await t.post(`DEMO trzecie. ${BODY} trzecie`);
+    await t.runner.drain();
+    expect(provider.calls).toHaveLength(1);
+  });
+
+  it('ends a pending backoff without another provider call (AC3)', async () => {
+    const provider = new GatedProvider();
+    const held = heldSleep();
+    const t = await setup({ provider, sleep: held.sleep });
+    const id = await t.post(`DEMO jedno. ${BODY}`);
+    t.runner.kick();
+    await until(() => provider.calls.length === 1);
+    provider.calls[0]!.reject(new ProviderError('unavailable', 503));
+    await until(() => held.waits.length === 1);
+    expect((await t.activity()).view.active?.stage).toBe('backoff');
+
+    expect(await t.cancel()).toEqual({ cancelled: true, paused: true });
+    await t.runner.idle();
+
+    expect(provider.calls).toHaveLength(1);
+    expect(storedFor(t, id)).toEqual([{ status: 'FAILED', error: 'cancelled', cost: null }]);
+    const { view } = await t.activity();
+    expect(view.history[0]).toMatchObject({ outcome: 'cancelled', attempts: 1 });
+  });
+
+  it('keeps an answer that arrived before the cancel and does not start the next item', async () => {
+    const provider = new GatedProvider();
+    const t = await setup({ provider });
+    const first = await t.post(`DEMO pierwsze. ${BODY}`);
+    const second = await t.post(`DEMO drugie. ${BODY}`);
+    t.runner.kick();
+    await until(() => provider.calls.length === 1);
+    provider.calls[0]!.resolve();
+    // The first item is saved; the runner is now asking for the second one.
+    await until(() => provider.calls.length === 2);
+    provider.calls[1]!.resolve();
+    await t.runner.idle();
+    // Both finished: a cancel now has nothing to abort, but still pauses.
+    expect(await t.cancel()).toEqual({ cancelled: false, paused: true });
+    expect(storedFor(t, first)[0]!.status).toBe('COMPLETE');
+    expect(storedFor(t, second)[0]!.status).toBe('COMPLETE');
+  });
+
+  it('does not take the next item when the pause lands between two items', async () => {
+    const provider = new GatedProvider();
+    const t = await setup({ provider });
+    const first = await t.post(`DEMO pierwsze. ${BODY}`);
+    const second = await t.post(`DEMO drugie. ${BODY}`);
+    t.runner.kick();
+    await until(() => provider.calls.length === 1);
+    // Pausing and settling in the same tick: the answer is kept, the drain must then stop.
+    const cancelled = t.cancel();
+    provider.calls[0]!.resolve();
+    await cancelled;
+    await t.runner.idle();
+    expect(provider.calls).toHaveLength(1);
+    expect(storedFor(t, second)).toEqual([]);
+    expect(storedFor(t, first).length).toBeLessThanOrEqual(1);
+  });
+
+  it('keeps the pause over a restart and resumes the queue on request (AC3)', async () => {
+    const provider = new GatedProvider();
+    const t = await setup({ provider });
+    const id = await t.post(`DEMO jedno. ${BODY}`);
+    await t.cancel();
+
+    const restarted = await buildTestApp({
+      dir: t.dir,
+      clock: t.clock,
+      provider,
+      env: { LLM_PROVIDER: 'mock', ANALYSIS_DAILY_LIMIT: '1000' },
+    });
+    const cookie = await loginAsOperator(restarted.app);
+    restarted.runner.kick();
+    await restarted.runner.drain();
+    expect(provider.calls).toHaveLength(0);
+    const view = AnalysisActivity.parse(
+      (
+        await restarted.app.inject({
+          method: 'GET',
+          url: '/api/analysis/activity',
+          headers: { cookie },
+        })
+      ).json(),
+    );
+    expect(view.paused).toBe(true);
+
+    const res = await restarted.app.inject({
+      method: 'POST',
+      url: '/api/analysis/resume',
+      headers: { cookie },
+    });
+    expect(res.json()).toEqual({ paused: false });
+    await until(() => provider.calls.length === 1);
+    provider.calls[0]!.resolve();
+    await restarted.runner.idle();
+    expect(storedFor(t, id)[0]!.status).toBe('COMPLETE');
+  });
+
+  it('needs an operator session to cancel and resume', async () => {
+    const t = await setup();
+    for (const url of ['/api/analysis/cancel', '/api/analysis/resume']) {
+      const res = await t.app.inject({ method: 'POST', url });
+      expect(res.statusCode).toBe(401);
+    }
+  });
+
+  it('closes only its own request to an OpenAI-compatible backend and says it may go on (AC4)', async () => {
+    const seen: string[] = [];
+    let closed = false;
+    const server = createServer((req) => {
+      seen.push(`${req.method} ${req.url}`);
+      req.on('close', () => (closed = true));
+      // Never answers: the connection stays open until the client closes it.
+    });
+    servers.push(server);
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const host = `127.0.0.1:${(server.address() as AddressInfo).port}`;
+    (getGlobalDispatcher() as MockAgent).enableNetConnect(host);
+    const provider = new OpenAiCompatibleProvider({
+      apiKey: 'k',
+      baseUrl: `http://${host}/v1`,
+      model: 'demo-model',
+      paid: false,
+      jsonMode: 'json_object',
+      timeoutMs: 30_000,
+      maxRetries: 0,
+    });
+    const t = await setup({ provider });
+    const id = await t.post(`DEMO lokalny. ${BODY}`);
+    t.runner.kick();
+    await until(() => seen.length === 1);
+    expect((await t.activity()).view.backendMayContinue).toBe(true);
+
+    expect(await t.cancel()).toEqual({ cancelled: true, paused: true });
+    await t.runner.idle();
+    await until(() => closed);
+
+    expect(seen).toEqual(['POST /v1/chat/completions']);
+    expect(storedFor(t, id)).toEqual([{ status: 'FAILED', error: 'cancelled', cost: null }]);
   });
 });

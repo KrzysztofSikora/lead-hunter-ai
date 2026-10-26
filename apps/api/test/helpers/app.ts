@@ -7,6 +7,7 @@ import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
 import { createActivityRepository } from '../../src/infrastructure/db/activity-repository.js';
+import { createRunnerState } from '../../src/infrastructure/db/runner-state-repository.js';
 import { createAnalysisRepository } from '../../src/infrastructure/db/analysis-repository.js';
 import {
   createLlmProvider,
@@ -139,6 +140,7 @@ export async function buildTestApp(
     maxAgeDays: config.prefilterMaxAgeDays,
     ...llmRunnerDeps(config.llm),
     sleep: options.sleep ?? (async () => undefined),
+    runnerState: createRunnerState(db),
     onError: () => undefined,
   });
   // Pages go through the real fetcher; the global MockAgent answers (nothing leaves the machine).

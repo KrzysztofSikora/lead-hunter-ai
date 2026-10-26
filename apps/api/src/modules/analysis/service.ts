@@ -25,6 +25,7 @@ import type {
   HostMetrics,
   LlmProvider,
   ProfileReader,
+  RunnerState,
   WaitingOpportunity,
 } from './ports.js';
 import { ProviderError } from './ports.js';
@@ -64,6 +65,8 @@ export interface AnalysisDeps {
   secrets?: string[];
   /** Backoff between attempts (D-1); tests inject one they can hold open. */
   sleep?: Sleep;
+  /** Whether the operator paused the queue; absent means it is never paused across restarts. */
+  runnerState?: RunnerState;
   /** Temperature and load for the activity view; absent means "niedostępne". */
   hostMetrics?: HostMetrics;
   /** Receives drain failures; must not log source text. */
@@ -83,6 +86,13 @@ export interface AnalysisRunner {
   requeue(id: number, force: boolean): 'queued' | 'prefiltered' | 'not_configured' | 'not_found';
   /** FR-34: what the queue is doing now, what waits and what finished lately. */
   activity(): Promise<AnalysisActivity>;
+  /**
+   * FR-34 AC3: aborts the app's own request and pending retries, and pauses the queue until
+   * `resume()`. `cancelled` is false when no request was in flight (D-5).
+   */
+  cancel(): { cancelled: boolean };
+  /** Clears the pause and runs the queue. */
+  resume(): void;
   /** Resolves when no drain is in flight. */
   idle(): Promise<void>;
 }
@@ -125,6 +135,15 @@ const reasonOf = (error: unknown): string =>
 export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
   const { repository, provider, clock } = deps;
   const sleep = deps.sleep ?? realSleep;
+  let pausedInMemory = false;
+  const runnerState: RunnerState = deps.runnerState ?? {
+    isPaused: () => pausedInMemory,
+    setPaused: (paused) => {
+      pausedInMemory = paused;
+    },
+  };
+  /** The call in flight, while `cancel()` may still stop it (not once the provider answered). */
+  let cancellable: AbortController | undefined;
   const tracker = createActivityTracker({
     clock,
     maxEntries: HISTORY_MAX_ENTRIES,
@@ -288,17 +307,28 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       };
 
       const controller = new AbortController();
+      cancellable = controller;
+      // D-3: the operator's cancel is stored as a failed analysis with the code `cancelled`.
+      const cancelledOut = (): Outcome => {
+        repository.saveFailed({ ...meta, error: 'cancelled' });
+        tracker.finish('cancelled', 'cancelled');
+        return 'stop';
+      };
       let provided;
       for (let attempt = 1; ; attempt += 1) {
         tracker.attempt(attempt);
         try {
           provided = await active.analyzeOpportunity(input, { signal: controller.signal });
+          if (controller.signal.aborted) return cancelledOut();
           break;
         } catch (error) {
+          // An abort can surface as any error, so the signal decides, not the error class.
+          if (controller.signal.aborted) return cancelledOut();
           const delay = error instanceof ProviderError ? nextDelay(attempt, error) : 'give_up';
           if (delay !== 'give_up') {
             tracker.backoff(new Date(clock.now().getTime() + delay), providerReason(error));
             await sleep(delay, controller.signal);
+            if (controller.signal.aborted) return cancelledOut();
             continue;
           }
           // A JSON.parse SyntaxError quotes the model's text, so it is stored as a code, not a message.
@@ -321,6 +351,7 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
         }
       }
 
+      cancellable = undefined;
       // The call is billed from here on, so a rejected answer is stored with its cost too.
       const cost = active.paid ? costMicroUsd(provided.usage, deps.budget?.price ?? null) : 0;
       const billed = { usage: provided.usage, costMicroUsd: cost };
@@ -351,13 +382,19 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       // After the provider answered: a failed save must not leave the row at the head of the queue.
       fail(`internal_error: ${reasonOf(error)}`, 'internal_error');
       return 'continue';
+    } finally {
+      cancellable = undefined;
     }
   }
 
   async function drainOnce(): Promise<void> {
     runPrefilter();
     if (!provider) return;
-    while (repository.countSince(startOfWarsawDay(clock.now()).getTime()) < deps.dailyLimit) {
+    // Checked per item: a cancel that lands between two items must not start the next call.
+    while (
+      !runnerState.isPaused() &&
+      repository.countSince(startOfWarsawDay(clock.now()).getTime()) < deps.dailyLimit
+    ) {
       const [next] = repository.nextWaiting(1);
       if (!next) return;
       if ((await analyseOne(next, provider)) === 'stop') return;
@@ -415,6 +452,7 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
         analysedToday,
         waiting: repository.waitingCount(),
         limitReached: analysedToday >= deps.dailyLimit,
+        paused: runnerState.isPaused(),
       };
     },
     requeue(id, force) {
@@ -436,7 +474,7 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       const active = tracker.active();
       return {
         now: now.toISOString(),
-        paused: false,
+        paused: runnerState.isPaused(),
         active,
         // The entry in flight is still `PENDING` until its result is saved, but it is not queued.
         queued: {
@@ -452,6 +490,17 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
         backendMayContinue: provider?.name === 'openai-compatible',
         host: { ...host, measuredAt: host.measuredAt.toISOString() },
       };
+    },
+    cancel() {
+      runnerState.setPaused(true);
+      const running = cancellable;
+      cancellable = undefined;
+      running?.abort();
+      return { cancelled: running !== undefined };
+    },
+    resume() {
+      runnerState.setPaused(false);
+      kickDrain();
     },
     idle: () => inFlight ?? Promise.resolve(),
   };

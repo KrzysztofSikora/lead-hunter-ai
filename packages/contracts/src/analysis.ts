@@ -218,6 +218,8 @@ export const AnalysisServiceStatus = z
     analysedToday: z.number().int(),
     waiting: z.number().int(),
     limitReached: z.boolean(),
+    /** FR-34 AC3: the operator cancelled an analysis and the queue waits for "Wznów kolejkę". */
+    paused: z.boolean(),
     /** D-13 (S-05): what is being used and whether the budget lets it run. */
     model: z.string().nullable(),
     paid: z.boolean(),
@@ -346,3 +348,12 @@ export const AnalysisActivity = z
   })
   .strict();
 export type AnalysisActivity = z.infer<typeof AnalysisActivity>;
+
+/** FR-34 AC3, D-5: cancel is idempotent and always pauses; `cancelled` says whether a request was aborted. */
+export const AnalysisCancelResult = z
+  .object({ cancelled: z.boolean(), paused: z.literal(true) })
+  .strict();
+export type AnalysisCancelResult = z.infer<typeof AnalysisCancelResult>;
+
+export const AnalysisResumeResult = z.object({ paused: z.literal(false) }).strict();
+export type AnalysisResumeResult = z.infer<typeof AnalysisResumeResult>;

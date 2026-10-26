@@ -1,8 +1,10 @@
 import {
   AnalysisActivity,
+  AnalysisCancelResult,
   AnalysisRequestBody,
   AnalysisRequestRefused,
   AnalysisRequestResult,
+  AnalysisResumeResult,
   AnalysisServiceStatus,
   ApiError,
   RetryAnalysisResult,
@@ -15,6 +17,8 @@ import { z } from 'zod';
 export interface AnalysisRouteDeps {
   status(): AnalysisServiceStatus;
   activity(): Promise<AnalysisActivity>;
+  cancel(): { cancelled: boolean };
+  resume(): void;
   requeue(id: number, force: boolean): 'queued' | 'prefiltered' | 'not_configured' | 'not_found';
   retry(id: number): 'reset' | 'not_failed' | 'not_found';
 }
@@ -32,6 +36,21 @@ export function registerAnalysisRoutes(app: FastifyInstance, deps: AnalysisRoute
     '/api/analysis/activity',
     { schema: { response: { 200: AnalysisActivity } } },
     async () => deps.activity(),
+  );
+
+  typed.post(
+    '/api/analysis/cancel',
+    { schema: { response: { 200: AnalysisCancelResult } } },
+    async () => ({ ...deps.cancel(), paused: true as const }),
+  );
+
+  typed.post(
+    '/api/analysis/resume',
+    { schema: { response: { 200: AnalysisResumeResult } } },
+    async () => {
+      deps.resume();
+      return { paused: false as const };
+    },
   );
 
   typed.post(

@@ -2,6 +2,8 @@ export {
   ANALYSIS_SCHEMA_VERSION,
   AnalysisActiveEntry,
   AnalysisActivity,
+  AnalysisCancelResult,
+  AnalysisResumeResult,
   AnalysisHistoryEntry,
   AnalysisReasonCode,
   HostSnapshot,

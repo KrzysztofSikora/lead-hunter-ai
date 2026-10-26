@@ -84,6 +84,12 @@ export interface HostSnapshot {
   measuredAt: Date;
 }
 
+/** FR-34 AC3, D-4: whether the operator stopped the queue; it survives a restart. */
+export interface RunnerState {
+  isPaused(): boolean;
+  setPaused(paused: boolean): void;
+}
+
 export interface HostMetrics {
   read(): Promise<HostSnapshot>;
 }

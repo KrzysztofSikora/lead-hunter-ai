@@ -222,7 +222,7 @@ only an operator session can read it (AC6). No token-level progress and no ETA (
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Abortable provider calls, runner-owned retries and the activity view API
-- [ ] Phase 2: Cancel, paused queue and host metrics
+- [x] Phase 2: Cancel, paused queue and host metrics
 - [ ] Phase 3: Phone view `/analiza`
 
 ## Human checks
@@ -234,6 +234,9 @@ only an operator session can read it (AC6). No token-level progress and no ETA (
 - [minor] (Phase 1) `server.ts` needs no change: `AnalysisDeps.sleep` defaults to a real abortable timer; only `buildTestApp` injects a no-op (overridable with `sleep`, plan-review 7). The activity route is typed on `AnalysisRouteDeps`, which the runner already satisfies.
 - [minor] (Phase 1) Plan-review 2, 4, 5, 7, 8, 9 applied: only the final outcome is stored (asserted: one row after two retries); `AnalysisActivity.now` and `attemptStartedAt` added; fake providers in `analysis.int.test.ts` and `jobs.int.test.ts` got `timeoutMs`; the canary sits after the 120-char title; one explicit 401 case. Findings 1, 3 and 6 belong to Phase 2 (paused gate per loop iteration, D-3 side effects, `controller.signal.aborted` decides "cancelled").
 - [minor] (Phase 1) A fake provider that rejects with a retryable `ProviderError` is now retried up to 3 attempts (no-op sleep in tests); tests that need a single failure use a non-retryable kind.
+- [minor] (Phase 2) Plan-review 1, 3, 6, 7 applied. The paused flag is checked per item in `drainOnce`; `cancel()` returns `cancelled: false` when the provider had already answered or nothing ran, and still pauses. A cancel stored as `FAILED`/`cancelled` (D-3) also uses a daily slot (`countSince`) and counts as `analysisFailed` in job-run statistics; accepted, switching to a `CANCELLED` status or excluding it from `countSince` is the reversal. The signal, not the error class, decides "cancelled"; a provider that ignores the signal and answers after the abort is also treated as cancelled (its answer is dropped).
+- [minor] (Phase 2) AC4 test uses a loopback HTTP server that never answers (instead of `MockAgent`, which cannot show the connection close): one `POST /v1/chat/completions`, then the server sees the connection closed, no other path touched.
+- [minor] (Phase 2) `AnalysisServiceStatus.paused` is required, so the web test fixture in `OpportunitiesPage.test.tsx` and two expectations in `analysis.int.test.ts` gained `paused: false`. `seed-demo.ts` needed no change (`runnerState` is optional).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
