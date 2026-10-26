@@ -6,7 +6,7 @@ import type {
   WaitingOpportunity,
 } from '../../modules/analysis/ports.js';
 import { moveFromNew, recordSystemMove, statusOf } from './system-move.js';
-import { analyses, opportunities, rawSignals } from './schema.js';
+import { analyses, offerDrafts, opportunities, rawSignals } from './schema.js';
 
 const selection = {
   id: opportunities.id,
@@ -80,8 +80,9 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
           .get()?.value ?? 0
       );
     },
+    /** D-8: analyses and offer drafts share one monthly cap. */
     spentSince(at) {
-      const row = db
+      const analysed = db
         .select({
           microUsd: sql<number>`COALESCE(SUM(${analyses.costMicroUsd}), 0)`,
           unknownCount: sql<number>`COALESCE(SUM(CASE WHEN ${analyses.status} = 'COMPLETE' AND ${analyses.costMicroUsd} IS NULL AND ${analyses.provider} <> 'mock' AND ${analyses.reusedFromAnalysisId} IS NULL THEN 1 ELSE 0 END), 0)`,
@@ -89,7 +90,18 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
         .from(analyses)
         .where(gte(analyses.createdAt, at))
         .get();
-      return { microUsd: row?.microUsd ?? 0, unknownCount: row?.unknownCount ?? 0 };
+      const drafted = db
+        .select({
+          microUsd: sql<number>`COALESCE(SUM(${offerDrafts.costMicroUsd}), 0)`,
+          unknownCount: sql<number>`COALESCE(SUM(CASE WHEN ${offerDrafts.status} <> 'FAILED' AND ${offerDrafts.costMicroUsd} IS NULL AND ${offerDrafts.provider} <> 'mock' THEN 1 ELSE 0 END), 0)`,
+        })
+        .from(offerDrafts)
+        .where(gte(offerDrafts.createdAt, at))
+        .get();
+      return {
+        microUsd: (analysed?.microUsd ?? 0) + (drafted?.microUsd ?? 0),
+        unknownCount: (analysed?.unknownCount ?? 0) + (drafted?.unknownCount ?? 0),
+      };
     },
     findReusable(opportunityId, promptVersion, schemaVersion) {
       const own = db

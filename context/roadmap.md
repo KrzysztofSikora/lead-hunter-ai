@@ -3,7 +3,8 @@
 Sources: `context/prd.md`, `context/tech-stack.md`. Order follows the brief (B-52): first the
 vertical slice from a manually imported signal to a recorded payment (S-01…S-08), then automatic
 sources (S-09, S-10 RSS, then S-11 Useme e-mail: planned first, swapped back on 2026-10-25
-because S-11 waits for the operator's `.eml` samples), then the routine (S-12, S-13) and deployment (S-16); insights (S-14) and data safety
+because S-11 waits for the operator's `.eml` samples), then the routine (S-12, S-13) and deployment (S-16); demand-only sources (S-17…S-19, added
+2026-10-25 because the first feeds brought mostly job offers, D-15) come next; insights (S-14) and data safety
 (S-15) come last. The Overview table is in execution order.
 Security that every route depends on (login) comes first, because retrofitting it is costlier
 than building on it.
@@ -18,14 +19,17 @@ than building on it.
 | S-04 | #5 | analysis-and-scoring | slice | FR-07, FR-08 (mock), FR-10 | S-03 | L | done |
 | S-05 | #6 | llm-providers | slice | FR-08 AC1–AC4, AC7, FR-09, FR-24 AC3 | S-04 | M | done |
 | S-06 | #7 | opportunity-card | slice | FR-11 AC2–AC4 | S-04 | M | done |
-| S-07 | #8 | offer-drafts | slice | FR-13 | S-05, S-06 | M | todo |
+| S-07 | #8 | offer-drafts | slice | FR-13 | S-05, S-06 | M | done |
 | S-08 | #9 | pipeline-and-payments | slice | FR-14, FR-15 | S-06 | M | done |
 | S-09 | #10 | url-import-guard | slice | FR-03 | S-03 | M | done |
 | S-10 | #11 | rss-sources | slice | FR-04, FR-18 AC3 | S-04, S-09 | L | done |
 | S-11 | #12 | email-alerts | slice | FR-05 | S-10 | L | todo |
 | S-12 | #13 | scheduler-and-jobs | slice | FR-17, FR-18 AC1–AC2 | S-10 | M | done |
 | S-13 | #14 | today-brief | slice | FR-16 | S-08, S-12 | M | done |
-| S-16 | #17 | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13 | M | todo |
+| S-16 | #17 | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13 | M | done |
+| S-17 | #31 | demand-sources | slice | FR-04 AC2/AC6 (rev.), FR-31 | S-10, S-12 | M | todo |
+| S-18 | #32 | public-tenders | slice | FR-32 | S-17 | M | todo |
+| S-19 | #33 | code-bounties | slice | FR-33, FR-27 (part) | S-17 | M | todo |
 | S-14 | #15 | insights | slice | FR-19 | S-08 | M | todo |
 | S-15 | #16 | data-ownership-backup | slice | FR-21, FR-22 | S-08 | M | todo |
 
@@ -205,6 +209,7 @@ than building on it.
   both presets from a machine with internet, evidence (counts, a sample signal) in the PR; the
   fixtures are recorded from that run.
 - Unknowns: current item format of hnrss and WWR feeds (`UNVERIFIED`).
+- Note (2026-10-25): the WWR and `jobs?q=contract` presets are withdrawn in S-17 (D-15).
 - Decided up front:
   - HN preset uses `https://hnrss.org/whoishiring/freelance`; WWR presets: programming,
     full-stack, back-end, devops. Optional HN query preset `whoishiring/jobs?q=contract`. (D-01)
@@ -222,6 +227,8 @@ than building on it.
   - **Prerequisite (person):** the operator creates/enables Useme e-mail alerts and commits 2–3
     anonymised `.eml` samples before this item starts; `ship` for this item is not run until they
     are in the repo. Oferia is added only if a sample exists. (user)
+  - Zleca.pl, Oferteo and Zlecenia3D.pl alerts (no feeds, D-15) get a parser each when a sample
+    `.eml` exists; senders added to the allow-list. (user)
   - IMAP via a dedicated mailbox or folder; read-only `EXAMINE`; sender allow-list in config
     (default `@useme.com`). (D-04)
 - Size: L
@@ -284,6 +291,58 @@ than building on it.
     optional `ollama` service behind a compose profile, and the measurements. (user)
 - Size: M
 
+### S-17 Demand-only presets and source filter (`demand-sources`)
+- Goal: presets bring requests for work, not job ads, and each source can drop obvious noise
+  before any analysis cost, with the filter switchable in the Sources view.
+- Covers: FR-04 AC2, AC6 (revised), FR-31 AC1–AC3; `docs/source-policy.md` entries for every new
+  preset.
+- Depends on: S-10, S-12
+- Acceptance: FR-04 AC2, AC6, FR-31 AC1–AC3; parser tests on recorded fixtures of each new preset
+  that has a reachable feed. Human check: a real run of every preset from a machine with
+  internet, evidence (counts, rejected-by-filter counts, one sample signal each) in the PR.
+- Unknowns: exact Freelancer.com skill feed slugs and item format; whether elektroda.pl offers
+  an RSS feed for forum 392 that robots.txt allows (if not, the preset is dropped and the
+  decision recorded); Arduino Forum Discourse feed `…/c/community/jobs/42.rss` (`UNVERIFIED`).
+- Decided up front:
+  - Presets withdrawn: WWR (all), `hnrss.org/jobs?q=contract`. Sources already created from
+    them stay as they are (the operator disables them); the Sources view marks them
+    "preset wycofany". (default — review in PR)
+  - New presets: Freelancer.com feeds for Node.js, React, TypeScript, Arduino, Raspberry Pi,
+    IoT, 3D printing, PCB layout, AI/automation (one source per skill); Arduino Forum jobs
+    category; elektroda.pl "Projektowanie Bazar" if a permitted feed exists. (D-15)
+  - Filter: include/exclude phrases per source, case-insensitive, matched on title + snippet,
+    stored with an `enabled` flag; presets ship sensible defaults (HN: include
+    "SEEKING FREELANCER"; Freelancer.com: none; Arduino: exclude "[FOR HIRE]", "looking for work").
+    Rejections follow FR-07 AC1 (stored, reason shown, not analysed). (user)
+- Size: M
+
+### S-18 Public procurement sources (`public-tenders`)
+- Goal: Polish and EU public tenders for software, IT services and R&D arrive as signals.
+- Covers: FR-32 AC1–AC3; `docs/source-policy.md` entries.
+- Depends on: S-17 (reuses the source filter)
+- Acceptance: FR-32 AC1–AC3; adapter tests on recorded API responses. Human check: one real run
+  of each source, evidence in the PR.
+- Unknowns: BZP notice API query parameters and response shape after the 2027-01-11 page-size
+  change (max 100); TED search API v3 query syntax; licence of the notice texts (`UNVERIFIED`).
+- Decided up front:
+  - Defaults: CPV prefixes 72, 48, 73; TED country PL; only notices opening a procedure; at most
+    30 requests per minute to BZP. (D-15)
+  - Baza Konkurencyjności is not automated unless a documented public API is found; until
+    then manual import. (brief §5)
+- Size: M
+
+### S-19 Paid code bounties (`code-bounties`)
+- Goal: paid GitHub issues and Opire rewards matching the profile arrive as signals.
+- Covers: FR-33 AC1–AC2; FR-27 AC1 for the bounty case.
+- Depends on: S-17
+- Acceptance: FR-33 AC1–AC2; adapter tests on recorded responses. Human check: one real run,
+  evidence in the PR.
+- Unknowns: Opire API response shape (`UNVERIFIED`); GitHub search rate limits without a token.
+- Decided up front:
+  - Optional `GITHUB_TOKEN` (read-only, public data) in `.env`; without it the adapter runs with
+    the anonymous limit. (default)
+- Size: M
+
 ## Later
 - FR-27 GitHub Issues adapter (P1).
 - FR-28 Web search adapter (P1).
@@ -291,6 +350,8 @@ than building on it.
 - FR-30 CSV export, semantic grouping, multiple evidence per need (P1).
 - Oferia e-mail parser if no sample is available for S-11.
 - English UI / i18n (NG-06).
+- Reddit (r/forhire `[Hiring]`) through the Data API, only if Reddit approves access for this
+  use (Responsible Builder Policy); until then manual import (D-15).
 
 ## Open roadmap questions
 - Q-01 Licence before the repository goes public.

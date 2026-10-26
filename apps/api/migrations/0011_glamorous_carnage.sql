@@ -1,1 +1,0 @@
-ALTER TABLE `opportunities` ADD `prefilter_phrase` text;

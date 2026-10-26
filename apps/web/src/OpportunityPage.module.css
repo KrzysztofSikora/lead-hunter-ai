@@ -208,3 +208,16 @@
     grid-column: auto;
   }
 }
+
+.draft {
+  flex-basis: 100%;
+  min-width: 0;
+}
+
+.draftNotes {
+  margin: 0.5rem 0;
+}
+
+.draftNotes h5 {
+  margin: 0.75rem 0 0.25rem;
+}

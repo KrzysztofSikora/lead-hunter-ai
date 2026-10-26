@@ -11,7 +11,7 @@ Test levels in this repo:
 | **unit** | Vitest | `apps/api/src/**/*.test.ts`, `packages/*/src/**/*.test.ts`, `apps/web/src/**/*.test.ts(x)` | pure rules named by a `test` risk (scoring, guards, transitions); no React component tests |
 | **integration** | Vitest | `apps/api/test/**/*.int.test.ts` | Fastify app via `inject` → services → real SQLite (temp file, all migrations); outbound HTTP through undici `MockAgent`; fake clock; fake IMAP server port |
 | **e2e** | Playwright (Chromium headless) | `e2e/*.spec.ts` | built app (`pnpm build && pnpm start`) on a temp data dir, `LLM_PROVIDER=mock`, no outbound network |
-| **image** | `docker build` | `Dockerfile` | the image builds; container healthcheck in the e2e-in-container check of S-16 |
+| **image** | `docker build` | `Dockerfile` | the image builds; `pnpm docker:smoke` (S-16) runs it: non-root, migrations, health, refusal without a hash, data kept when the container is replaced |
 | **human** | PR checklist with evidence | `context/changes/<id>/evidence/` | real feeds, real LLM providers, real IMAP mailbox, the Raspberry Pi; never a gate |
 
 ## Test budget (user decision, 2026-10-25)
@@ -33,10 +33,10 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 
 | ID | Risk | Impact | Likelihood | Level | Test(s) | Status |
 |----|------|--------|------------|-------|---------|--------|
-| TR-01 (test) | Invented data shown as fact: URL, budget, contact, company or person not present in the source (brief's main honesty risk) | H | M | unit + integration | output guard: values absent from the source text are removed/flagged (FR-08 AC4); `sourceBudget` only with a quote; fixtures where the model "hallucinates" a URL, e-mail and company; card shows "wniosek modelu" for every inferred field | planned (S-04, S-05, S-06) |
+| TR-01 (test) | Invented data shown as fact: URL, budget, contact, company or person not present in the source (brief's main honesty risk) | H | M | unit + integration | output guard: values absent from the source text are removed/flagged (FR-08 AC4); `sourceBudget` only with a quote; offer-draft guard removes URLs and e-mails absent from source and profile (S-07); fixtures where the model "hallucinates" a URL, e-mail and company; card shows "wniosek modelu" for every inferred field | planned (S-04, S-05, S-06) |
 | TR-02 (test) | Prompt injection in source content executes, leaks secrets or changes settings | H | M | integration | injection fixtures (feed item, page, e-mail) through analysis with a fake provider that echoes its input: request has source data only inside the delimited data block, no secret value in the request, no setting changed after the run; system prompt states data ≠ instructions | planned (S-04, S-05) |
 | TR-03 (test) | SSRF through manual URL import (loopback, private, link-local, metadata, IPv6, redirects, DNS rebinding) | H | M | unit + integration | guard table (`address-guard.test.ts`) and loopback client tests (`http-client.int.test.ts`): address ranges (v4/v6, mapped v6); lookup returning a private address after a public one; redirect hop to a private host; non-http schemes; oversize/timeout | planned (S-09) |
-| TR-04 (test) | Something is sent to a client or any third party automatically | H | L | integration | `MockAgent` with `disableNetConnect()` across draft and pipeline flows: the only allowed host is the configured LLM; no IMAP write commands; e2e runs with no network access | planned (S-07, S-08, S-11) |
+| TR-04 (test) | Something is sent to a client or any third party automatically | H | L | integration | `MockAgent` with `disableNetConnect()` across draft and pipeline flows: the only allowed host is the configured LLM; no IMAP write commands; e2e runs with no network access | covered for drafts (S-07: `offer-drafts.int.test.ts` recording dispatcher, e2e draft step); S-11 pending |
 | TR-05 (test) | Score not deterministic, components do not sum, caps ignored (SPECULATIVE > 6/30), OSS bug report scored as a paid job | H | M | unit | table-driven rubric tests per component and evidence level; property: sum = total, 0 ≤ total ≤ 100, same input → same output; fixture "OSS bug issue" never `DIRECT_REQUEST` | planned (S-04) |
 | TR-06 (test) | Duplicate opportunities from re-import, re-run or URL variants; or different clients merged | H | M | unit + integration | canonicalisation table (tracking params, fragment, slash, case); import twice → one row; run a feed twice → no new signals; two similar titles with different URLs/authors stay separate | covered (S-03, S-10: `sources.int.test.ts` “never creates a duplicate on a re-read…”) |
 | TR-07 (test) | Invalid LLM output stored as analysis (bad JSON, schema mismatch, out-of-range numbers, overlong strings) | H | M | unit + integration | Zod schema boundary tests; provider adapters fed recorded bad responses → `ANALYSIS_FAILED` with reason, retry works, signal kept | partial (S-04: mock; S-05: Anthropic and OpenAI-compatible adapters through `MockAgent`, retry route) |
@@ -58,8 +58,8 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 | TR-23 (none) | Layer boundary violated (domain imports infrastructure/SDKs; web imports api internals) | M | M | lint | ESLint `no-restricted-imports` + a fixture asserting lint fails | planned (F-01) |
 | TR-24 (human) | Facts and estimates indistinguishable in the UI; status by colour only; unusable at 360 px | M | M | unit + e2e | component tests assert the "ze źródła" / "wniosek modelu" / "szacunek (hipoteza)" labels; e2e at 360 px viewport asserts no horizontal scroll on the main views | planned (S-06, S-13) |
 | TR-25 (none) | Pre-filter lets "SEEKING WORK" posts or excluded categories reach the LLM; daily limits ignored | M | M | unit | pre-filter rule table; limit counters with fake clock | planned (S-04, S-05) |
-| TR-26 (human) | Image does not build or the container cannot start (native better-sqlite3, non-root permissions, volume) | M | M | image + human | CI `docker build` on every PR; S-16 human check on the Pi with evidence | planned (F-01, S-16) |
-| TR-27 (human) | Footprint too large for the Pi 4 (NFR-01, NFR-02) | M | L | human | S-16 measurements with seeded 10 000 signals | planned (S-16) |
+| TR-26 (human) | Image does not build or the container cannot start (native better-sqlite3, non-root permissions, volume) | M | M | image + human | CI `docker build` and `docker:smoke` on every PR; S-16 human check on the Pi with evidence | covered (S-16: container-smoke; Pi build human) |
+| TR-27 (human) | Footprint too large for the Pi 4 (NFR-01, NFR-02) | M | L | human | S-16 measurements with seeded 10 000 signals | planned (S-16 human checks, evidence in changes/pi-deployment/evidence/) |
 
 ## Not tested (and why)
 - **Real third-party services in automated tests** (hnrss.org, WWR, Useme mail, Anthropic,
@@ -80,13 +80,14 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 | unit + integration `pnpm test` | `/implement` each phase; `/review`; CI | yes |
 | e2e `pnpm e2e` | `/review`; CI on every PR and push | yes (F-01: one smoke spec; S-08 on: main path) |
 | image `pnpm docker:build` | `/review`; CI on every PR and push | yes |
+| image smoke `pnpm docker:smoke` | `/review` (needs Docker); CI `image` job after the build | yes |
 | mutation `pnpm mutation --mutate <file>` | only S-04 and S-09 (`ship <id> --mutation`); CI job `mutation-report` report-only | no (report only, target 80 %) |
 
 - No pre-commit hook: autonomous runs are gated by the skills; human commits rely on CI.
 - CI (`.github/workflows/ci.yml`, created in F-01): Node 24 + pnpm, `pnpm install
   --frozen-lockfile`, then typecheck, lint, test; job `e2e` (`pnpm exec playwright install
   --with-deps chromium`, `pnpm e2e`, report uploaded as an artifact on failure); job `image`
-  (`pnpm docker:build`); job `repo-hygiene` (fails if `.env`, `*.db`, backups or logs are
+  (`pnpm docker:build`, then `pnpm docker:smoke`); job `repo-hygiene` (fails if `.env`, `*.db`, backups or logs are
   tracked); job `mutation-report` (Stryker on changed target files, score in the job summary,
   never fails).
 - `pnpm e2e` builds the app, starts it on a free port with a temp `DATA_DIR`,

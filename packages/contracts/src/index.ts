@@ -108,3 +108,16 @@ export {
   RetryAnalysisResult,
 } from './jobs.js';
 export { DigestItem, DigestQuery, DigestToday, WEAK_CATEGORIES, WEAK_EVIDENCE } from './digest.js';
+export {
+  nextDraftStatus,
+  OFFER_SCHEMA_VERSION,
+  OfferDraft,
+  OfferDraftAction,
+  OfferDraftConflict,
+  OfferDraftContent,
+  OfferDraftFailed,
+  OfferDraftHistoryItem,
+  OfferDraftPatch,
+  OfferDraftRefused,
+  OfferDraftStatus,
+} from './offer-drafts.js';

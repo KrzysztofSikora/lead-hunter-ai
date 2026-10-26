@@ -11,7 +11,7 @@ import { and, count, desc, eq, gte, inArray, isNotNull, notInArray, sql } from '
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { DigestCandidateRow, DigestRepository } from '../../modules/digest/ports.js';
 import { toSourceErrors } from './source-error.js';
-import { analyses, opportunities, rawSignals, sources } from './schema.js';
+import { analyses, offerDrafts, opportunities, rawSignals, sources } from './schema.js';
 
 /** S-13 D-3: statuses of rows that still wait for a decision. */
 const OPEN_STATUSES: BusinessStatus[] = ['NEW', 'QUALIFIED', 'SAVED', 'OFFER_DRAFTED'];
@@ -146,6 +146,7 @@ export function createDigestRepository(db: BetterSQLite3Database): DigestReposit
         };
       });
     },
+    /** D-18: `analyses` counts every stored LLM call (drafts too), so `reported` never exceeds it. */
     llmUsageSince(since) {
       const row = db
         .select({
@@ -157,11 +158,23 @@ export function createDigestRepository(db: BetterSQLite3Database): DigestReposit
         .from(analyses)
         .where(gte(analyses.createdAt, since))
         .get();
+      const drafts = db
+        .select({
+          n: count(),
+          reported: sql<number>`count(${offerDrafts.inputTokens})`,
+          input: sql<number | null>`sum(${offerDrafts.inputTokens})`,
+          output: sql<number | null>`sum(${offerDrafts.outputTokens})`,
+        })
+        .from(offerDrafts)
+        .where(gte(offerDrafts.createdAt, since))
+        .get();
+      const add = (a: number | null | undefined, b: number | null | undefined) =>
+        a === null || a === undefined ? (b ?? null) : a + (b ?? 0);
       return {
-        analyses: row?.n ?? 0,
-        reported: row?.reported ?? 0,
-        inputTokens: row?.input ?? null,
-        outputTokens: row?.output ?? null,
+        analyses: (row?.n ?? 0) + (drafts?.n ?? 0),
+        reported: (row?.reported ?? 0) + (drafts?.reported ?? 0),
+        inputTokens: add(row?.input, drafts?.input),
+        outputTokens: add(row?.output, drafts?.output),
       };
     },
   };

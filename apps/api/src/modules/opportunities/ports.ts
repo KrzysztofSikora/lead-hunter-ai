@@ -13,6 +13,7 @@ import type {
   SourceType,
   SourcesStatus,
 } from '@lead-hunter/contracts';
+import type { OfferDraftRow } from '../offers/ports.js';
 
 /** An opportunity joined with its primary signal. Times are UTC epoch ms. */
 export interface OpportunityRow {
@@ -119,6 +120,8 @@ export interface OpportunityRepository {
         followUpAt: number | null;
         /** Newest paid first. */
         payments: PaymentRow[];
+        /** Newest first, no `FAILED` rows: the current draft, then the history (at most 20). */
+        offerDrafts: OfferDraftRow[];
       }
     | undefined;
 }

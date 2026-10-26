@@ -1,1 +1,0 @@
-ALTER TABLE `sources` ADD `filter_json` text;
