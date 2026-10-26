@@ -258,7 +258,7 @@ The operator owns their data and can get it back after a failure:
 - `db.backup()` restarts when another connection writes during the copy; on a busy DB a copy can
   take longer, but the 03:30 slot is idle.
 - Retention deletes what the operator never looked at again; D-4 keeps rows with payments and
-  judges by the last change (the newest `updated_at`, or a note or work entry, review R1).
+  judges by the last change (the newest `updated_at`, or a note, work entry or offer draft, review R1, R5).
 - Deleting or retaining rows also removes their history: insights read `activity_events` for
   `REJECTED` moves and per-run outcomes join `raw_signals → opportunities`, so both shrink. With
   D-3 an item removed by retention that a source lists again comes back as `NEW`. The decision on

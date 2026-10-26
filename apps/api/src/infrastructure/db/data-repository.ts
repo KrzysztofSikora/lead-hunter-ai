@@ -262,6 +262,18 @@ export function createDataRepository(db: BetterSQLite3Database): DataRepository 
                         ),
                       ),
                   ),
+                  // Generating or editing an offer draft likewise leaves `updated_at` alone.
+                  notExists(
+                    tx
+                      .select({ one: sql`1` })
+                      .from(offerDrafts)
+                      .where(
+                        and(
+                          eq(offerDrafts.opportunityId, opportunities.id),
+                          gte(offerDrafts.updatedAt, before),
+                        ),
+                      ),
+                  ),
                 ),
               )
               .orderBy(opportunities.id)

@@ -144,6 +144,21 @@ describe('retention in the daily job (FR-21 AC3)', () => {
     expect(t.ids()).toEqual([noted]);
   });
 
+  it('keeps a closed row an offer draft was generated for within the period', async () => {
+    const t = await setup();
+    const drafted = await t.importText(1);
+    const stale = await t.importText(2);
+    t.set(drafted, 'REJECTED', 100);
+    t.set(stale, 'REJECTED', 100);
+    t.clock.advance(-DAY);
+    expect((await t.call('POST', `/api/opportunities/${drafted}/offer-drafts`)).statusCode).toBe(
+      201,
+    );
+    t.clock.advance(DAY);
+    await t.service().runDaily();
+    expect(t.ids()).toEqual([drafted]);
+  });
+
   it('deletes a backlog larger than one batch and counts it', async () => {
     const t = await setup();
     const old = t.clock.now().getTime() - 100 * DAY;
