@@ -554,7 +554,7 @@ Unchanged `SourceFailureReason` values:
 - [x] Phase 2: Reward parsing and the bounty guard rules
 - [x] Phase 3: GitHub search adapter and preset (checkpoint)
 - [x] Phase 4: Opire adapter and preset
-- [ ] Phase 5: Sources view editor, source policy and test plan
+- [x] Phase 5: Sources view editor, source policy and test plan
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
@@ -562,6 +562,8 @@ Unchanged `SourceFailureReason` values:
 - [ ] (Phase 3) One run with a read-only, public-data `GITHUB_TOKEN`: no 403 occurs — run: set `GITHUB_TOKEN` in `.env`, `pnpm discover` — evidence: `context/changes/code-bounties/evidence/github-run.txt` (no token, no personal data in it)
 - [ ] (Phase 3) If the real response differs from the synthetic fixtures in `apps/api/test/fixtures/bounties/`, replace them with trimmed anonymised recordings (the roadmap's "recorded responses") — run: compare `/search/issues` output with `github-search-*.json` — evidence: the replaced fixtures
 - [ ] (Phase 4) One real run of the Opire preset: record the real response shape against `map-reward.ts` (field names, envelope, unit), the counts of open, closed and skipped rewards, and one signal compared with its issue; if the shape differs, replace `opire-rewards.json` with a trimmed real one — run: add the preset in the Sources view, then `pnpm discover` with only it enabled — evidence: `context/changes/code-bounties/evidence/opire-run.txt` (not produced: `api.opire.dev` is unreachable from the session)
+- [ ] (Phase 5) In the Sources view at phone width, add both presets, change the GitHub languages to `TypeScript` only and save; judge the wording of the editor and the access notes — run: `pnpm dev`, open the Sources view — evidence: none (not produced)
+- [ ] (Phase 5) Read the GitHub and Opire entries in `docs/source-policy.md` against the current terms of GitHub and Opire, and tick or correct each `DO WERYFIKACJI` item — run: read `docs/source-policy.md` — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -608,6 +610,12 @@ Unchanged `SourceFailureReason` values:
   key and URL), while the reward's own key goes to the cursor (v1 R5).
 - [minor] (Phase 4) The Phase 1 test "no adapter → `internal`" for a stored `opire` source now
   uses an invalid stored config (`{ unexpected: true }`), because the adapter exists.
+- [minor] (Phase 5) `pnpm docker:build` and `pnpm docker:smoke` could not run: the Docker daemon is
+  not available in the session. Phase 5 changes only web code, docs and strings, so the image is not
+  expected to differ, but the gate is unproven; the PR should run both.
+- [minor] (Phase 5) The Sources view checks languages against `GITHUB_LANGUAGES` case-insensitively
+  and sends the canonical name; an unknown name is refused in the browser, before the request.
+  Labels are deduplicated case-insensitively, keeping the first spelling.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

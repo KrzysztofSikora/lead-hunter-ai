@@ -172,6 +172,21 @@ export const strings = {
       saveFailed: 'Nie udało się zapisać zakresu.',
       invalid: 'Sprawdź kody CPV i kraje.',
     },
+    github: {
+      title: 'GitHub: zakres wyszukiwania',
+      labelsLabel: 'Etykiety nagrody (jedna w wierszu)',
+      labelsHint:
+        'Zgłoszenie musi mieć jedną z nich. Od 1 do 10 etykiet, do 50 znaków, bez cudzysłowu.',
+      languagesLabel: 'Języki (jeden w wierszu)',
+      languagesHint:
+        'Osobne zapytanie dla każdego języka, najwyżej 5; bez języków jedno zapytanie. Nazwy jak w GitHub, np. TypeScript.',
+      unknownLanguage: (name: string) => `Nieznany język: ${name}.`,
+      save: 'Zapisz zakres',
+      saving: 'Zapisywanie…',
+      saved: 'Zakres zapisany. Obowiązuje od następnego przebiegu.',
+      saveFailed: 'Nie udało się zapisać zakresu.',
+      invalid: 'Sprawdź etykiety i języki.',
+    },
     runFailed: (reason: string) => `Błąd pobierania: ${reason}.`,
     checkOk: (time: string) => `Kanał odpowiada (${time}).`,
     checkFailed: (reason: string) => `Kanał nie odpowiada: ${reason}.`,
