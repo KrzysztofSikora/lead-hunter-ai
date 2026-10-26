@@ -67,3 +67,15 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: demand-sources, R2
 - Scope: integration tests for settings with an `enabled` flag
 - Status: proposed in the PR for demand-sources
+
+## A resume cursor must make progress on every run; test a unit of work larger than the per-run budget
+- Why: a cursor that restarts the capped unit re-reads it forever and never reaches later units.
+- Seen in: public-tenders, R1
+- Scope: `apps/api/src/infrastructure/sources/**`, `apps/api/src/modules/sources/service.ts`
+- Status: proposed in the PR for public-tenders
+
+## A pattern that extracts a source fact needs negative tests with the domain's look-alike phrasing
+- Why: threshold sentences ("nie przekracza kwoty ...") were read as an estimated value and shown as a source fact.
+- Seen in: public-tenders, R2
+- Scope: `apps/api/src/infrastructure/sources/**` text extraction
+- Status: proposed in the PR for public-tenders
