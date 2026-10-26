@@ -21,14 +21,12 @@ export function registerDataRoutes(app: FastifyInstance, service: DataService): 
   );
 
   // S-15 D-8: built in memory first, so an error never sends a partial file.
-  app.withTypeProvider<ZodTypeProvider>().get(
-    '/api/export',
-    { schema: { response: { 200: DataExport } } },
-    async (_request, reply) => {
+  app
+    .withTypeProvider<ZodTypeProvider>()
+    .get('/api/export', { schema: { response: { 200: DataExport } } }, async (_request, reply) => {
       const { body, date } = service.exportData();
       return reply
         .header('content-disposition', `attachment; filename="lead-hunter-export-${date}.json"`)
         .send(body);
-    },
-  );
+    });
 }

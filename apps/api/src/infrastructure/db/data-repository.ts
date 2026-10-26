@@ -1,7 +1,7 @@
 import { and, eq, getTableColumns, gte, inArray, lt, notExists, sql } from 'drizzle-orm';
 import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import type { DataRepository, ExportTables } from '../../modules/data/ports.js';
+import type { DataRepository, ExportTables } from '../../modules/ownership/ports.js';
 import {
   activityEvents,
   analyses,

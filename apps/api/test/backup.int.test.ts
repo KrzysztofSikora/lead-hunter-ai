@@ -17,7 +17,7 @@ import {
   backupFileName,
   createSqliteBackupStore,
 } from '../src/infrastructure/backup/sqlite-backup.js';
-import { createDataService } from '../src/modules/data/service.js';
+import { createDataService } from '../src/modules/ownership/service.js';
 import { createDataRepository } from '../src/infrastructure/db/data-repository.js';
 
 let root: string;

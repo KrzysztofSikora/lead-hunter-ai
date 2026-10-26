@@ -18,7 +18,7 @@ import {
 } from './infrastructure/llm/create-provider.js';
 import { createDataRepository } from './infrastructure/db/data-repository.js';
 import { createSqliteBackupStore } from './infrastructure/backup/sqlite-backup.js';
-import { createDataService } from './modules/data/service.js';
+import { createDataService } from './modules/ownership/service.js';
 import { createOfferService } from './modules/offers/service.js';
 import { createOpportunityService } from './modules/opportunities/service.js';
 import {

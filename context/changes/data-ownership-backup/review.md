@@ -27,8 +27,8 @@ Extra check this round: a throwaway vitest probe, removed afterwards and not com
 | `apps/api/src/infrastructure/db/data-repository.ts` | done | Delete, retention and export. Round 2 adds the `NOTE`/`WORK` guard (R1), round 3 the offer-draft guard (R5) |
 | `apps/api/src/infrastructure/db/analysis-repository.ts` | done | Sums from `deleted_usage`; D-2 paths |
 | `apps/api/src/infrastructure/db/offer-draft-repository.ts`, `modules/offers/{ports,service}.ts` | done | `insert` returns `number \| null`; both paths answer `not_found` |
-| `apps/api/src/modules/data/{ports,service,routes}.ts` | done | |
-| `apps/api/src/modules/data/export-rows.ts` (+ test) | done | |
+| `apps/api/src/modules/ownership/{ports,service,routes}.ts` | done | |
+| `apps/api/src/modules/ownership/export-rows.ts` (+ test) | done | |
 | `apps/api/src/app.ts`, `apps/api/src/server.ts` | done | |
 | `packages/contracts/src/{data,index}.ts` | done | |
 | `apps/web/src/api/data.ts`, `OpportunityPage.tsx` (+ css, test), `ProfilePage.tsx` (+ css), `strings.pl.ts` | done | |

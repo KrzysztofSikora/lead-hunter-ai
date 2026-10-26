@@ -10,8 +10,8 @@ import {
   rawSignals,
   signalIdentities,
 } from '../src/infrastructure/db/schema.js';
-import { createDataService } from '../src/modules/data/service.js';
-import type { BackupStore } from '../src/modules/data/ports.js';
+import { createDataService } from '../src/modules/ownership/service.js';
+import type { BackupStore } from '../src/modules/ownership/ports.js';
 import { buildTestApp, FakeClock, loginAsOperator, openTestDb } from './helpers/app.js';
 
 const DAY = 86_400_000;

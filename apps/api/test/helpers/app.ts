@@ -16,7 +16,7 @@ import {
   offerDrafterDeps,
 } from '../../src/infrastructure/llm/create-provider.js';
 import { createDataRepository } from '../../src/infrastructure/db/data-repository.js';
-import { createDataService } from '../../src/modules/data/service.js';
+import { createDataService } from '../../src/modules/ownership/service.js';
 import { createOfferService } from '../../src/modules/offers/service.js';
 import type { OfferDrafter } from '../../src/modules/offers/ports.js';
 import { createOpportunityService } from '../../src/modules/opportunities/service.js';

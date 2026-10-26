@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { mkdirSync, readdirSync, renameSync, rmSync, statSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import type { BackupStore } from '../../modules/data/ports.js';
+import type { BackupStore } from '../../modules/ownership/ports.js';
 
 const COPY = /^lead-hunter-\d{8}T\d{6}Z\.db$/;
 const PARTIAL = /^lead-hunter-\d{8}T\d{6}Z\.db\.partial$/;

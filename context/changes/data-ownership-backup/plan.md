@@ -99,18 +99,18 @@ The operator owns their data and can get it back after a failure:
 `spentSince`). Index on `(kind, created_at)`. Additive only.
 
 ### Modules
-- `apps/api/src/modules/data/ports.ts`: `DataRepository { deleteOpportunity(id, usageSince): boolean;
+- `apps/api/src/modules/ownership/ports.ts`: `DataRepository { deleteOpportunity(id, usageSince): boolean;
   deleteClosedBefore(before, usageSince, batch): number; exportAll(): ExportTables }`,
   `BackupStore { write(at: Date): Promise<{ file: string; bytes: number }>; prune(keep: number): string[] }`.
-- `apps/api/src/modules/data/service.ts`: `createDataService({ repository, backups, clock,
+- `apps/api/src/modules/ownership/service.ts`: `createDataService({ repository, backups, clock,
   backupKeep, retentionDays, logger })` with `deleteOpportunity(id)`, `exportData()` (adds
   `format`, `version`, `exportedAt`, Warsaw date for the file name), `backup()` (write + prune)
   and `runDaily()` (backup, then retention unless the backup failed; logs
   `backup: <file> (<bytes> B), removed <n> old copies` and
   `retention: removed <n> opportunities (REJECTED/EXPIRED, unchanged for <days> days)`).
   `usageSince` = `startOfWarsawMonth(now)`.
-- `apps/api/src/modules/data/export-rows.ts`: pure mapping (D-8): `toExportRow(row)`.
-- `apps/api/src/modules/data/routes.ts`: `DELETE /api/opportunities/:id`, `GET /api/export`.
+- `apps/api/src/modules/ownership/export-rows.ts`: pure mapping (D-8): `toExportRow(row)`.
+- `apps/api/src/modules/ownership/routes.ts`: `DELETE /api/opportunities/:id`, `GET /api/export`.
 - `apps/api/src/infrastructure/db/data-repository.ts`: the transactions (`behavior: 'immediate'`).
   Delete order: copy usage → read `primary_signal_id` → delete opportunity (cascade) → delete the
   raw signal.
@@ -143,7 +143,7 @@ The operator owns their data and can get it back after a failure:
   - `apps/api/src/infrastructure/db/offer-draft-repository.ts`, `apps/api/src/modules/offers/ports.ts`,
     `apps/api/src/modules/offers/service.ts`: `countSince` adds `deleted_usage`; `insert` returns
     `number | null` (null = opportunity gone, usage recorded); the service answers `not_found`.
-  - `apps/api/src/modules/data/{ports,service,routes}.ts` (new): `deleteOpportunity` and
+  - `apps/api/src/modules/ownership/{ports,service,routes}.ts` (new): `deleteOpportunity` and
     `DELETE /api/opportunities/:id` (D-9).
   - `apps/api/src/app.ts`, `apps/api/src/server.ts`: wire `data` deps.
   - `apps/api/test/data-delete.int.test.ts` (new).
@@ -162,12 +162,12 @@ The operator owns their data and can get it back after a failure:
 ### Phase 2: Export and the UI (delete button, export link)
 - Files:
   - `packages/contracts/src/data.ts` (new), `packages/contracts/src/index.ts`: `DataExport`.
-  - `apps/api/src/modules/data/export-rows.ts` (new): D-8 mapping; unit test
+  - `apps/api/src/modules/ownership/export-rows.ts` (new): D-8 mapping; unit test
     `export-rows.test.ts` (epoch → ISO for `…At`, `null` kept, `…Json` parsed, bad JSON kept as the
     raw string under the original key rather than dropped).
   - `apps/api/src/infrastructure/db/data-repository.ts`: `exportAll()` selecting the allowlisted
     tables and columns.
-  - `apps/api/src/modules/data/{service,routes}.ts`: `GET /api/export` with the attachment header.
+  - `apps/api/src/modules/ownership/{service,routes}.ts`: `GET /api/export` with the attachment header.
   - `apps/web/src/api/data.ts` (new): `deleteOpportunity(id)`; export URL constant.
   - `apps/web/src/OpportunityPage.tsx` (+ `.module.css`): two-step delete (D-10), then navigate to
     `/okazje`.
@@ -192,7 +192,7 @@ The operator owns their data and can get it back after a failure:
   - `packages/config/src/env.ts` (+ `env.test.ts`), `.env.example`: `BACKUP_DIR`, `BACKUP_KEEP`
     (D-7). Contract: `Config.backupDir` (absolute after resolve), `Config.backupKeep`.
   - `apps/api/src/infrastructure/backup/sqlite-backup.ts` (new): D-6 write/check/rename and prune.
-  - `apps/api/src/modules/data/{ports,service}.ts`: `backup()` and `runDaily()` (retention hook
+  - `apps/api/src/modules/ownership/{ports,service}.ts`: `backup()` and `runDaily()` (retention hook
     added in phase 4).
   - `apps/api/src/infrastructure/scheduler/schedule.ts` (+ test): `maintenance` cron at 03:30.
   - `apps/api/src/server.ts`: create the store, pass `maintenance: () => void data.runDaily()`.
@@ -215,7 +215,7 @@ The operator owns their data and can get it back after a failure:
   - `packages/config/src/env.ts` (+ test), `.env.example`: `RETENTION_DAYS` (D-7).
   - `apps/api/src/infrastructure/db/data-repository.ts`: `deleteClosedBefore(before, usageSince,
     batch)` (D-4), reusing the phase 1 delete routine per row.
-  - `apps/api/src/modules/data/service.ts`: `runDaily()` runs retention after a successful
+  - `apps/api/src/modules/ownership/service.ts`: `runDaily()` runs retention after a successful
     backup and logs the count (D-5).
   - `apps/api/test/retention.int.test.ts` (new).
 - Proves: FR-21 AC3: fake clock; rows: REJECTED unchanged 91 days, EXPIRED unchanged 91 days,
@@ -288,7 +288,7 @@ The operator owns their data and can get it back after a failure:
 - [minor] Plan-review #7 (D-2, draft path): when the opportunity is gone, both the successful and the failed draft path answer `404` (`insert` returns `null`, the service returns `not_found`); asserted for both in `data-delete.int.test.ts`.
 - [minor] Plan-review #5: the second evidence row in the phase 1 test comes from a real duplicate import, not a direct insert.
 - [minor] Plan-review #10: FK line numbers in *Findings* are off by a few lines (`analyses.opportunity_id` is `schema.ts:194`, evidence 228, events 249, identities 272, payments 288, drafts 312); the code is unaffected.
-- [minor] `.gitignore` has `data/`, which hid the new module `apps/api/src/modules/data/`; added the negation `!apps/api/src/modules/data/`.
+- [minor] `.gitignore` has `data/`, which hid the new module `apps/api/src/modules/ownership/`; added the negation `!apps/api/src/modules/ownership/`.
 - [minor] `POST /api/opportunities/:id/payments` answers `200` (not `201`); the phase 1 test asserts what the route does.
 - Plan-review majors (answered before implementing, per lesson): #3 phase 2 uses an explicit per-table column allowlist in `data-repository.ts` plus a test comparing `getTableColumns` with allowlist + "not exported" list; #1 phase 3 bounds the writer in the test and passes a large `progress` page count / aborts after bounded restarts; #2 phase 5 restores from a backup of a DB migrated only up to an earlier journal entry and asserts `0013` applies, and the smoke restores in place on the same volume.
 - [minor] Plan-review #1: `write()` copies in one step (`progress` returns a huge page count), so a writer on another connection cannot restart it between steps; the test uses a bounded writer and asserts every row committed before `write()` started is in the copy and `quick_check` is `ok`. No restart-limit error was added.

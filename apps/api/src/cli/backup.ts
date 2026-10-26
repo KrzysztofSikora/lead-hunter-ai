@@ -4,7 +4,7 @@ import { loadConfigOrExit } from './config.js';
 import { openDb } from '../infrastructure/db/client.js';
 import { createSqliteBackupStore } from '../infrastructure/backup/sqlite-backup.js';
 import { createDataRepository } from '../infrastructure/db/data-repository.js';
-import { createDataService } from '../modules/data/service.js';
+import { createDataService } from '../modules/ownership/service.js';
 
 /** FR-22 AC1 (S-15 D-12): one verified copy into BACKUP_DIR, then the rotation. */
 async function main(): Promise<number> {
