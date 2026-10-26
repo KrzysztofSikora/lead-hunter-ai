@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  addCalendarDays,
   instantToWarsawDate,
+  isoWeekOf,
+  isoWeeksInYear,
+  isoWeekStartDate,
   startOfWarsawDay,
   startOfWarsawMonth,
   warsawDateToInstant,
@@ -85,5 +89,26 @@ describe('warsawDateToInstant / instantToWarsawDate', () => {
   it('reads the Warsaw day of a late-evening UTC instant', () => {
     expect(instantToWarsawDate(new Date('2026-07-14T22:30:00Z'))).toBe('2026-07-15');
     expect(instantToWarsawDate(new Date('2026-07-14T21:30:00Z'))).toBe('2026-07-14');
+  });
+});
+
+describe('ISO weeks (S-14)', () => {
+  // The year ends are where the week number and the week-year disagree with the calendar.
+  it('puts the days around a year end in the week of their Thursday', () => {
+    expect(isoWeekOf('2026-10-25')).toEqual({ year: 2026, week: 43 }); // Sunday, clocks go back
+    expect(isoWeekOf('2026-10-26')).toEqual({ year: 2026, week: 44 });
+    expect(isoWeekOf('2026-12-31')).toEqual({ year: 2026, week: 53 });
+    expect(isoWeekOf('2027-01-01')).toEqual({ year: 2026, week: 53 });
+    expect(isoWeekOf('2027-01-04')).toEqual({ year: 2027, week: 1 });
+    expect(isoWeekOf('2024-12-30')).toEqual({ year: 2025, week: 1 });
+  });
+
+  it('starts a week on its Monday and counts 52 or 53 weeks in a year', () => {
+    expect(isoWeekStartDate(2027, 1)).toBe('2027-01-04');
+    expect(isoWeekStartDate(2026, 44)).toBe('2026-10-26');
+    expect(isoWeekStartDate(2026, 53)).toBe('2026-12-28');
+    expect(isoWeeksInYear(2026)).toBe(53);
+    expect(isoWeeksInYear(2027)).toBe(52);
+    expect(addCalendarDays('2026-10-26', 6)).toBe('2026-11-01');
   });
 });

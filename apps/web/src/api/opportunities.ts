@@ -7,6 +7,7 @@ import {
   type SourceType,
   type FollowUpRequest,
   type PaymentRequest,
+  type WorkRequest,
   type StatusChangeRequest,
 } from '@lead-hunter/contracts';
 import { apiFetch } from './client.js';
@@ -113,6 +114,10 @@ export function addNote(id: number, text: string): Promise<ActionOutcome> {
 
 export function setFollowUp(id: number, body: FollowUpRequest): Promise<ActionOutcome> {
   return send('PUT', `/api/opportunities/${id}/follow-up`, body);
+}
+
+export function addWork(id: number, body: WorkRequest): Promise<ActionOutcome> {
+  return postAction(`/api/opportunities/${id}/work`, body);
 }
 
 export function addPayment(id: number, body: PaymentRequest): Promise<ActionOutcome> {

@@ -6,6 +6,7 @@ import {
   FollowUpRequest,
   NoteRequest,
   PaymentRequest,
+  WorkRequest,
   StatusChangeRequest,
   ValidationError,
 } from '@lead-hunter/contracts';
@@ -131,6 +132,24 @@ export function registerOpportunityRoutes(app: FastifyInstance, deps: Opportunit
     },
     async (request, reply) => {
       const outcome = service.addPayment(request.params.id, request.body);
+      if (outcome.result === 'ok') return outcome.detail;
+      return outcome.result === 'invalid'
+        ? reply.code(400).send(invalid(outcome))
+        : reply.code(404).send({ error: 'not_found' });
+    },
+  );
+
+  typed.post(
+    '/api/opportunities/:id/work',
+    {
+      schema: {
+        params: idParams,
+        body: WorkRequest,
+        response: { 200: OpportunityDetail, 400: ValidationError, 404: ApiError },
+      },
+    },
+    async (request, reply) => {
+      const outcome = service.addWork(request.params.id, request.body);
       if (outcome.result === 'ok') return outcome.detail;
       return outcome.result === 'invalid'
         ? reply.code(400).send(invalid(outcome))

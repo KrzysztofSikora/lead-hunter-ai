@@ -184,5 +184,25 @@ export const PaymentRequest = z
   .strict();
 export type PaymentRequest = z.infer<typeof PaymentRequest>;
 
+/** A cost entered on an opportunity (S-14 D-6); bounds as for a payment. */
+export const WorkCost = z
+  .object({ amountMinor: z.number().int().min(1).max(PAYMENT_MAX_MINOR), currency: Currency })
+  .strict();
+export type WorkCost = z.infer<typeof WorkCost>;
+
+/** S-14 D-6: time spent and/or a cost on an opportunity, dated by the server (D-7). */
+export const WorkRequest = z
+  .object({
+    minutes: z.number().int().min(1).max(100_000).optional(),
+    cost: WorkCost.optional(),
+    note: note.optional(),
+  })
+  .strict()
+  .refine((body) => body.minutes !== undefined || body.cost !== undefined, {
+    path: ['minutes'],
+    message: 'podaj czas albo koszt',
+  });
+export type WorkRequest = z.infer<typeof WorkRequest>;
+
 export const NoteRequest = z.object({ text: note }).strict();
 export type NoteRequest = z.infer<typeof NoteRequest>;

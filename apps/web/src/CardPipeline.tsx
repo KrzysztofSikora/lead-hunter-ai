@@ -7,8 +7,8 @@ import {
   type OpportunityDetail,
 } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
-import { addPayment, setFollowUp, type ActionOutcome } from './api/opportunities.js';
-import { inputToMinor } from './profileForm.js';
+import { addPayment, addWork, setFollowUp, type ActionOutcome } from './api/opportunities.js';
+import { hoursToMinutes, inputToMinor } from './profileForm.js';
 import { formatMinor, strings } from './strings.pl.js';
 import { formatCalendarDate, formatWarsaw, warsawToday } from './warsawTime.js';
 
@@ -30,6 +30,10 @@ export function CardPipeline({
   const [currency, setCurrency] = useState<Currency>('PLN');
   const [paidOn, setPaidOn] = useState(warsawToday());
   const [paymentNote, setPaymentNote] = useState('');
+  const [hours, setHours] = useState('');
+  const [cost, setCost] = useState('');
+  const [costCurrency, setCostCurrency] = useState<Currency>('PLN');
+  const [workNote, setWorkNote] = useState('');
   const canFollowUp = FOLLOW_UP_STATUSES.includes(data.businessStatus);
 
   async function run(action: () => Promise<ActionOutcome>, done: () => void) {
@@ -89,6 +93,41 @@ export function CardPipeline({
       () => {
         setAmount('');
         setPaymentNote('');
+      },
+    );
+  }
+
+  function submitWork(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (hours.trim() === '' && cost.trim() === '') {
+      setError(p.workEmpty);
+      return;
+    }
+    const minutes = hours.trim() === '' ? undefined : hoursToMinutes(hours);
+    if (
+      minutes !== undefined &&
+      (typeof minutes !== 'number' || minutes < 1 || minutes > 100_000)
+    ) {
+      setError(p.workHoursInvalid);
+      return;
+    }
+    const minor = cost.trim() === '' ? undefined : inputToMinor(cost);
+    if (minor !== undefined && (typeof minor !== 'number' || minor < 1)) {
+      setError(p.workCostInvalid);
+      return;
+    }
+    const note = workNote.trim();
+    void run(
+      () =>
+        addWork(data.id, {
+          ...(minutes !== undefined ? { minutes } : {}),
+          ...(minor !== undefined ? { cost: { amountMinor: minor, currency: costCurrency } } : {}),
+          ...(note ? { note } : {}),
+        }),
+      () => {
+        setHours('');
+        setCost('');
+        setWorkNote('');
       },
     );
   }
@@ -198,6 +237,53 @@ export function CardPipeline({
         <div className={styles.formButtons}>
           <button type="submit" disabled={busy}>
             {p.paymentSave}
+          </button>
+        </div>
+      </form>
+      <h4 className={styles.subheading}>{p.workTitle}</h4>
+      <p className={styles.meta}>{p.workHint}</p>
+      <form className={styles.form} onSubmit={submitWork}>
+        <label>
+          {p.workHoursLabel}
+          <input
+            inputMode="decimal"
+            value={hours}
+            onChange={(event) => setHours(event.target.value)}
+          />
+        </label>
+        <label>
+          {p.workCostLabel}
+          <input
+            inputMode="decimal"
+            value={cost}
+            onChange={(event) => setCost(event.target.value)}
+          />
+        </label>
+        <label>
+          {p.currencyLabel}
+          <select
+            value={costCurrency}
+            onChange={(event) => setCostCurrency(event.target.value as Currency)}
+          >
+            {Currency.options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {p.workNoteLabel}
+          <textarea
+            value={workNote}
+            maxLength={NOTE_MAX_CHARS}
+            rows={2}
+            onChange={(event) => setWorkNote(event.target.value)}
+          />
+        </label>
+        <div className={styles.formButtons}>
+          <button type="submit" disabled={busy}>
+            {p.workSave}
           </button>
         </div>
       </form>

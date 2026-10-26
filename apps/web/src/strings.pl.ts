@@ -2,8 +2,9 @@ import type { FetchFailureReason, SourceFailureReason } from '@lead-hunter/contr
 
 /** `150000` + `PLN` → `1 500,00 PLN` (U+00A0 groups); amounts are never converted between currencies. */
 export function formatMinor(minor: number, currency: string): string {
-  const units = String(Math.trunc(minor / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
-  return `${units},${String(minor % 100).padStart(2, '0')} ${currency}`;
+  const abs = Math.abs(minor);
+  const units = String(Math.trunc(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+  return `${minor < 0 ? '-' : ''}${units},${String(abs % 100).padStart(2, '0')} ${currency}`;
 }
 
 export const strings = {
@@ -36,6 +37,7 @@ export const strings = {
     pipeline: 'Lejek',
     sources: 'Źródła',
     analysis: 'Analiza',
+    insights: 'Wyniki',
   },
   analysis: {
     title: 'Analiza',
@@ -224,6 +226,49 @@ export const strings = {
       failed: 'błędy',
       skipped: 'pominięte',
       sourceFiltered: 'odrzucone przez filtr źródła',
+    },
+  },
+  insights: {
+    title: 'Wyniki',
+    loading: 'Wczytuję wyniki…',
+    loadFailed: 'Nie udało się wczytać wyników.',
+    kindLabel: 'Okres',
+    week: 'Tydzień',
+    month: 'Miesiąc',
+    previous: 'Poprzedni',
+    next: 'Następny',
+    current: 'bieżący',
+    range: (from: string, to: string) => `${from} – ${to}`,
+    noData: 'brak danych',
+    totalsTitle: 'Podsumowanie okresu',
+    transitions: 'Zmiany etapu',
+    transitionsTo: (status: string, n: number) => `${status}: ${n}`,
+    offersSent: 'Wysłane oferty',
+    contacted: 'Pierwszy kontakt',
+    replyRate: 'Odpowiedzi',
+    replyLine: (replied: number, known: number, awaiting: number) =>
+      `${replied} z ${known} z wynikiem (${awaiting} bez wyniku)`,
+    replyNote:
+      'Wynik kontaktu może jeszcze się zmienić, gdy zapiszesz odpowiedź lub zamkniesz sprawę.',
+    meetings: 'Spotkania',
+    wins: 'Wygrane',
+    payments: 'Płatności',
+    bySource: 'Według źródła',
+    byCategory: 'Według kategorii',
+    manualSource: 'Ręczny import',
+    uncategorised: 'bez kategorii',
+    groupEmpty: 'Brak zapisanych działań w tym okresie.',
+    colGroup: 'Grupa',
+    workTitle: 'Czas i koszty (wpisane ręcznie)',
+    workMinutes: 'Czas',
+    workCosts: 'Koszty',
+    workNet: 'Wynik (płatności − wpisane koszty)',
+    hoursMinutes: (minutes: number) => {
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return [h > 0 ? `${h} h` : null, m > 0 || h === 0 ? `${m} min` : null]
+        .filter((part) => part !== null)
+        .join(' ');
     },
   },
   pipeline: {
@@ -625,6 +670,11 @@ export const strings = {
       followUpSet: (on: string) => `ustawiono na ${on}`,
       followUpCleared: 'usunięto',
       followUpDropped: 'follow-up usunięty przy zmianie statusu',
+      work: 'Czas i koszty',
+      workEntry: (minutes: string | null, cost: string | null) =>
+        [minutes ? `czas: ${minutes}` : null, cost ? `koszt: ${cost}` : null]
+          .filter((part) => part !== null)
+          .join(' · '),
     },
     pipeline: {
       followUpTitle: 'Follow-up',
@@ -645,6 +695,16 @@ export const strings = {
       paidOnInvalid: 'Podaj poprawną datę płatności.',
       paymentNoteLabel: 'Notatka do płatności',
       paymentSave: 'Zapisz płatność',
+      workTitle: 'Czas i koszty',
+      workHint:
+        'Wpisane ręcznie; trafiają do widoku Wyniki. Wpis ma datę zapisu i nie da się go zmienić.',
+      workHoursLabel: 'Czas (godziny, np. 1,5)',
+      workHoursInvalid: 'Podaj czas w godzinach, np. 1,5 (od 1 minuty do 100 000 minut).',
+      workCostLabel: 'Koszt',
+      workCostInvalid: 'Podaj koszt większy od zera, np. 120,00.',
+      workEmpty: 'Podaj czas albo koszt.',
+      workNoteLabel: 'Notatka do wpisu',
+      workSave: 'Zapisz czas i koszt',
     },
     detectedEntry: 'Wykryto',
     empty: {

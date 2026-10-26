@@ -32,6 +32,7 @@ import { createProfileService } from '../../src/modules/profile/service.js';
 import { createPaymentRepository } from '../../src/infrastructure/db/payment-repository.js';
 import { createOpportunityRepository } from '../../src/infrastructure/db/opportunity-repository.js';
 import { createDigestRepository } from '../../src/infrastructure/db/digest-repository.js';
+import { createInsightsRepository } from '../../src/infrastructure/db/insights-repository.js';
 import { createPipelineRepository } from '../../src/infrastructure/db/pipeline-repository.js';
 import { createProfileRepository } from '../../src/infrastructure/db/profile-repository.js';
 import { createSignalRepository } from '../../src/infrastructure/db/signal-repository.js';
@@ -222,6 +223,7 @@ export async function buildTestApp(
       pipeline: createPipelineRepository(db),
       clock,
     },
+    insights: { repository: createInsightsRepository(db), clock },
     analysis: runner,
     offers,
     sources: sourceRuntime.service,

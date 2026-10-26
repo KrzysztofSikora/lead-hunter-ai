@@ -88,6 +88,8 @@ export {
   PaymentRequest,
   RejectionReason,
   StatusChangeRequest,
+  WorkCost,
+  WorkRequest,
 } from './status.js';
 export type { MoveCheck } from './status.js';
 export {
@@ -143,3 +145,14 @@ export {
   OfferDraftRefused,
   OfferDraftStatus,
 } from './offer-drafts.js';
+export {
+  INSIGHTS_MAX_YEAR,
+  INSIGHTS_MIN_YEAR,
+  Insights,
+  InsightsMetrics,
+  InsightsQuery,
+  InsightsSource,
+  IsoMonth,
+  IsoWeek,
+  isoWeeksInYear,
+} from './insights.js';
