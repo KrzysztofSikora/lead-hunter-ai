@@ -23,7 +23,7 @@
     {
       "html_url": "https://github.com/demo-org/demo-repo/issues/2",
       "number": 2,
-      "title": "DEMO [$200] add retry to client",
+      "title": "[$200] DEMO add retry to client",
       "body": "Please add retries.",
       "labels": [
         {

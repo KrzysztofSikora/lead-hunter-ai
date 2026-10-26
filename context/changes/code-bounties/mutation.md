@@ -6,6 +6,8 @@ Score 88.95 % (159 killed, 2 timeout, 20 survived), target 80 %.
 
 Re-run after fix-review (R1, R5): 89.92 % (209 killed, 5 timeout, 24 survived, 1 error); the R1 rules added mutants, not reviewed one by one.
 
+Re-run after fix-review round 3 (R7–R9): 93.93 % (225 killed, 7 timeout, 15 survived, 1 error). The survivors in the R1 code are killed by new tests (title price beside a label reward, body line without a reward word, `$200AUD`, two currencies, `DEMO[$200]`). The 15 left: the `KEYWORD`/`RATE`/`MARKER_*` variants decided above, `hasForeignDollar`, `majorUnits`, the `.trim()` of the quote and `\s`→`\S` variants of the title head (a head with no whitespace is the same string; equivalent). Accepted.
+
 Survivors, all decided as accepted:
 
 | Where | Mutants | Decision |

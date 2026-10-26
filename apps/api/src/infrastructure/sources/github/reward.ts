@@ -24,9 +24,15 @@ const NOT_A_REWARD = /sponsor|credit/iu;
 /** What may stand between a reward word and its amount: punctuation, numbers, a linking word. */
 const GAP = String.raw`(?:[^\p{L}\p{N}]|\d|(?<![\p{L}])(?:is|are|issue|of|jest|są|wynosi)(?![\p{L}]))`;
 const KEYWORD_BEFORE = new RegExp(String.raw`${KEYWORD.source}${GAP}{0,25}$`, 'iu');
-const KEYWORD_AFTER = new RegExp(String.raw`^[^\p{L}\p{N}]{0,15}${KEYWORD.source}`, 'iu');
-/** A currency code other than the three we know follows the amount (`AUD`, `CAD`, `USDC`). */
-const OTHER_CODE = /^\s?(?!USD|EUR|PLN)[A-Z]{3,4}(?![\p{L}])/u;
+/** After the amount only a reward noun counts: `$10 paid plan` or `$20 budget tier` is not one. */
+const REWARD_NOUN = /(?:bount(?:y|ies)|rewards?|nagrod\p{L}*)(?![\p{L}\p{N}])/iu;
+const KEYWORD_AFTER = new RegExp(
+  String.raw`^[^\p{L}\p{N}]{0,15}(?<![\p{L}\p{N}])${REWARD_NOUN.source}`,
+  'iu',
+);
+/** A currency code other than the three we know follows the amount (`AUD`, `usdc`, `(CAD)`). */
+const OTHER_CODE =
+  /^\s?\(?(?:(?!(?:USD|EUR|PLN)(?![\p{L}]))[A-Z]{3,4}|(?:aud|cad|nzd|gbp|chf|jpy|sek|nok|dkk|czk|usdc|usdt|btc|eth))(?![\p{L}])/u;
 
 const NUMBER = String.raw`\d{1,3}(?:[ ,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?`;
 const TOKEN = new RegExp(String.raw`(?<![\d.,])(${NUMBER})(?!\d)(k(?![\p{L}\p{N}]))?`, 'gu');
@@ -84,7 +90,7 @@ function amountsIn(line: string, where: 'label' | 'title' | 'body'): ParsedRewar
       const reward =
         KEYWORD_BEFORE.test(head) ||
         KEYWORD_AFTER.test(line.slice(end)) ||
-        (where === 'title' && (head.trim() === '' || /[[(]\s*$/u.test(head)));
+        (where === 'title' && /^\s*[[(]?\s*$/u.test(head));
       if (!reward) {
         if (where === 'body') return null;
         continue;

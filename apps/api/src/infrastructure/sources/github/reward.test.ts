@@ -197,6 +197,10 @@ describe('parseReward: amounts that are not the reward (R1)', () => {
     'Support invoices over $1,000',
     '[Bounty] Fix rounding for $5 items',
     'Fix the $5 rounding bug, bounty welcome',
+    'Fix the $10 paid tier checkout',
+    'Wrong price shown ($10)',
+    'DEMO[$200] fix it',
+    '[DEMO$200] fix it',
   ])('title %s is unknown', (text) => {
     expect(title(text)).toBeNull();
   });
@@ -207,8 +211,39 @@ describe('parseReward: amounts that are not the reward (R1)', () => {
     'Bounty: $200 AUD',
     'Bounty: 200 USDC',
     'Bounty $: 50',
+    'The $10 paid plan is broken',
+    'Users on the $20 budget tier',
+    'Bounty: $200 USDC',
+    'Bounty: $200 USDT',
+    'Bounty: $200 aud',
+    'Bounty: $200 (AUD)',
+    'Bounty: $200AUD',
+    '$5 fee applies to this bounty',
   ])('body %s is unknown', (line) => {
     expect(body(line)).toBeNull();
+  });
+
+  it.each([
+    'Bounty: $50 paid after merge',
+    'This issue has a $50 bounty',
+    'Bounty: $50 EXTRAS',
+    'Bounty: $50 for the fix',
+  ])('body %s is the reward', (line) => {
+    expect(body(line)).toMatchObject({ amountMinor: 5_000, currency: 'USD' });
+  });
+
+  it('refuses the same amount in two currencies', () => {
+    expect(parseReward({ labels: ['$50'], title: 'x', body: 'Bounty: €50' })).toBeNull();
+  });
+
+  it('keeps a label reward next to a price in the title', () => {
+    expect(
+      parseReward({ labels: ['💎 Bounty $50'], title: 'Fix the $5 rounding', body: '' }),
+    ).toMatchObject({ amountMinor: 5_000 });
+  });
+
+  it('ignores a body line without a reward word beside a reward line', () => {
+    expect(body('Bounty: $50\nCosts $5 to run')).toMatchObject({ amountMinor: 5_000 });
   });
 
   it.each(['[$200] Fix it', '($200) Fix it', '$200 Fix it', 'Bounty: $200 Fix it'])(
