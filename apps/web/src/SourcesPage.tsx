@@ -77,7 +77,11 @@ function FilterEditor({ source, onChanged }: { source: Source; onChanged: () => 
     setPending(true);
     setMessage(null);
     try {
-      await updateSource(source.id, { filter });
+      const saved = await updateSource(source.id, { filter });
+      if (done) {
+        setExclude(saved.filter.exclude.join('\n'));
+        setInclude(saved.filter.include.join('\n'));
+      }
       setMessage(done ? { kind: 'ok', text: done } : null);
       onChanged();
     } catch {
