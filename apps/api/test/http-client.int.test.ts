@@ -362,3 +362,66 @@ describe('guarded HTTP client, POST and per-request limit (S-18 D-11, D-20)', ()
     expect(got.body.length).toBe(2000);
   });
 });
+
+describe('guarded HTTP client, per-request headers (S-19 D-9)', () => {
+  const seen: Array<{ url: string | undefined; auth: string | undefined }> = [];
+  beforeEach(() => {
+    seen.length = 0;
+  });
+  const record = (req: IncomingMessage) =>
+    seen.push({ url: req.url, auth: req.headers.authorization });
+
+  it('sends the header on the first hop', async () => {
+    handler = (req, res) => {
+      record(req);
+      res.end('ok');
+    };
+    await get(permissiveClient(), `http://127.0.0.1:${port}/a`, 5000, {
+      headers: { authorization: 'Bearer T' },
+    });
+    expect(seen).toEqual([{ url: '/a', auth: 'Bearer T' }]);
+  });
+
+  it('sends nothing extra when none was given', async () => {
+    handler = (req, res) => {
+      record(req);
+      res.end('ok');
+    };
+    await get(permissiveClient(), `http://127.0.0.1:${port}/a`);
+    expect(seen[0]?.auth).toBeUndefined();
+  });
+
+  it('keeps the header on a same-origin 301', async () => {
+    handler = (req, res) => {
+      record(req);
+      if (req.url === '/old') res.writeHead(301, { location: '/new' }).end();
+      else res.end('ok');
+    };
+    await get(permissiveClient(), `http://127.0.0.1:${port}/old`, 5000, {
+      headers: { authorization: 'Bearer T' },
+    });
+    expect(seen).toEqual([
+      { url: '/old', auth: 'Bearer T' },
+      { url: '/new', auth: 'Bearer T' },
+    ]);
+  });
+
+  it('drops the header after a cross-origin 302 and keeps it dropped on a hop back', async () => {
+    handler = (req, res) => {
+      record(req);
+      if (req.url === '/start') {
+        res.writeHead(302, { location: `http://localhost:${port}/other` }).end();
+      } else if (req.url === '/other') {
+        res.writeHead(302, { location: `http://127.0.0.1:${port}/back` }).end();
+      } else res.end('ok');
+    };
+    await get(permissiveClient(), `http://127.0.0.1:${port}/start`, 5000, {
+      headers: { authorization: 'Bearer T' },
+    });
+    expect(seen).toEqual([
+      { url: '/start', auth: 'Bearer T' },
+      { url: '/other', auth: undefined },
+      { url: '/back', auth: undefined },
+    ]);
+  });
+});

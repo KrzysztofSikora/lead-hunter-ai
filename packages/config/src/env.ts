@@ -29,6 +29,7 @@ export const ENV_VARIABLES = [
   'SOURCE_MIN_INTERVAL_MINUTES',
   'SOURCE_MAX_ATTEMPTS',
   'DISCOVERY_TIMES',
+  'GITHUB_TOKEN',
 ] as const;
 
 /** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
@@ -106,6 +107,7 @@ export const EnvSchema = z
         if (message) ctx.addIssue({ code: 'custom', message });
       }),
     ),
+    GITHUB_TOKEN: optional(z.string().trim().min(1)),
   })
   .superRefine((env, ctx) => {
     const missing = (path: string, message: string) =>
@@ -179,6 +181,8 @@ export interface Config {
   sourceMaxAttempts: number;
   /** Daily discovery slots as `HH:MM` in Europe/Warsaw, sorted (S-12 D-6). */
   discoveryTimes: string[];
+  /** S-19 D-9: optional read-only token for api.github.com; raises the search limit. Secret. */
+  github: { token?: string };
 }
 
 export interface ConfigIssue {
@@ -270,6 +274,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
           .map((t) => t.trim())
           .sort()
       : DEFAULT_DISCOVERY_TIMES,
+    github: v.GITHUB_TOKEN ? { token: v.GITHUB_TOKEN } : {},
     ...(llm ? { llm } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };

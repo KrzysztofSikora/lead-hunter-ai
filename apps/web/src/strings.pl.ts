@@ -356,6 +356,8 @@ export const strings = {
       rss: 'Kanał RSS/Atom',
       bzp: 'e-Zamówienia (BZP)',
       ted: 'TED',
+      github: 'GitHub — zgłoszenie z nagrodą',
+      opire: 'Opire — nagroda za zgłoszenie',
     },
   },
   prefilterRules: {

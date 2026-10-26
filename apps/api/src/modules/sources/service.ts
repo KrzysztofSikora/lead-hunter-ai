@@ -1,5 +1,7 @@
 import {
+  BountyFacts,
   BzpConfig,
+  GithubSearchConfig,
   SourceFilter,
   TedConfig,
   TenderFacts,
@@ -71,6 +73,7 @@ export type UpdateOutcome =
   | { kind: 'updated'; source: Source }
   | { kind: 'not_found' }
   | { kind: 'not_tender_source' }
+  | { kind: 'not_github_source' }
   | { kind: 'invalid'; issues: string[] };
 
 export type RunOutcome = { kind: 'done'; result: SourceRunResult } | Refusal;
@@ -80,8 +83,8 @@ export interface SourceService {
   list(): SourceList;
   create(request: CreateSourceRequest): CreateOutcome;
   /**
-   * D-13: `filter` replaces the whole filter; S-18 D-7: `tender` the tender config. Both are
-   * validated before they are stored.
+   * D-13: `filter` replaces the whole filter; S-18 D-7: `tender` the tender config; S-19 D-11:
+   * `github` the GitHub search config. Each is validated before it is stored.
    */
   update(id: number, patch: UpdateSourceRequest): UpdateOutcome;
   run(id: number, context?: RunContext): Promise<RunOutcome>;
@@ -97,11 +100,16 @@ export interface SourceService {
 
 const iso = (ms: number): string => new Date(ms).toISOString();
 
+/** S-19 D-1: the fixed endpoint of every API source, for display and the log host. */
+const SOURCE_ENDPOINTS: Readonly<Record<Exclude<SourceKind, 'rss'>, string>> = {
+  bzp: 'https://ezamowienia.gov.pl/mo-board/api/v1/notice',
+  ted: 'https://api.ted.europa.eu/v3/notices/search',
+  github: 'https://api.github.com/search/issues',
+  opire: 'https://api.opire.dev/rewards',
+};
+
 function parseConfigUrl(record: SourceRecord): string {
-  if (record.type !== 'rss') {
-    // S-18: a tender source's endpoint is fixed; its preset holds it for display.
-    return PRESETS.find((candidate) => candidate.type === record.type)?.url ?? '';
-  }
+  if (record.type !== 'rss') return SOURCE_ENDPOINTS[record.type];
   try {
     const config = JSON.parse(record.configJson) as { url?: unknown };
     return typeof config.url === 'string' ? config.url : '';
@@ -130,6 +138,24 @@ function tenderSettings(record: SourceRecord): TenderSettings | null {
     return parsed.success ? parsed.data : null;
   }
   return null;
+}
+
+/** S-19 D-11: the editable config of the GitHub source; null for every other type. */
+function githubSettings(record: SourceRecord): GithubSearchConfig | null {
+  if (record.type !== 'github') return null;
+  const parsed = GithubSearchConfig.safeParse(parseConfig(record));
+  return parsed.success ? parsed.data : null;
+}
+
+/** S-19 D-2: bounty facts are validated before they are stored; invalid ones are dropped. */
+function checkBounty(item: FeedItem, warn: (field: string) => void): string | null {
+  if (item.bounty === undefined) return null;
+  const parsed = BountyFacts.safeParse(item.bounty);
+  if (!parsed.success) {
+    warn(parsed.error.issues[0]?.path.join('.') || 'bounty');
+    return null;
+  }
+  return JSON.stringify(parsed.data);
 }
 
 /** S-18 D-2: facts are validated and bounded before they are stored; invalid ones are dropped. */
@@ -206,6 +232,7 @@ export function createSourceService({
       name: record.name,
       url: parseConfigUrl(record),
       tender: tenderSettings(record),
+      github: githubSettings(record),
       presetId: record.presetId,
       accessNote: preset?.accessNote ?? MANUAL_ACCESS_NOTE,
       termsUrl: preset?.termsUrl ?? null,
@@ -342,6 +369,9 @@ export function createSourceService({
           const tenderJson = checkTender(item, (field) =>
             logger?.warn(`source ${id} ${logHost(record)}: tender_invalid ${field}`),
           );
+          const bountyJson = checkBounty(item, (field) =>
+            logger?.warn(`source ${id} ${logHost(record)}: bounty_invalid ${field}`),
+          );
           const snippet = normaliseSnippet(item.text);
           let canonicalUrl: string | null = null;
           if (item.url !== null) {
@@ -370,6 +400,7 @@ export function createSourceService({
               sourceFact: snippet !== '' ? snippet : (item.url ?? ''),
               jobRunId: runId,
               tenderJson,
+              bountyJson,
             });
             // D-4: only a new opportunity is rejected; a duplicate keeps whatever status it has.
             if (ingested.result === 'created' && !verdict.pass) {
@@ -524,7 +555,7 @@ export function createSourceService({
       const filter = patch.filter === undefined ? undefined : SourceFilter.parse(patch.filter);
       let configJson: string | undefined;
       if (patch.tender !== undefined) {
-        if (record.type === 'rss') return { kind: 'not_tender_source' };
+        if (record.type !== 'bzp' && record.type !== 'ted') return { kind: 'not_tender_source' };
         const checked =
           record.type === 'bzp'
             ? BzpConfig.safeParse({
@@ -535,6 +566,14 @@ export function createSourceService({
                 cpvPrefixes: patch.tender.cpvPrefixes,
                 countries: patch.tender.countries ?? tenderSettings(record)?.countries,
               });
+        if (!checked.success) {
+          return { kind: 'invalid', issues: checked.error.issues.map((issue) => issue.message) };
+        }
+        configJson = JSON.stringify({ ...parseConfig(record), ...checked.data });
+      }
+      if (patch.github !== undefined) {
+        if (record.type !== 'github') return { kind: 'not_github_source' };
+        const checked = GithubSearchConfig.safeParse(patch.github);
         if (!checked.success) {
           return { kind: 'invalid', issues: checked.error.issues.map((issue) => issue.message) };
         }

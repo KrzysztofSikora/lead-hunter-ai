@@ -1,4 +1,9 @@
-import type { SourceFailureReason, SourceKind, TenderFacts } from '@lead-hunter/contracts';
+import type {
+  BountyFacts,
+  SourceFailureReason,
+  SourceKind,
+  TenderFacts,
+} from '@lead-hunter/contracts';
 import type { JobTrigger } from '../jobs/ports.js';
 
 /** One entry of a feed, mapped to the fields of a raw signal (S-10 Design). */
@@ -11,6 +16,8 @@ export interface FeedItem {
   publishedAt: number | null;
   /** S-18 D-2: set by the tender adapters only; validated by the service before it is stored. */
   tender?: TenderFacts;
+  /** S-19 D-2: set by the bounty adapters only; validated by the service before it is stored. */
+  bounty?: BountyFacts;
 }
 
 /** S-18 D-9: what the service tells an adapter about the run. */

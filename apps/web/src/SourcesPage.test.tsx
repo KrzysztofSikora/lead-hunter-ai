@@ -24,6 +24,7 @@ const bzp = {
   name: 'DEMO BZP',
   url: 'https://ezamowienia.gov.pl/mo-board/api/v1/notice',
   tender: { cpvPrefixes: ['72', '48', '73'], countries: null },
+  github: null,
 };
 const ted = {
   ...base,
@@ -32,6 +33,7 @@ const ted = {
   name: 'DEMO TED',
   url: 'https://api.ted.europa.eu/v3/notices/search',
   tender: { cpvPrefixes: ['72'], countries: ['PL'] },
+  github: null,
 };
 const feed = {
   ...base,
@@ -40,6 +42,7 @@ const feed = {
   name: 'DEMO RSS',
   url: 'https://example.com/feed',
   tender: null,
+  github: null,
 };
 
 function stubApi(

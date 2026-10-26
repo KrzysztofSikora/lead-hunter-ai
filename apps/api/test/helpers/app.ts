@@ -111,6 +111,8 @@ export async function buildTestApp(
     heartbeatMs?: number;
     /** Adapters that replace the real ones, by source type (S-18). */
     adapters?: Partial<SourceAdapters>;
+    /** Receives the source service's log lines (S-19). */
+    sourceLogger?: { info(message: string): void; warn(message: string): void };
     /** The analysis backoff wait; a no-op unless a test holds it open (S-20). */
     sleep?: Sleep;
     /** Wraps the stored pause flag, to land a cancel at an exact point of the drain. */
@@ -169,6 +171,7 @@ export async function buildTestApp(
     clock,
     sleep: async () => undefined,
     ...(options.adapters ? { adapters: options.adapters } : {}),
+    ...(options.sourceLogger ? { logger: options.sourceLogger } : {}),
     ...(options.jobLock ? { jobLock: options.jobLock } : {}),
     ...(options.heartbeatMs === undefined ? {} : { heartbeatMs: options.heartbeatMs }),
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),

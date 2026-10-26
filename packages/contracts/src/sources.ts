@@ -123,7 +123,95 @@ export type TedConfig = z.infer<typeof TedConfig>;
 export const TenderSettings = z.object({ cpvPrefixes, countries: countries.nullable() }).strict();
 export type TenderSettings = z.infer<typeof TenderSettings>;
 
-export const SourceKind = z.enum(['rss', 'bzp', 'ted']);
+/** S-19 D-3: the languages a GitHub search can be limited to (GitHub Linguist names). */
+export const GITHUB_LANGUAGES = [
+  'C',
+  'C#',
+  'C++',
+  'CSS',
+  'Dart',
+  'Elixir',
+  'Go',
+  'Haskell',
+  'HTML',
+  'Java',
+  'JavaScript',
+  'Jupyter Notebook',
+  'Kotlin',
+  'Lua',
+  'Objective-C',
+  'PHP',
+  'Python',
+  'R',
+  'Ruby',
+  'Rust',
+  'Scala',
+  'Shell',
+  'Solidity',
+  'Swift',
+  'TypeScript',
+  'Vue',
+  'Zig',
+] as const;
+
+/** S-19 D-3: GitHub rejects a search query over 256 characters. */
+export const GITHUB_QUERY_MAX_CHARS = 256;
+export const GITHUB_QUERY_BASE = 'is:issue is:open archived:false';
+
+/** S-19 D-3, D-5: the longest query is the base, all labels and the longest language. */
+export function longestGithubQuery(
+  labels: readonly string[],
+  languages: readonly string[],
+): number {
+  const labelClause = `label:${labels.map((label) => (/[\s,]/.test(label) ? `"${label}"` : label)).join(',')}`;
+  const language = languages.reduce((longest, name) => Math.max(longest, name.length), 0);
+  const languageClause = languages.length === 0 ? '' : ` language:"${'x'.repeat(language)}"`;
+  return `${GITHUB_QUERY_BASE} ${labelClause}${languageClause}`.length;
+}
+
+const githubLabels = z
+  .array(
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(50)
+      // eslint-disable-next-line no-control-regex
+      .regex(/^[^"\u0000-\u001f\u007f]+$/, {
+        message: 'Etykieta: bez cudzysłowu i znaków sterujących.',
+      }),
+  )
+  .min(1)
+  .max(10)
+  .refine((labels) => new Set(labels.map((label) => label.toLowerCase())).size === labels.length, {
+    message: 'Etykieta występuje więcej niż raz.',
+  });
+
+const githubLanguages = z
+  .array(z.enum(GITHUB_LANGUAGES))
+  .max(5)
+  .refine((languages) => new Set(languages).size === languages.length, {
+    message: 'Język występuje więcej niż raz.',
+  });
+
+const githubQueryFits = (config: { labels: string[]; languages: string[] }): boolean =>
+  longestGithubQuery(config.labels, config.languages) <= GITHUB_QUERY_MAX_CHARS;
+const GITHUB_QUERY_TOO_LONG = {
+  message: 'Zapytanie jest za długie: skróć etykiety lub zmniejsz liczbę języków.',
+};
+
+/** S-19 D-3: the config of the GitHub bounty source; the adapter builds its queries from it. */
+export const GithubSearchConfig = z
+  .object({ labels: githubLabels, languages: githubLanguages })
+  .strict()
+  .refine(githubQueryFits, GITHUB_QUERY_TOO_LONG);
+export type GithubSearchConfig = z.infer<typeof GithubSearchConfig>;
+
+/** S-19 D-11: Opire has nothing to configure. */
+export const OpireConfig = z.object({}).strict();
+export type OpireConfig = z.infer<typeof OpireConfig>;
+
+export const SourceKind = z.enum(['rss', 'bzp', 'ted', 'github', 'opire']);
 export type SourceKind = z.infer<typeof SourceKind>;
 
 /** D-11: a ready-made source the operator adds in one step. */
@@ -158,6 +246,8 @@ export const Source = z
     filter: SourceFilter,
     /** S-18 D-7: null for a feed. */
     tender: TenderSettings.nullable(),
+    /** S-19 D-11: null for everything but the GitHub bounty source. */
+    github: GithubSearchConfig.nullable(),
     /** S-17 D-7: the preset is no longer offered; the source keeps working. */
     presetWithdrawn: z.boolean(),
     lastAttemptAt: isoInstant.nullable(),
@@ -194,11 +284,17 @@ export const UpdateSourceRequest = z
     enabled: z.boolean().optional(),
     filter: SourceFilter.optional(),
     tender: z.object({ cpvPrefixes, countries: countries.optional() }).strict().optional(),
+    /** S-19 D-11: replaces the whole GitHub search config. */
+    github: GithubSearchConfig.optional(),
   })
   .strict()
   .refine(
-    (body) => body.enabled !== undefined || body.filter !== undefined || body.tender !== undefined,
-    { message: 'Podaj enabled, filter lub tender.' },
+    (body) =>
+      body.enabled !== undefined ||
+      body.filter !== undefined ||
+      body.tender !== undefined ||
+      body.github !== undefined,
+    { message: 'Podaj enabled, filter, tender lub github.' },
   );
 export type UpdateSourceRequest = z.infer<typeof UpdateSourceRequest>;
 

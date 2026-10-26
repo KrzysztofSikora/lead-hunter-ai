@@ -549,7 +549,7 @@ Unchanged `SourceFailureReason` values:
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Source types, bounty facts storage and the token header
+- [x] Phase 1: Source types, bounty facts storage and the token header
 - [ ] Phase 2: Reward parsing and the bounty guard rules
 - [ ] Phase 3: GitHub search adapter and preset (checkpoint)
 - [ ] Phase 4: Opire adapter and preset
@@ -563,6 +563,15 @@ Unchanged `SourceFailureReason` values:
 - [REVIEW] (plan) The roadmap asks for adapter tests on recorded responses. D-14 uses synthetic
   fixtures, because the egress proxy refuses `api.github.com` and `api.opire.dev` (probed
   2026-10-26). The recorded fixtures are owed through the Phase 3 and Phase 4 human checks.
+- [minor] (Phase 1) Plan says the redaction key `token` covers `config.github.token`; the test
+  showed pino's `*.token` reaches one level only, so a logged whole `config` leaked it. Added
+  the path `*.*.token` to `REDACT_PATHS` (`logger.ts`) and a canary for both shapes in
+  `logging.int.test.ts`.
+- [minor] (Phase 1) `longestGithubQuery` (label quoting and length of the longest query) lives in
+  `packages/contracts/src/sources.ts` for the contract refine; Phase 3's `query.ts` reuses it so
+  the adapter and the refine cannot disagree. `buildTestApp` gained an optional `sourceLogger`
+  to assert the `bounty_invalid` warn line. `SOURCE_ENDPOINTS` holds the Opire URL
+  `https://api.opire.dev/rewards`, `UNVERIFIED` until the Phase 4 human check.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

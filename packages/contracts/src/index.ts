@@ -70,6 +70,9 @@ export {
   SourcesStatus,
   SourceType,
   TenderFacts,
+  BountyFacts,
+  GITHUB_OWNER_PATTERN,
+  GITHUB_REPO_PATTERN,
 } from './opportunities.js';
 export type { ImportRequest } from './opportunities.js';
 export {
@@ -96,6 +99,12 @@ export {
 export {
   BzpConfig,
   CreateSourceRequest,
+  GITHUB_LANGUAGES,
+  GITHUB_QUERY_BASE,
+  GITHUB_QUERY_MAX_CHARS,
+  GithubSearchConfig,
+  longestGithubQuery,
+  OpireConfig,
   RssConfig,
   Source,
   SourceFilter,

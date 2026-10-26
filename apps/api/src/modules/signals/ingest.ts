@@ -22,6 +22,8 @@ export interface IngestCandidate {
   jobRunId?: number | null;
   /** S-18 D-2: validated `TenderFacts` JSON, or null. */
   tenderJson?: string | null;
+  /** S-19 D-2: validated `BountyFacts` JSON, or null. */
+  bountyJson?: string | null;
 }
 
 export type IngestResult =
@@ -89,6 +91,7 @@ export function ingest(tx: SignalTx, candidate: IngestCandidate): IngestResult {
     lastVerifiedAt: null,
     jobRunId: candidate.jobRunId ?? null,
     tenderJson: candidate.tenderJson ?? null,
+    bountyJson: candidate.bountyJson ?? null,
   });
   const opportunityId = tx.insertOpportunity(signalId, at);
   tx.insertEvidence({
