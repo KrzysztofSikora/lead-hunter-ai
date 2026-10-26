@@ -1,7 +1,9 @@
 # Review: code-bounties
 
 Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (82 files, 1292 tests), e2e ok (5), mutation reward.ts ok (88.95 %, 20 survivors, matches `mutation.md`), image not run (no Docker daemon in the session), image smoke not run (same) · Round: 1
+Gates: typecheck ok, lint ok, unit tests ok (82 files, 1292 tests), e2e ok (5), mutation reward.ts ok (88.95 %, 20 survivors, same as `mutation.md`), image not run (no Docker daemon in the session), image smoke not run (same) · Round: 2
+
+Round 2 note: no code changed since round 1. `/fix-review` never ran (both attempts exited after one turn, see `pr-body.md`), so no finding is marked `fixed`. R1-R4 were re-verified against the code and still hold. R5 is narrowed: its claim that no test has a Polish body line was wrong (`reward.test.ts:80-81` has `Płaca: 100 zł` and `Płatne 100 zł`). R6 is new. A first full `pnpm test` timed out in two `cli.int.test.ts` cases while a probe of mine was loading the CPU. `cli.int.test.ts` alone passed 7/7, and a clean full rerun passed.
 
 ## Plan vs diff
 | File | Status | Note |
@@ -34,19 +36,21 @@ Gates: typecheck ok, lint ok, unit tests ok (82 files, 1292 tests), e2e ok (5), 
 | `apps/api/src/infrastructure/sources/{bzp,ted}/adapter.test.ts` | unplanned | logged [minor] (Phase 4): `seen: new Set()` |
 | `apps/web/src/SourcesPage.tsx`, `api/sources.ts`, `SourcesPage.test.tsx` | done | `GithubEditor`, `updateGithub`, endpoint row for API sources |
 | `docs/source-policy.md` | done | GitHub and Opire entries with `DO WERYFIKACJI` items |
-| `context/roadmap.md` | done | status |
+| `context/roadmap.md` | done | status (`review`) |
+| `context/changes/code-bounties/review.md` | done | round 1, rewritten here as round 2 |
+| `context/changes/code-bounties/pr-body.md` | diverged | holds the runner's fallback run summary (`wip(code-bounties): S-19`), not a PR body: `/fix-review` and `/pr-body` both exited before doing anything (run log in the file) |
 | `context/changes/code-bounties/evidence/` | absent | empty; every human check is open and says why (APIs unreachable) |
 
 ## Areas
 | Area | Result | One-line reason |
 |------|--------|-----------------|
-| Correctness | concern | The reward parser turns non-reward amounts in a title or a `paid`/`pay` line into a "ze źródła" budget and a kept `DIRECT_REQUEST` (R1). |
-| Design | ok | Two source types on S-18's registry; one guarded HTTP path; the Opire field reads stay in one file. |
-| Safety | ok | Token only to `api.github.com`, dropped on a cross-origin hop, redacted two levels deep, canary-tested; names validated before they reach a path. |
-| Tests | concern | Thorough integration coverage with exact counts, but no look-alike title or `paid` cases (R1) and one mutation decision that is not equivalent (R5). |
-| Simplicity | ok | Small focused modules; no dead code found. |
-| Plan fidelity | concern | Plan-review majors 2 and 3 have no Decisions row or Deviations line (R2); two commits carry attribution trailers the plan itself forbids (R3). |
-| Agent decisions | ok | Each `costly` decision sits in one place (`SOURCE_ENDPOINTS`, `api.ts`, `bounty_json`, `GetOptions.headers`); D-4 still marked `cheap` (R2). |
+| Correctness | concern | The reward parser turns non-reward amounts into a "ze źródła" budget and a kept `DIRECT_REQUEST`: a price in the title, a `paid` product tier, a per-item rate, and `$200 AUD` read as USD (R1). |
+| Design | ok | Two source types on S-18's registry, one guarded HTTP path, and the Opire field reads in one file. The endpoint constants are repeated (R6). |
+| Safety | ok | The token goes only to `api.github.com`, is dropped on a cross-origin hop, is redacted two levels deep and is canary-tested. Names are validated before they reach a path. |
+| Tests | concern | Integration coverage with exact counts is thorough. The look-alike negatives are missing (R1), and one mutation decision is not equivalent (R5). |
+| Simplicity | ok | Small focused modules, no dead code. |
+| Plan fidelity | concern | Plan-review majors 2 and 3 have no Decisions row or Deviations line (R2). Two commits carry the attribution trailer that the plan forbids (R3). |
+| Agent decisions | ok | Each `costly` decision sits in one place. D-4 is still marked `cheap` (R2). |
 
 ## Findings
 ### R1: The reward parser reads non-reward amounts in titles and `paid`/`pay` lines as the issue's reward
@@ -55,10 +59,12 @@ Gates: typecheck ok, lint ok, unit tests ok (82 files, 1292 tests), e2e ok (5), 
 - Problem: `parseReward` takes any marked amount in the title, and any on a body line containing `pay`/`paid`/`budget`. Probed with `labels: ['bounty']`:
   - title `Support invoices over $1,000` → `{ amountMinor: 100000, currency: 'USD', quote: '$1,000' }`;
   - title `[Bounty] Fix rounding for $5 items` → 5 USD;
-  - body `The paid plan costs $10` → 10 USD.
+  - body `The paid plan costs $10` → 10 USD;
+  - (round 2) body `We pay $5 per test case` → 5 USD: a per-item rate, and `RATE` knows only time units;
+  - (round 2) body `Bounty: $200 AUD` → 200 **USD**: `hasForeignDollar` looks only before the `$`, and `MARKER_AFTER` does not know `AUD`/`CAD`, so the currency is wrong.
 
   The guard then sets `sourceBudget` to that amount with its quote and treats it as an offer to pay (`output-guard.ts:153-173`), so the card shows an invented budget as a source fact and keeps `DIRECT_REQUEST`. That goes against PRD §0 / D-7 ("unknown, never guessed") and the lesson "a pattern that extracts a source fact needs negative tests with the domain's look-alike phrasing". The tests cover sponsor, credit, rate and range look-alikes, but not a title that only mentions a price, and not a `paid` that names a product tier.
-- Fix: accept a title amount only in the reward forms (`[$200]`, `($200)`, a leading `$200`, or with a reward keyword such as `bounty`/`reward`/`nagroda` in the title). For body lines, require the amount to sit right after the keyword (for example `(bounty|reward|nagroda|pay|paid|budget)\W{0,15}<amount>`), rather than anywhere on the line. Add the three probes above as negative tests.
+- Fix: accept a title amount only in the reward forms (`[$200]`, `($200)`, a leading `$200`, or with a reward keyword such as `bounty`/`reward`/`nagroda` in the title). For body lines, require the amount to sit right after the keyword (for example `(bounty|reward|nagroda|pay|paid|budget)\W{0,15}<amount>`), rather than anywhere on the line. Refuse a line where a currency code other than USD/EUR/PLN follows the amount (`AUD`, `CAD`, `USDC`…), and add `per <noun>` to `RATE` or refuse it. Add every probe above as a negative test.
 - Effort: small
 - Lesson candidate: no (the existing look-alike lesson covers it)
 - Decision: open
@@ -92,11 +98,20 @@ Gates: typecheck ok, lint ok, unit tests ok (82 files, 1292 tests), e2e ok (5), 
 - Lesson candidate: no
 - Decision: open
 
-### R5: A mutation decision on `reward.ts` is not equivalent, and the Polish keywords are untested
+### R5: A mutation decision on `reward.ts` is not equivalent
 - Severity: minor
-- Where: `context/changes/code-bounties/mutation.md` (`MARKER_BEFORE` row and `KEYWORD` row), `apps/api/src/infrastructure/sources/github/reward.ts:26`, `:18`
-- Problem: `mutation.md` says dropping the `$` anchor of `MARKER_BEFORE` "finds the same marker" because the window is 4 characters. That is false. For `Bounty $: 50` the window is `" $: "`: the anchored pattern does not match (the parse gives `null`), while the unanchored one does (50 USD). The `KEYWORD` survivors include removing the `płac…`/`płatn…` branches. So no test has a Polish body line such as `Płacę 200 zł za poprawkę`, even though the operator is Polish and D-7 names those stems.
-- Fix: add `Bounty $: 50` (→ `null`) and a `Płatne: 300 zł` / `Płacę 200 zł` body line (→ PLN reward) to `reward.test.ts`, then re-run the mutation and update the decisions.
+- Where: `context/changes/code-bounties/mutation.md` (`MARKER_BEFORE` / `MARKER_AFTER` row), `apps/api/src/infrastructure/sources/github/reward.ts:26`
+- Problem: `mutation.md` says that dropping the `$` anchor of `MARKER_BEFORE` "finds the same marker", because the window is 4 characters. That is false. For `Bounty $: 50` the window is `" $: "`. The anchored pattern does not match, and the parse gives `null` (probed in round 2). The unanchored pattern matches `$` and gives 50 USD. No test pins this, so the mutant survives under a wrong decision. (Round 1 also said the Polish stems were untested. That was wrong: `reward.test.ts:80-81` covers `Płaca` and `Płatne`.)
+- Fix: add `Bounty $: 50` → `null` to `reward.test.ts`, re-run the mutation, and correct the decision row.
+- Effort: small
+- Lesson candidate: no
+- Decision: open
+
+### R6: Each API endpoint is written in two or three places
+- Severity: minor
+- Where: `apps/api/src/modules/sources/service.ts:108-113` (`SOURCE_ENDPOINTS`), `apps/api/src/modules/sources/presets.ts:68,80,92,104`, `apps/api/src/infrastructure/sources/opire/api.ts:7` (`OPIRE_REWARDS_URL`), `bzp/adapter.ts:8`, `ted/adapter.ts:9`
+- Problem: the Opire URL `https://api.opire.dev/rewards` is a literal in three files: the one the adapter calls, the one `GET /api/sources` shows and `logHost` logs, and the preset's. The plan marks it `UNVERIFIED` until the Phase 4 human check, so it is the constant most likely to change. Fix it in `opire/api.ts` only, and the Sources view and the logs keep showing the old host, and no test fails. D-1 says the endpoint table exists so that `toSource` and `logHost` share one source. The same goes for BZP, TED and GitHub search.
+- Fix: build `SOURCE_ENDPOINTS` from the adapters' exported constants (`OPIRE_REWARDS_URL`, `BZP_ENDPOINT`, `TED_ENDPOINT`, a `GITHUB_SEARCH_URL`), or give each adapter an `endpoint` field that the service reads. Let the presets reference the same constants.
 - Effort: small
 - Lesson candidate: no
 - Decision: open
