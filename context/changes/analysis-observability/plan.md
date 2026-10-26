@@ -223,10 +223,14 @@ only an operator session can read it (AC6). No token-level progress and no ETA (
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Abortable provider calls, runner-owned retries and the activity view API
 - [x] Phase 2: Cancel, paused queue and host metrics
-- [ ] Phase 3: Phone view `/analiza`
+- [x] Phase 3: Phone view `/analiza`
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 3) `/analiza` readable at 360 px, no horizontal scroll, labels clear — run: open `/analiza` on a phone after login — evidence: context/changes/analysis-observability/evidence/analiza-360.png (idle state, mock provider; overflow 0)
+- [ ] (Phase 3) On the Pi with local Ollama: start an analysis, see it under *W toku* (model, stage, elapsed against timeout); "Anuluj analizę" moves it to *Historia* as cancelled, queue paused, AC4 caveat shown; `docker compose restart` keeps it paused; "Wznów kolejkę" resumes — run: `/okazje` → retry an analysis, then `/analiza` — evidence: none
+- [ ] (Phase 3) On the Pi: temperature (°C) and load show with a measurement time; note whether `/sys/class/thermal` was readable in the container without a mount (D-7) — run: `/analiza`, section *Urządzenie* — evidence: none
+- [ ] (Phase 3) Whether Ollama stopped inference after the cancel (AC4 `UNVERIFIED`) — run: `ollama ps` and `top` on the Pi after pressing "Anuluj analizę" — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -237,6 +241,8 @@ only an operator session can read it (AC6). No token-level progress and no ETA (
 - [minor] (Phase 2) Plan-review 1, 3, 6, 7 applied. The paused flag is checked per item in `drainOnce`; `cancel()` returns `cancelled: false` when the provider had already answered or nothing ran, and still pauses. A cancel stored as `FAILED`/`cancelled` (D-3) also uses a daily slot (`countSince`) and counts as `analysisFailed` in job-run statistics; accepted, switching to a `CANCELLED` status or excluding it from `countSince` is the reversal. The signal, not the error class, decides "cancelled"; a provider that ignores the signal and answers after the abort is also treated as cancelled (its answer is dropped).
 - [minor] (Phase 2) AC4 test uses a loopback HTTP server that never answers (instead of `MockAgent`, which cannot show the connection close): one `POST /v1/chat/completions`, then the server sees the connection closed, no other path touched.
 - [minor] (Phase 2) `AnalysisServiceStatus.paused` is required, so the web test fixture in `OpportunitiesPage.test.tsx` and two expectations in `analysis.int.test.ts` gained `paused: false`. `seed-demo.ts` needed no change (`runnerState` is optional).
+
+- [minor] (Phase 3) The "Anuluj analizę" button is always shown (a cancel with nothing running still pauses, D-5); "Wznów kolejkę" only while paused. The AC4 caveat shows whenever `backendMayContinue` is true, not only after a cancel. The nav gained an "Analiza" link besides the one on `/okazje`. The evidence screenshot is the idle state from the mock provider, made with a throwaway script (no new e2e spec, per the test budget).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

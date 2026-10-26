@@ -392,12 +392,16 @@ function AnalysisLine({ load }: { load: StatusLoad }) {
     status.budget.unknownCostCount > 0 ? (
       <p role="status">{t.analysisUnknownCost(status.budget.unknownCostCount)}</p>
     ) : null;
+  const link = <Link to="/analiza">{t.analysisActivityLink}</Link>;
+  const paused = status.paused ? <p role="status">{t.analysisPaused}</p> : null;
   const blocked = blockedMessage(status);
   if (blocked) {
     return (
       <>
         <p role="alert">{blocked}</p>
+        {paused}
         {unknown}
+        <p>{link}</p>
       </>
     );
   }
@@ -405,14 +409,18 @@ function AnalysisLine({ load }: { load: StatusLoad }) {
     return (
       <>
         <p role="status">{t.analysisLimit(status.dailyLimit, status.waiting)}</p>
+        {paused}
         {unknown}
+        <p>{link}</p>
       </>
     );
   }
   return (
     <>
       {status.waiting > 0 && <p role="status">{t.analysisWaiting(status.waiting)}</p>}
+      {paused}
       {unknown}
+      <p>{link}</p>
     </>
   );
 }

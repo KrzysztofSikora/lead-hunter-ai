@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Navigate, NavLink, Route, Routes } from 'react-router';
 import styles from './App.module.css';
+import { AnalysisPage } from './AnalysisPage.js';
 import { ImportPage } from './ImportPage.js';
 import { LoginForm } from './LoginForm.js';
 import { OpportunitiesPage } from './OpportunitiesPage.js';
@@ -23,6 +24,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
           {strings.nav.start}
         </NavLink>
         <NavLink to="/okazje">{strings.nav.opportunities}</NavLink>
+        <NavLink to="/analiza">{strings.nav.analysis}</NavLink>
         <NavLink to="/lejek">{strings.nav.pipeline}</NavLink>
         <NavLink to="/zrodla">{strings.nav.sources}</NavLink>
         <NavLink to="/import">{strings.nav.import}</NavLink>
@@ -35,6 +37,7 @@ function Shell({ onLogout }: { onLogout: () => void }) {
         <Route path="/" element={<TodayPage />} />
         <Route path="/okazje" element={<OpportunitiesPage />} />
         <Route path="/okazje/:id" element={<OpportunityPage />} />
+        <Route path="/analiza" element={<AnalysisPage />} />
         <Route path="/lejek" element={<PipelinePage />} />
         <Route path="/zrodla" element={<SourcesPage />} />
         <Route path="/import" element={<ImportPage />} />
