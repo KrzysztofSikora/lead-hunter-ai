@@ -426,7 +426,7 @@ describe('GitHub search source (S-19 D-3, D-4, D-5, FR-33 AC1)', () => {
       q.includes('language:JavaScript')
         ? { status: 500, body: '{}' }
         : { status: 200, body: TS_PAGE };
-    const { add, call, db } = await github();
+    const { add, call, db, warnings } = await github();
     const { id } = await add();
 
     expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
@@ -435,6 +435,20 @@ describe('GitHub search source (S-19 D-3, D-4, D-5, FR-33 AC1)', () => {
     });
     expect(githubSeen).toHaveLength(2);
     expect(db().select().from(rawSignals).all()).toHaveLength(5);
+    // R3: the reason is logged (status, no query text), not dropped.
+    expect(warnings).toContain('github search: query 2 failed http_status 500');
+  });
+
+  it('maps a secondary limit (403 with retry-after) to rate_limited', async () => {
+    githubAnswer = () => ({ status: 403, body: '{}', headers: { 'retry-after': '120' } });
+    const { add, call } = await github();
+    const { id } = await add();
+
+    expect((await call('POST', `/api/sources/${id}/run`)).json()).toMatchObject({
+      status: 'failed',
+      error: { reason: 'rate_limited', httpStatus: 403 },
+    });
+    expect(githubSeen).toHaveLength(1);
   });
 
   it('fails explicitly: 500, bad JSON, wrong shape, and stores nothing', async () => {
@@ -741,6 +755,32 @@ describe('Opire source (S-19 D-8, D-15, FR-33 AC2)', () => {
     clock.advance(HOUR + 60_000);
     expect(await run(id)).toMatchObject({ status: 'ok', new: 5, duplicates: 0 });
     expect(githubCalls()).toHaveLength(5);
+  });
+
+  it('remembers a reward whose issue answers with another key, so the next run skips it', async () => {
+    opireAnswer = () => ({
+      status: 200,
+      body: JSON.stringify({
+        rewards: [{ url: 'https://github.com/demo-org/demo-api/issues/100' }],
+      }),
+    });
+    issueAnswer = () => ({
+      status: 200,
+      body: JSON.stringify({
+        html_url: 'https://github.com/demo-org/demo-ui/issues/7',
+        title: 'DEMO: moved issue',
+        body: 'Moved.',
+        state: 'open',
+        labels: [{ name: 'bounty' }],
+      }),
+    });
+    const { add, run, clock, githubCalls } = await opire();
+    const { id } = await add();
+
+    expect(await run(id)).toMatchObject({ new: 1 });
+    clock.advance(HOUR + 60_000);
+    expect(await run(id)).toMatchObject({ new: 0 });
+    expect(githubCalls()).toHaveLength(1);
   });
 
   it('ends the run as rate_limited when a check is, and stores nothing', async () => {

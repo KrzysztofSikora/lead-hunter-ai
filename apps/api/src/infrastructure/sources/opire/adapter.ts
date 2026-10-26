@@ -117,10 +117,10 @@ export function createOpireAdapter(deps: OpireAdapterDeps): SourceAdapter<OpireC
         } else skipped += 1;
         continue;
       }
+      checkedKeys.push(reward.key);
       const state = (issue.json as { state?: unknown } | null)?.state;
       if (state !== 'open') {
         closed += 1;
-        checkedKeys.push(reward.key);
         continue;
       }
       const mapped = mapIssue(issue.json, {
@@ -130,7 +130,6 @@ export function createOpireAdapter(deps: OpireAdapterDeps): SourceAdapter<OpireC
         ...(reward.line ? { opireLine: reward.line } : {}),
       });
       if (mapped === 'pull_request') {
-        checkedKeys.push(reward.key);
         continue;
       }
       if (mapped === 'invalid') {
