@@ -23,7 +23,7 @@ export interface DigestRepository {
   countMainScoredSince(since: number, minScore: number): number;
   /** Open, completed, scored rows created since `since`, best score first, at most `limit`. */
   candidates(since: number, limit: number): DigestCandidateRow[];
-  /** Analyses stored since `since`; a token sum is null when no row reported tokens. */
+  /** Analyses and offer drafts (LLM calls) stored since `since`; a token sum is null when no row reported tokens. */
   llmUsageSince(since: number): {
     analyses: number;
     reported: number;

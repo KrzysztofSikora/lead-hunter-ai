@@ -1,5 +1,6 @@
 import type { LlmConfig, ModelPrice } from '@lead-hunter/config';
 import type { LlmProvider } from '../../modules/analysis/ports.js';
+import type { OfferDrafter } from '../../modules/offers/ports.js';
 import { AnthropicProvider } from './anthropic.js';
 import { MockProvider } from './mock.js';
 import { OpenAiCompatibleProvider } from './openai-compatible.js';
@@ -13,14 +14,15 @@ export interface ProviderTuning {
   maxRetries?: number;
 }
 
-export function createLlmProvider(
+function build(
   config: LlmConfig | undefined,
-  tuning: ProviderTuning = {},
-): LlmProvider | undefined {
+  model: string | undefined,
+  tuning: ProviderTuning,
+): (LlmProvider & OfferDrafter) | undefined {
   if (!config) return undefined;
   if (config.provider === 'mock') return new MockProvider();
   const common = {
-    model: config.model,
+    model: model ?? config.model,
     paid: config.paid,
     timeoutMs: tuning.timeoutMs ?? TIMEOUT_MS,
     maxRetries: tuning.maxRetries ?? MAX_RETRIES,
@@ -40,6 +42,25 @@ export function createLlmProvider(
   });
 }
 
+export function createLlmProvider(
+  config: LlmConfig | undefined,
+  tuning: ProviderTuning = {},
+): LlmProvider | undefined {
+  return build(config, undefined, tuning);
+}
+
+/** S-07 D-6: a second instance whose model is `LLM_MODEL_OFFER`. */
+export function createOfferDrafter(
+  config: LlmConfig | undefined,
+  tuning: ProviderTuning = {},
+): OfferDrafter | undefined {
+  return build(
+    config,
+    config && config.provider !== 'mock' ? config.offerModel : undefined,
+    tuning,
+  );
+}
+
 /** What the runner needs besides the provider: the cap, the model's price and the key to guard (D-3, D-9). */
 export function llmRunnerDeps(config: LlmConfig | undefined): {
   budget: { monthlyCapMicroUsd: number | null; price: ModelPrice | null };
@@ -55,4 +76,11 @@ export function llmRunnerDeps(config: LlmConfig | undefined): {
     },
     secrets: config.apiKey ? [config.apiKey] : [],
   };
+}
+
+/** Same as `llmRunnerDeps`, priced for the offer model (S-07 D-8). */
+export function offerDrafterDeps(config: LlmConfig | undefined): ReturnType<typeof llmRunnerDeps> {
+  const deps = llmRunnerDeps(config);
+  if (!config || config.provider === 'mock') return deps;
+  return { ...deps, budget: { ...deps.budget, price: config.prices[config.offerModel] ?? null } };
 }

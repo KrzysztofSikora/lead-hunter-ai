@@ -10,7 +10,7 @@ import styles from './OpportunityPage.module.css';
 import { addPayment, setFollowUp, type ActionOutcome } from './api/opportunities.js';
 import { inputToMinor } from './profileForm.js';
 import { formatMinor, strings } from './strings.pl.js';
-import { formatCalendarDate, warsawToday } from './warsawTime.js';
+import { formatCalendarDate, formatWarsaw, warsawToday } from './warsawTime.js';
 
 const p = strings.opportunity.pipeline;
 const a = strings.opportunity.actions;
@@ -103,6 +103,11 @@ export function CardPipeline({
             ? p.followUpNone
             : p.followUpUnavailable}
       </p>
+      {data.offerDraft?.status === 'SENT_MANUALLY' && !data.followUpOn && (
+        <p className={styles.meta}>
+          {strings.opportunity.offer.sentOn(formatWarsaw(data.offerDraft.statusChangedAt))}
+        </p>
+      )}
       {canFollowUp && (
         <form className={styles.form} onSubmit={submitFollowUp}>
           <label>

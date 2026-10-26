@@ -8,7 +8,19 @@ import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
 import { createActivityRepository } from '../../src/infrastructure/db/activity-repository.js';
 import { createAnalysisRepository } from '../../src/infrastructure/db/analysis-repository.js';
-import { createLlmProvider, llmRunnerDeps } from '../../src/infrastructure/llm/create-provider.js';
+import {
+  createLlmProvider,
+  createOfferDrafter,
+  llmRunnerDeps,
+  offerDrafterDeps,
+} from '../../src/infrastructure/llm/create-provider.js';
+import { createOfferService } from '../../src/modules/offers/service.js';
+import type { OfferDrafter } from '../../src/modules/offers/ports.js';
+import { createOpportunityService } from '../../src/modules/opportunities/service.js';
+import {
+  createOfferDraftRepository,
+  createOfferSourceReader,
+} from '../../src/infrastructure/db/offer-draft-repository.js';
 import { createAnalysisRunner, type AnalysisRunner } from '../../src/modules/analysis/service.js';
 import type { LlmProvider } from '../../src/modules/analysis/ports.js';
 import { createProfileService } from '../../src/modules/profile/service.js';
@@ -84,6 +96,8 @@ export async function buildTestApp(
     dir?: string;
     /** Replaces the provider chosen by `LLM_PROVIDER`; `null` means none. */
     provider?: LlmProvider | null;
+    /** Replaces the offer drafter chosen by `LLM_PROVIDER`; `null` means none. */
+    drafter?: OfferDrafter | null;
     /** Kick the runner after every created import, as the server does. Tests drain by hand otherwise. */
     autoKick?: boolean;
     /** Another identity or staleness for the job lock (S-12). */
@@ -109,8 +123,9 @@ export async function buildTestApp(
     options.provider !== undefined
       ? (options.provider ?? undefined)
       : createLlmProvider(config.llm, { maxRetries: 0 });
+  const analysisRepository = createAnalysisRepository(db);
   const runner = createAnalysisRunner({
-    repository: createAnalysisRepository(db),
+    repository: analysisRepository,
     provider,
     profile: { get: () => profileService.get().profile },
     clock,
@@ -143,6 +158,29 @@ export async function buildTestApp(
     ...(options.heartbeatMs === undefined ? {} : { heartbeatMs: options.heartbeatMs }),
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),
   });
+  const opportunityDeps = {
+    repository: createOpportunityRepository(db),
+    activity: createActivityRepository(db),
+    payments: createPaymentRepository(db),
+    sourceStatus: sourceRuntime.statusReader,
+    clock,
+  };
+  const drafter =
+    options.drafter !== undefined
+      ? (options.drafter ?? undefined)
+      : createOfferDrafter(config.llm, { maxRetries: 0 });
+  const offers = createOfferService({
+    repository: createOfferDraftRepository(db),
+    sources: createOfferSourceReader(db),
+    drafter,
+    profile: { get: () => profileService.get().profile },
+    activity: opportunityDeps.activity,
+    spentSince: (at) => analysisRepository.spentSince(at),
+    detail: createOpportunityService(opportunityDeps).get,
+    clock,
+    dailyLimit: config.offerDraftDailyLimit,
+    ...offerDrafterDeps(config.llm),
+  });
   const app = await buildApp({
     config,
     healthProbe: createHealthProbe(sqlite),
@@ -156,13 +194,7 @@ export async function buildTestApp(
     profile: profileDeps,
     signals: { repository: createSignalRepository(db), clock, pageFetcher },
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),
-    opportunities: {
-      repository: createOpportunityRepository(db),
-      activity: createActivityRepository(db),
-      payments: createPaymentRepository(db),
-      sourceStatus: sourceRuntime.statusReader,
-      clock,
-    },
+    opportunities: opportunityDeps,
     pipeline: { repository: createPipelineRepository(db), clock },
     digest: {
       repository: createDigestRepository(db),
@@ -170,6 +202,7 @@ export async function buildTestApp(
       clock,
     },
     analysis: runner,
+    offers,
     sources: sourceRuntime.service,
     jobs: sourceRuntime.jobs,
     schedule: { times: config.discoveryTimes, nextRunAt: () => null },

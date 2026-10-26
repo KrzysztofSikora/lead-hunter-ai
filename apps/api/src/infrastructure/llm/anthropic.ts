@@ -5,8 +5,15 @@ import {
   ProviderError,
   type ProviderOutput,
 } from '../../modules/analysis/ports.js';
+import type { OfferDrafter, OfferInput } from '../../modules/offers/ports.js';
 import { toProviderError } from './errors.js';
 import { parseBilledJson } from './parse-json.js';
+import {
+  buildOfferUserMessage,
+  OFFER_PROMPT_VERSION,
+  offerJsonSchema,
+  offerSystemPrompt,
+} from './offer-prompt.js';
 import { buildUserMessage, outputJsonSchema, PROMPT_VERSION, systemPrompt } from './prompt.js';
 
 export interface AnthropicOptions {
@@ -20,10 +27,18 @@ export interface AnthropicOptions {
 
 const MAX_TOKENS = 8000;
 
-export class AnthropicProvider implements LlmProvider {
+interface Call {
+  system: string;
+  user: string;
+  schema: Record<string, unknown>;
+  effort: 'low' | 'medium';
+}
+
+export class AnthropicProvider implements LlmProvider, OfferDrafter {
   readonly name = 'anthropic' as const;
   readonly demo = false;
   readonly promptVersion = PROMPT_VERSION;
+  readonly offerPromptVersion = OFFER_PROMPT_VERSION;
   readonly model: string;
   readonly paid: boolean;
   private readonly client: Anthropic;
@@ -39,18 +54,33 @@ export class AnthropicProvider implements LlmProvider {
     });
   }
 
-  async analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
+  analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
+    return this.request({
+      system: systemPrompt(),
+      user: buildUserMessage(input),
+      schema: outputJsonSchema(),
+      effort: 'low',
+    });
+  }
+
+  draftOffer(input: OfferInput): Promise<ProviderOutput> {
+    return this.request({
+      system: offerSystemPrompt(),
+      user: buildOfferUserMessage(input),
+      schema: offerJsonSchema(),
+      effort: 'medium',
+    });
+  }
+
+  private async request({ system, user, schema, effort }: Call): Promise<ProviderOutput> {
     let response;
     try {
       response = await this.client.messages.create({
         model: this.model,
         max_tokens: MAX_TOKENS,
-        system: systemPrompt(),
-        messages: [{ role: 'user', content: buildUserMessage(input) }],
-        output_config: {
-          effort: 'low',
-          format: { type: 'json_schema', schema: outputJsonSchema() },
-        },
+        system,
+        messages: [{ role: 'user', content: user }],
+        output_config: { effort, format: { type: 'json_schema', schema } },
       });
     } catch (error) {
       throw toProviderError(error);

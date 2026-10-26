@@ -29,10 +29,14 @@ import {
   analyses,
   opportunities,
   opportunityEvidence,
+  offerDrafts,
   payments,
   rawSignals,
   sources,
 } from './schema.js';
+import { toOfferDraftRow } from './offer-draft-repository.js';
+
+const OFFER_HISTORY_LIMIT = 20;
 
 const columns = {
   id: opportunities.id,
@@ -219,7 +223,23 @@ export function createOpportunityRepository(db: BetterSQLite3Database): Opportun
         .where(eq(payments.opportunityId, id))
         .orderBy(desc(payments.paidAt), desc(payments.id))
         .all() as PaymentRow[];
-      return { row, evidence, latestAnalysis, activity, followUpAt, payments: paid };
+      const drafts = db
+        .select()
+        .from(offerDrafts)
+        .where(and(eq(offerDrafts.opportunityId, id), ne(offerDrafts.status, 'FAILED')))
+        .orderBy(desc(offerDrafts.id))
+        .limit(OFFER_HISTORY_LIMIT + 1)
+        .all()
+        .map(toOfferDraftRow);
+      return {
+        row,
+        evidence,
+        latestAnalysis,
+        activity,
+        followUpAt,
+        payments: paid,
+        offerDrafts: drafts,
+      };
     },
   };
 }

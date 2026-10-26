@@ -295,3 +295,43 @@ export const payments = sqliteTable(
     index('payments_opportunity_idx').on(table.opportunityId, table.paidAt),
   ],
 );
+
+/** S-07 D-1: one row per generated draft; the newest non-FAILED row is the current draft. */
+export const offerDrafts = sqliteTable(
+  'offer_drafts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    opportunityId: integer('opportunity_id')
+      .notNull()
+      .references(() => opportunities.id, { onDelete: 'cascade' }),
+    /** DRAFT, REVIEWED, COPIED_OR_EXPORTED, SENT_MANUALLY, or the internal FAILED. */
+    status: text('status').notNull(),
+    language: text('language').notNull(),
+    /** Editable by the operator. */
+    subject: text('subject').notNull(),
+    messageMarkdown: text('message_markdown').notNull(),
+    proposalMarkdown: text('proposal_markdown').notNull(),
+    /** The guarded generated sections, never edited. */
+    contentJson: text('content_json'),
+    guardNotesJson: text('guard_notes_json'),
+    provider: text('provider').notNull(),
+    model: text('model').notNull(),
+    promptVersion: text('prompt_version').notNull(),
+    schemaVersion: integer('schema_version').notNull(),
+    /** D-14: whether a completed analysis went into the prompt. */
+    analysed: integer('analysed').notNull().default(0),
+    /** A reason code, never an SDK message or model text. */
+    error: text('error'),
+    inputTokens: integer('input_tokens'),
+    outputTokens: integer('output_tokens'),
+    /** micro-USD, 0 for an unpaid provider, null when usage or price is unknown. */
+    costMicroUsd: integer('cost_micro_usd'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    statusChangedAt: integer('status_changed_at').notNull(),
+  },
+  (table) => [
+    index('offer_drafts_opportunity_idx').on(table.opportunityId, table.id),
+    index('offer_drafts_created_at_idx').on(table.createdAt),
+  ],
+);

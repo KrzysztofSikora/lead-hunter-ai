@@ -1,12 +1,14 @@
 import {
   ActivityCause,
   ActivityMetadata,
+  OfferDraftContent,
   OpportunityAnalysis,
   checkMove,
   ScoreBreakdown,
   upgradeStoredAnalysis,
   type FollowUpRequest,
   type NoteRequest,
+  type OfferDraftStatus,
   type PaymentRequest,
   type OpportunityDetail,
   type OpportunityList,
@@ -14,6 +16,7 @@ import {
   type OpportunitySummary,
   type StatusChangeRequest,
 } from '@lead-hunter/contracts';
+import type { OfferDraftRow } from '../offers/ports.js';
 import type { Clock } from '../shared/clock.js';
 import { isDemo } from '../shared/demo.js';
 import { instantToWarsawDate, warsawDateToInstant } from '../shared/warsaw-day.js';
@@ -196,6 +199,40 @@ function parseNotes(json: string): string[] {
   }
 }
 
+const toOfferDraft = (row: OfferDraftRow): NonNullable<OpportunityDetail['offerDraft']> => ({
+  id: row.id,
+  opportunityId: row.opportunityId,
+  status: row.status as NonNullable<OpportunityDetail['offerDraft']>['status'],
+  language: row.language,
+  subject: row.subject,
+  message: row.messageMarkdown,
+  proposal: row.proposalMarkdown,
+  content: parseStored(OfferDraftContent, row.contentJson),
+  guardNotes: row.guardNotesJson === null ? [] : parseNotes(row.guardNotesJson),
+  provider: row.provider,
+  model: row.model,
+  promptVersion: row.promptVersion,
+  demo: isDemo(row.provider),
+  analysed: row.analysed,
+  inputTokens: row.inputTokens,
+  outputTokens: row.outputTokens,
+  costMicroUsd: row.costMicroUsd,
+  createdAt: iso(row.createdAt),
+  updatedAt: iso(row.updatedAt),
+  statusChangedAt: iso(row.statusChangedAt),
+});
+
+const toOfferHistory = (row: OfferDraftRow): OpportunityDetail['offerDraftHistory'][number] => ({
+  id: row.id,
+  status: row.status as OfferDraftStatus,
+  language: row.language,
+  subject: row.subject,
+  message: row.messageMarkdown,
+  proposal: row.proposalMarkdown,
+  createdAt: iso(row.createdAt),
+  statusChangedAt: iso(row.statusChangedAt),
+});
+
 const DAY_MS = 86_400_000;
 
 export function createOpportunityService({
@@ -217,6 +254,8 @@ export function createOpportunityService({
         found.followUpAt === null ? null : instantToWarsawDate(new Date(found.followUpAt)),
       payments: found.payments.map(toPayment),
       activity: found.activity.map(toActivity),
+      offerDraft: found.offerDrafts[0] ? toOfferDraft(found.offerDrafts[0]) : null,
+      offerDraftHistory: found.offerDrafts.slice(1).map(toOfferHistory),
     };
   }
 

@@ -129,7 +129,11 @@ const linkKey = (link: string): string =>
     .toLowerCase();
 
 /** D-12: URLs and e-mail addresses the source does not contain are the model's invention. */
-function removeInventedLinks(value: unknown, sourceLower: string, removed: string[]): unknown {
+export function removeInventedLinks(
+  value: unknown,
+  sourceLower: string,
+  removed: string[],
+): unknown {
   if (typeof value === 'string') {
     return value.replace(LINK, (link) => {
       if (sourceLower.includes(linkKey(link))) return link;

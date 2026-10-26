@@ -5,8 +5,10 @@ import {
   ProviderError,
   type ProviderOutput,
 } from '../../modules/analysis/ports.js';
+import type { OfferDrafter, OfferInput } from '../../modules/offers/ports.js';
 import { toProviderError } from './errors.js';
 import { parseBilledJson } from './parse-json.js';
+import { buildOfferUserMessage, OFFER_PROMPT_VERSION, offerSystemPrompt } from './offer-prompt.js';
 import { buildUserMessage, PROMPT_VERSION, systemPrompt } from './prompt.js';
 
 export interface OpenAiCompatibleOptions {
@@ -21,11 +23,13 @@ export interface OpenAiCompatibleOptions {
 }
 
 const MAX_TOKENS = 4000;
+const OFFER_MAX_TOKENS = 6000;
 
-export class OpenAiCompatibleProvider implements LlmProvider {
+export class OpenAiCompatibleProvider implements LlmProvider, OfferDrafter {
   readonly name = 'openai-compatible' as const;
   readonly demo = false;
   readonly promptVersion = PROMPT_VERSION;
+  readonly offerPromptVersion = OFFER_PROMPT_VERSION;
   readonly model: string;
   readonly paid: boolean;
   private readonly jsonMode: 'json_object' | 'off';
@@ -43,15 +47,23 @@ export class OpenAiCompatibleProvider implements LlmProvider {
     });
   }
 
-  async analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
+  analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
+    return this.request(systemPrompt(), buildUserMessage(input), MAX_TOKENS);
+  }
+
+  draftOffer(input: OfferInput): Promise<ProviderOutput> {
+    return this.request(offerSystemPrompt(), buildOfferUserMessage(input), OFFER_MAX_TOKENS);
+  }
+
+  private async request(system: string, user: string, maxTokens: number): Promise<ProviderOutput> {
     let response;
     try {
       response = await this.client.chat.completions.create({
         model: this.model,
-        max_tokens: MAX_TOKENS,
+        max_tokens: maxTokens,
         messages: [
-          { role: 'system', content: systemPrompt() },
-          { role: 'user', content: buildUserMessage(input) },
+          { role: 'system', content: system },
+          { role: 'user', content: user },
         ],
         ...(this.jsonMode === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
       });

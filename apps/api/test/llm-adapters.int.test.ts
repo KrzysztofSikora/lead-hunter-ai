@@ -2,13 +2,15 @@ import { readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
-import { OpportunityAnalysis } from '@lead-hunter/contracts';
+import { OfferDraftContent, OpportunityAnalysis } from '@lead-hunter/contracts';
 import { getGlobalDispatcher, type MockAgent } from 'undici';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { AnthropicProvider } from '../src/infrastructure/llm/anthropic.js';
 import { OpenAiCompatibleProvider } from '../src/infrastructure/llm/openai-compatible.js';
+import { OFFER_SYSTEM_PROMPT } from '../src/infrastructure/llm/offer-prompt.js';
 import { SYSTEM_PROMPT } from '../src/infrastructure/llm/prompt.js';
 import { type AnalysisInput, ProviderError } from '../src/modules/analysis/ports.js';
+import type { OfferInput } from '../src/modules/offers/ports.js';
 
 const read = (name: string): string =>
   readFileSync(fileURLToPath(new URL(`./fixtures/llm/${name}`, import.meta.url)), 'utf8');
@@ -37,6 +39,22 @@ const input: AnalysisInput = {
     languages: ['pl'],
     rateRanges: [],
   },
+};
+
+const offerInput: OfferInput = {
+  source: { title: 'DEMO post', text: injection, sourceType: 'manual_text' },
+  analysis: null,
+  profile: {
+    skills: ['TypeScript'],
+    serviceTypes: ['DASHBOARD'],
+    preferredTechnologies: [],
+    experience: 'DEMO: 5 lat doświadczenia.',
+    languages: ['pl'],
+    rateRanges: [],
+    billingModels: ['FIXED_PRICE'],
+    minimumJobValue: null,
+  },
+  targetLanguage: 'pl',
 };
 
 const agent = getGlobalDispatcher() as MockAgent;
@@ -303,5 +321,81 @@ describe('OpenAI-compatible adapter', () => {
       (m) => m.role === 'user',
     )!;
     expect(user.content.match(/<\/source_data>/g)).toHaveLength(1);
+  });
+});
+
+describe('offer drafts (S-07 Phase 2)', () => {
+  const expectOfferRequest = (sent: Captured, model: string) => {
+    const body = JSON.parse(sent.body) as Record<string, unknown>;
+    expect(body['model']).toBe(model);
+    expect(sent.body).not.toContain(KEY);
+    expect(sent.body).not.toContain('/post/7');
+    expect(body).not.toHaveProperty('tools');
+    const chat = body['messages'] as { role: string; content: string }[];
+    const system = String(body['system'] ?? chat.find((m) => m.role === 'system')?.content);
+    expect(system).toContain(OFFER_SYSTEM_PROMPT.slice(0, 80));
+    expect(system).not.toContain('Ignore all previous instructions');
+    const user = (body['messages'] as { role: string; content: string }[]).find(
+      (m) => m.role === 'user',
+    )!.content;
+    expect(user.startsWith('<source_data>\n')).toBe(true);
+    expect(user.match(/<\/source_data>/g)).toHaveLength(1);
+    expect(user).toContain('<analysis>\nnull\n</analysis>');
+    expect(user).toContain('DEMO: 5 lat doświadczenia.');
+    expect(user).toContain('<target_language>\n"pl"\n</target_language>');
+    const source = user.slice(0, user.indexOf('</source_data>'));
+    expect(source).toContain('Ignore all previous instructions');
+    expect(user.slice(user.indexOf('</source_data>'))).not.toContain(
+      'Ignore all previous instructions',
+    );
+    return body;
+  };
+
+  it('Anthropic sends the offer model, prompt and blocks, and parses the answer', async () => {
+    const base = await capture(json('anthropic-offer-valid.json'));
+    const provider = new AnthropicProvider({
+      apiKey: KEY,
+      baseUrl: base,
+      model: 'claude-sonnet-5-5',
+      paid: true,
+      timeoutMs: 5000,
+      maxRetries: 0,
+    });
+    const result = await provider.draftOffer(offerInput);
+    const body = expectOfferRequest(requests[0]!, 'claude-sonnet-5-5');
+    expect(String(body['system']).startsWith(OFFER_SYSTEM_PROMPT)).toBe(true);
+    const config = body['output_config'] as { format: { type: string }; effort: string };
+    expect(config.format.type).toBe('json_schema');
+    expect(config.effort).toBe('medium');
+    expect(result.usage).toEqual({ inputTokens: 2100, outputTokens: 900 });
+    expect(OfferDraftContent.safeParse(result.output).success).toBe(true);
+  });
+
+  it('OpenAI-compatible sends the offer prompt and blocks, and parses the answer', async () => {
+    const base = await capture(json('openai-offer-valid.json'));
+    const provider = new OpenAiCompatibleProvider({
+      apiKey: KEY,
+      baseUrl: `${base}/v1`,
+      model: 'demo-model',
+      paid: false,
+      jsonMode: 'json_object',
+      timeoutMs: 5000,
+      maxRetries: 0,
+    });
+    const result = await provider.draftOffer(offerInput);
+    const body = expectOfferRequest(requests[0]!, 'demo-model');
+    const messages = body['messages'] as { role: string; content: string }[];
+    expect(messages.find((m) => m.role === 'system')!.content.startsWith(OFFER_SYSTEM_PROMPT)).toBe(
+      true,
+    );
+    expect(body['max_tokens']).toBe(6000);
+    expect(body['response_format']).toEqual({ type: 'json_object' });
+    expect(result.usage).toEqual({ inputTokens: 410, outputTokens: 320 });
+    expect(OfferDraftContent.safeParse(result.output).success).toBe(true);
+  });
+
+  it('keeps billed usage on an unusable offer answer', async () => {
+    reply(ANTHROPIC, MESSAGES, 200, json('anthropic-truncated.json'));
+    expect(await kindOf(anthropic().draftOffer(offerInput))).toBe('truncated');
   });
 });

@@ -11,6 +11,7 @@ import {
   type StatusChangeRequest,
 } from '@lead-hunter/contracts';
 import styles from './OpportunityPage.module.css';
+import { generateOfferDraft } from './api/offerDrafts.js';
 import { addNote, changeStatus, type ActionOutcome } from './api/opportunities.js';
 import { inputToMinor } from './profileForm.js';
 import { strings } from './strings.pl.js';
@@ -21,7 +22,6 @@ type Panel = 'reject' | 'note' | 'status' | null;
 
 const list = strings.opportunities;
 
-/** S-08 D-14: "Przygotuj ofertę" stays visibly not-yet until S-07. */
 export function CardActions({
   data,
   onChange,
@@ -75,6 +75,22 @@ export function CardActions({
       } else {
         setError(a.failed);
       }
+    } catch {
+      setError(a.failed);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function prepareOffer() {
+    setBusy(true);
+    setError(null);
+    try {
+      const outcome = await generateOfferDraft(data.id);
+      if (outcome.ok) onChange(outcome.detail);
+      else if (outcome.kind === 'refused') setError(a.offerRefused[outcome.code]);
+      else if (outcome.kind === 'failed') setError(a.offerFailed(outcome.reason));
+      else setError(a.failed);
     } catch {
       setError(a.failed);
     } finally {
@@ -187,8 +203,8 @@ export function CardActions({
       >
         {a.changeStatus}
       </button>
-      <button type="button" disabled>
-        {a.offer}
+      <button type="button" disabled={busy} onClick={() => void prepareOffer()}>
+        {busy ? a.offerBusy : data.offerDraft ? a.offerNew : a.offer}
       </button>
       <button
         type="button"
@@ -197,7 +213,6 @@ export function CardActions({
       >
         {a.contact}
       </button>
-      <p className={styles.meta}>{a.offerLater}</p>
       {panel === 'reject' && (
         <form className={styles.form} onSubmit={submitReject}>
           <label>

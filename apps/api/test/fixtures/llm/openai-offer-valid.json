@@ -1,0 +1,21 @@
+{
+  "id": "chatcmpl-demo-offer",
+  "object": "chat.completion",
+  "created": 1,
+  "model": "demo-model",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "{\"language\": \"pl\", \"problem\": \"DEMO: klient potrzebuje prostego dashboardu.\", \"plan\": [\"DEMO: doprecyzować wymagania\", \"DEMO: zbudować wersję pierwszą\"], \"valueProposition\": \"DEMO: szybka pierwsza wersja.\", \"mvpScope\": [\"DEMO: jeden widok z danymi\"], \"exclusions\": [\"DEMO: utrzymanie po odbiorze\"], \"timeline\": {\"minDays\": 5, \"maxDays\": 10, \"assumptions\": [\"DEMO: 6 godzin dziennie\"]}, \"pricing\": {\"model\": \"FIXED_PRICE\", \"range\": {\"minMinor\": 500000, \"maxMinor\": 900000, \"currency\": \"PLN\"}, \"assumptions\": [\"DEMO: szacunek z godzin i stawki z profilu\"]}, \"questions\": [\"DEMO: jaki jest zakres?\", \"DEMO: jaki termin?\", \"DEMO: kto odbiera?\"], \"message\": {\"subject\": \"DEMO: propozycja\", \"body\": \"DEMO: Dzień dobry, mogę pomóc.\"}, \"proposal\": {\"body\": \"# DEMO\\n\\nPropozycja B2B.\"}}"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 410,
+    "completion_tokens": 320,
+    "total_tokens": 730
+  }
+}
