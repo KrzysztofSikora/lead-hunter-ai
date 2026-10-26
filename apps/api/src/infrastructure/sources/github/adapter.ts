@@ -50,11 +50,15 @@ export function createGithubAdapter(deps: GithubAdapterDeps): SourceAdapter<Gith
       if (!result.ok) {
         // Plan-review 3: what earlier queries found is kept, and the run is `partial`.
         if (index === 0) return result;
+        deps.logger?.warn(
+          `github search: query ${index + 1} failed ${result.reason}${result.httpStatus === undefined ? '' : ` ${result.httpStatus}`}`,
+        );
         return { ok: true, items: [...items.values()], skipped, truncated: true };
       }
       const page = result.json as { items?: unknown; incomplete_results?: unknown } | null;
       if (page === null || typeof page !== 'object' || !Array.isArray(page.items)) {
         if (index === 0) return { ok: false, reason: 'invalid_feed' };
+        deps.logger?.warn(`github search: query ${index + 1} failed invalid_feed`);
         return { ok: true, items: [...items.values()], skipped, truncated: true };
       }
       if (page.incomplete_results === true) deps.logger?.warn('github search: incomplete_results');

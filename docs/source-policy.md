@@ -73,8 +73,10 @@ ręczną kontrolę (patrz `context/changes/rss-sources/plan.md`, *Human checks*)
 - **Regulamin:** <https://docs.github.com/en/site-policy/github-terms/github-terms-of-service>
   i zasady API. `DO WERYFIKACJI` przez operatora względem aktualnych stron.
 - **Limity:** 10 zapytań wyszukiwania na minutę bez tokenu, 30 z tokenem; odstęp między
-  zapytaniami przebiegu pilnuje tego limitu. Limit (także wtórny) kończy się jawnym błędem
-  `rate_limited`, nigdy „brak wyników".
+  zapytaniami przebiegu pilnuje tego limitu. Limit (także wtórny: 403 z `Retry-After`) kończy
+  się jawnym błędem `rate_limited`, nigdy „brak wyników". Gdy limit lub błąd trafi dopiero
+  zapytanie po pierwszym, przebieg zachowuje to, co już znalazł, kończy się jako `partial`,
+  a powód (rodzaj błędu i kod HTTP, bez treści zapytania) trafia do logu.
 - **Token:** `GITHUB_TOKEN` w `.env` jest opcjonalny. Tylko do odczytu, tylko dane publiczne
   (bez zakresów, token klasyczny lub szczegółowy bez uprawnień). Nigdy w logach, odpowiedziach
   API, bazie ani w zapytaniu do innego hosta. Bez tokenu adapter działa anonimowo.

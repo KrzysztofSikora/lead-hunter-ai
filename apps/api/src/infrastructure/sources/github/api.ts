@@ -76,9 +76,11 @@ export function createGithubApi({
           };
         }
         const now = clock.now().getTime();
+        // A primary limit sends `x-ratelimit-remaining: 0`; a secondary one a `retry-after`.
         const exhausted =
           (response.status === 403 || response.status === 429) &&
-          first(response.headers['x-ratelimit-remaining']) === '0';
+          (first(response.headers['x-ratelimit-remaining']) === '0' ||
+            first(response.headers['retry-after']) !== undefined);
         if (exhausted) {
           const wait = limitWaitMs(response.headers, now);
           return {
