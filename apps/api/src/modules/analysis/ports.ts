@@ -41,7 +41,9 @@ export type ProviderErrorKind =
   | 'refusal'
   | 'truncated'
   | 'empty'
-  | 'not_json';
+  | 'not_json'
+  /** The app's own abort (FR-34 AC3); never produced by a provider. */
+  | 'cancelled';
 
 export class ProviderError extends Error {
   constructor(
@@ -49,6 +51,8 @@ export class ProviderError extends Error {
     readonly status?: number,
     /** Set when the provider answered and billed the call before the answer was rejected. */
     readonly usage?: ProviderOutput['usage'],
+    /** The provider's `Retry-After`, bounded; the runner decides whether to wait that long. */
+    readonly retryAfterMs?: number,
   ) {
     super(status === undefined ? kind : `${kind} ${status}`);
     this.name = 'ProviderError';
@@ -63,7 +67,25 @@ export interface LlmProvider {
   readonly promptVersion: string;
   /** True for results that are rules, not AI analysis; every view labels them DEMO / MOCK. */
   readonly demo: boolean;
-  analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput>;
+  /** The per-request limit in ms the view compares elapsed time with; 0 means no limit. */
+  readonly timeoutMs: number;
+  /** An aborted `signal` ends the request and rejects with a `cancelled` `ProviderError`. */
+  analyzeOpportunity(
+    input: AnalysisInput,
+    options?: { signal?: AbortSignal },
+  ): Promise<ProviderOutput>;
+}
+
+/** One reading of the host; a value that could not be read is `null`, never 0. */
+export interface HostSnapshot {
+  temperatureC: number | null;
+  load1: number | null;
+  cpuCount: number | null;
+  measuredAt: Date;
+}
+
+export interface HostMetrics {
+  read(): Promise<HostSnapshot>;
 }
 
 export interface ProfileReader {
@@ -185,6 +207,8 @@ export interface AnalysisRepository {
   /** Tells a missing opportunity from one the pre-filter skipped when `requeue` says no. */
   exists(id: number): boolean;
   waitingCount(): number;
+  /** The head of the queue without the source text (the activity view polls it). */
+  waitingPreview(limit: number): { id: number; title: string }[];
   saveComplete(analysis: CompletedAnalysis): void;
   saveFailed(analysis: FailedAnalysis): void;
   /** D-12: `FAILED` back to `PENDING`; the failed attempt stays as history. One UPDATE. */

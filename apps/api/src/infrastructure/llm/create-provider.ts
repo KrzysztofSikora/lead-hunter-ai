@@ -5,7 +5,7 @@ import { AnthropicProvider } from './anthropic.js';
 import { MockProvider } from './mock.js';
 import { OpenAiCompatibleProvider } from './openai-compatible.js';
 
-/** D-8: bounded call time, SDK backoff on 429/5xx and connection errors. */
+/** D-8: bounded call time; offer drafts keep SDK backoff on 429/5xx and connection errors. */
 const TIMEOUT_MS = 120_000;
 const MAX_RETRIES = 2;
 
@@ -46,7 +46,8 @@ export function createLlmProvider(
   config: LlmConfig | undefined,
   tuning: ProviderTuning = {},
 ): LlmProvider | undefined {
-  return build(config, undefined, tuning);
+  // S-20 D-1: the analysis runner owns the retries, so attempt and backoff are observable.
+  return build(config, undefined, { maxRetries: 0, ...tuning });
 }
 
 /** S-07 D-6: a second instance whose model is `LLM_MODEL_OFFER`. */

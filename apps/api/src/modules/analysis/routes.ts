@@ -1,4 +1,5 @@
 import {
+  AnalysisActivity,
   AnalysisRequestBody,
   AnalysisRequestRefused,
   AnalysisRequestResult,
@@ -13,6 +14,7 @@ import { z } from 'zod';
 
 export interface AnalysisRouteDeps {
   status(): AnalysisServiceStatus;
+  activity(): Promise<AnalysisActivity>;
   requeue(id: number, force: boolean): 'queued' | 'prefiltered' | 'not_configured' | 'not_found';
   retry(id: number): 'reset' | 'not_failed' | 'not_found';
 }
@@ -24,6 +26,12 @@ export function registerAnalysisRoutes(app: FastifyInstance, deps: AnalysisRoute
     '/api/analysis/status',
     { schema: { response: { 200: AnalysisServiceStatus } } },
     async () => deps.status(),
+  );
+
+  typed.get(
+    '/api/analysis/activity',
+    { schema: { response: { 200: AnalysisActivity } } },
+    async () => deps.activity(),
   );
 
   typed.post(

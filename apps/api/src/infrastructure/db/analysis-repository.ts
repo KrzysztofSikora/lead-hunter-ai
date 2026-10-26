@@ -209,6 +209,20 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
           .get() !== undefined
       );
     },
+    waitingPreview(limit) {
+      return db
+        .select({ id: opportunities.id, title: rawSignals.title })
+        .from(opportunities)
+        .innerJoin(rawSignals, eq(opportunities.primarySignalId, rawSignals.id))
+        .where(waiting)
+        .orderBy(
+          desc(opportunities.prefilterMatches),
+          asc(opportunities.createdAt),
+          asc(opportunities.id),
+        )
+        .limit(limit)
+        .all();
+    },
     waitingCount() {
       return db.select({ value: count() }).from(opportunities).where(waiting).get()?.value ?? 0;
     },

@@ -221,7 +221,7 @@ only an operator session can read it (AC6). No token-level progress and no ETA (
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Abortable provider calls, runner-owned retries and the activity view API
+- [x] Phase 1: Abortable provider calls, runner-owned retries and the activity view API
 - [ ] Phase 2: Cancel, paused queue and host metrics
 - [ ] Phase 3: Phone view `/analiza`
 
@@ -230,6 +230,10 @@ only an operator session can read it (AC6). No token-level progress and no ETA (
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] (Phase 1) Plan says the queue preview uses `nextWaiting(20)`; that returns the full source text of 20 rows on every 3 s poll. Added `AnalysisRepository.waitingPreview(limit)` (id and title only) in `analysis-repository.ts`. The entry in flight stays `PENDING` until saved, so `queued` excludes it explicitly.
+- [minor] (Phase 1) `server.ts` needs no change: `AnalysisDeps.sleep` defaults to a real abortable timer; only `buildTestApp` injects a no-op (overridable with `sleep`, plan-review 7). The activity route is typed on `AnalysisRouteDeps`, which the runner already satisfies.
+- [minor] (Phase 1) Plan-review 2, 4, 5, 7, 8, 9 applied: only the final outcome is stored (asserted: one row after two retries); `AnalysisActivity.now` and `attemptStartedAt` added; fake providers in `analysis.int.test.ts` and `jobs.int.test.ts` got `timeoutMs`; the canary sits after the 120-char title; one explicit 401 case. Findings 1, 3 and 6 belong to Phase 2 (paused gate per loop iteration, D-3 side effects, `controller.signal.aborted` decides "cancelled").
+- [minor] (Phase 1) A fake provider that rejects with a retryable `ProviderError` is now retried up to 3 attempts (no-op sleep in tests); tests that need a single failure use a non-retryable kind.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

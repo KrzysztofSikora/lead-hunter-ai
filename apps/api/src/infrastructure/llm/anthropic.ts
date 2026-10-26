@@ -32,6 +32,7 @@ interface Call {
   user: string;
   schema: Record<string, unknown>;
   effort: 'low' | 'medium';
+  signal?: AbortSignal;
 }
 
 export class AnthropicProvider implements LlmProvider, OfferDrafter {
@@ -41,11 +42,13 @@ export class AnthropicProvider implements LlmProvider, OfferDrafter {
   readonly offerPromptVersion = OFFER_PROMPT_VERSION;
   readonly model: string;
   readonly paid: boolean;
+  readonly timeoutMs: number;
   private readonly client: Anthropic;
 
   constructor(options: AnthropicOptions) {
     this.model = options.model;
     this.paid = options.paid;
+    this.timeoutMs = options.timeoutMs;
     this.client = new Anthropic({
       apiKey: options.apiKey,
       ...(options.baseUrl ? { baseURL: options.baseUrl } : {}),
@@ -54,12 +57,16 @@ export class AnthropicProvider implements LlmProvider, OfferDrafter {
     });
   }
 
-  analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
+  analyzeOpportunity(
+    input: AnalysisInput,
+    options?: { signal?: AbortSignal },
+  ): Promise<ProviderOutput> {
     return this.request({
       system: systemPrompt(),
       user: buildUserMessage(input),
       schema: outputJsonSchema(),
       effort: 'low',
+      ...(options?.signal ? { signal: options.signal } : {}),
     });
   }
 
@@ -72,16 +79,19 @@ export class AnthropicProvider implements LlmProvider, OfferDrafter {
     });
   }
 
-  private async request({ system, user, schema, effort }: Call): Promise<ProviderOutput> {
+  private async request({ system, user, schema, effort, signal }: Call): Promise<ProviderOutput> {
     let response;
     try {
-      response = await this.client.messages.create({
-        model: this.model,
-        max_tokens: MAX_TOKENS,
-        system,
-        messages: [{ role: 'user', content: user }],
-        output_config: { effort, format: { type: 'json_schema', schema } },
-      });
+      response = await this.client.messages.create(
+        {
+          model: this.model,
+          max_tokens: MAX_TOKENS,
+          system,
+          messages: [{ role: 'user', content: user }],
+          output_config: { effort, format: { type: 'json_schema', schema } },
+        },
+        signal ? { signal } : undefined,
+      );
     } catch (error) {
       throw toProviderError(error);
     }

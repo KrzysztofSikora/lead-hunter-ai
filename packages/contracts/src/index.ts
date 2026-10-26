@@ -1,5 +1,10 @@
 export {
   ANALYSIS_SCHEMA_VERSION,
+  AnalysisActiveEntry,
+  AnalysisActivity,
+  AnalysisHistoryEntry,
+  AnalysisReasonCode,
+  HostSnapshot,
   AnalysisRequestBody,
   AnalysisRequestRefused,
   AnalysisRequestResult,
