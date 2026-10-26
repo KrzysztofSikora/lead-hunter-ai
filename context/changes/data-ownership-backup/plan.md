@@ -266,13 +266,15 @@ The operator owns their data and can get it back after a failure:
 - [x] Phase 2: Export and the UI (delete button, export link)
 - [x] Phase 3: Backup command and daily job
 - [x] Phase 4: Retention
-- [ ] Phase 5: Restore procedure, tested in CI
+- [x] Phase 5: Restore procedure, tested in CI
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 2) At phone width the *Usuń okazję* two-step confirm on a card reads clearly and cannot be hit by accident — run: `docker compose up --build`, open an opportunity, narrow the window to ~375 px, tap *Usuń okazję*, then *Anuluj* — evidence: none (Chromium is not installed in the autonomous run; take screenshots with `E2E_EVIDENCE=1 pnpm e2e` after `pnpm exec playwright install chromium` if wanted)
 - [ ] (Phase 2) The *Eksportuj dane (JSON)* link in *Profil* downloads `lead-hunter-export-<date>.json` that opens as JSON — run: `docker compose up --build`, log in, open *Profil*, click the link — evidence: none (the response is asserted in `apps/api/test/data-export.int.test.ts`)
 - [ ] (Phase 3) On the Pi, the backup command writes a file owned by uid 1000 — run: `docker compose exec app node apps/api/dist/cli/backup.js`, then `ls -l data/backups/` — evidence: none (needs the Pi; the CLI is covered by `apps/api/test/cli.int.test.ts`)
+- [ ] (Phase 5) On the Pi, follow the README *Kopia zapasowa i przywracanie* steps with a copy from `data/backups/`; the panel shows that copy's data and `docker compose ps` is healthy — run: the README restore steps — evidence: none yet (put the command output in `context/changes/data-ownership-backup/evidence/`)
+- [ ] (Phase 5) `pnpm docker:build` then `pnpm docker:smoke` pass with the new step 5/5 (backup, in-place restore) — run: both commands on a machine with Docker access to the npm registry — evidence: none (the autonomous sandbox could start dockerd, but the image build failed at `pnpm install` with SELF_SIGNED_CERT_IN_CHAIN from the sandbox proxy; TLS checks were not disabled)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -294,3 +296,5 @@ The operator owns their data and can get it back after a failure:
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->
+- [REVIEW] Phase 5: `pnpm docker:build` and `pnpm docker:smoke` could not run in the autonomous sandbox (build fails at `pnpm install`, SELF_SIGNED_CERT_IN_CHAIN). The new smoke step 5/5 is checked only with `bash -n`; the PR reviewer should see it pass in a real Docker run before merging. The restore logic itself is covered by `restore.int.test.ts` (passes).
+- [minor] Plan-review #2: the smoke restores in place on the same volume with the README's steps (move `lead-hunter.db*` aside, copy the newest backup, start) instead of a fresh volume, and asserts that a post-backup opportunity is gone; the vitest test restores a backup of a DB migrated only to `0007` and asserts `0013` (`deleted_usage`) is applied.
