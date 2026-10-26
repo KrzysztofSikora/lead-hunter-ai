@@ -106,7 +106,7 @@ R4-R6 are new and all come from the R1/R3 fix. I demonstrated R4 and R5 with scr
 - Fix: in `update`, when `configJson` changes, drop `resumeAt` from the cursor (keep `resumeFrom`, so the day is re-read from its start). In `run`, when a run that was given a `resumeAt` fails, save the cursor without `resumeAt`, so the next run restarts that day from page 1 / no token. That costs one re-read, never a stuck source. Add a service-level test for both cases.
 - Effort: small
 - Lesson candidate: An opaque continuation token stored across runs must be dropped when the query it belongs to changes and after a failed run that used it.
-- Decision: open
+- Decision: fixed (790ba72) + lesson proposed
 
 ### R5: Nothing tests that the service stores and passes `resumeAt`
 - Severity: major
@@ -115,7 +115,7 @@ R4-R6 are new and all come from the R1/R3 fix. I demonstrated R4 and R5 with scr
 - Fix: add a case to `test/tender-sources.int.test.ts` with the fake adapter recording `context.resumeAt`. A truncated run returns `resumeFrom` + `resumeAt: 'p11'`, and the next run must get `since = resumeFrom` and `resumeAt = 'p11'`. A complete run must clear both. A run that returns `resumeAt` without `resumeFrom`, or one longer than `RESUME_AT_MAX`, must not store it.
 - Effort: small
 - Lesson candidate: no (covered by the proposed R1 lesson)
-- Decision: open
+- Decision: fixed (790ba72)
 
 ### R6: The plan no longer describes the cursor and the TED cap
 - Severity: minor
@@ -127,4 +127,4 @@ R4-R6 are new and all come from the R1/R3 fix. I demonstrated R4 and R5 with scr
 - Fix: update D-9 and D-21 (or add `[minor]` deviations) to cover the per-slice TED cap, the `resumeAt` cursor field and the page-order assumption. Mark that assumption `UNVERIFIED` and add it to the BZP human check. Optionally bound the TED run to a total request budget as well (e.g. 5 × slices, at most 40).
 - Effort: small
 - Lesson candidate: no
-- Decision: open
+- Decision: fixed (plan.md deviation and human check; no code change)
