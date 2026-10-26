@@ -54,6 +54,16 @@ describe('estimated value (S-18 D-20)', () => {
     expect(findEstimatedValue('Cena oferty 100 PLN')).toBeNull();
     expect(findEstimatedValue('Wartość zamówienia: nie podano')).toBeNull();
     expect(findEstimatedValue('Wartość zamówienia: 10 000 CHF')).toBeNull();
+    // R2: threshold phrases with the same words are not a stated value.
+    expect(
+      findEstimatedValue('Wartość zamówienia nie przekracza kwoty 130 000 zł netto.'),
+    ).toBeNull();
+    expect(
+      findEstimatedValue('Szacunkowa wartość zamówienia jest mniejsza niż 5 538 000 euro.'),
+    ).toBeNull();
+    expect(findEstimatedValue('Wartość zamówienia (netto): 10 000 PLN')?.amountMinor).toBe(
+      1_000_000,
+    );
   });
 
   it('formats the line the guard takes the budget quote from', () => {

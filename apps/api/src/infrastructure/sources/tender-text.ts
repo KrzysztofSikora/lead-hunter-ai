@@ -78,8 +78,10 @@ export interface StatedValue {
   currency: Currency;
 }
 
+// R2: the label is followed directly by the amount (after an optional qualifier and separator), so
+// threshold phrases such as "nie przekracza kwoty 130 000 zł" are not read as a stated value.
 const VALUE_LABEL =
-  /(?:szacunkow[a-zćńóśźż]*\s+warto[śs][ćc][^\d\n]{0,60}|warto[śs][ćc]\s+(?:zam[óo]wienia|szacunkowa)[^\d\n]{0,60})(\d[\d \u00a0.,]{0,30})\s*(PLN|z[łl]|EUR|euro|USD)/i;
+  /(?:szacunkow[a-zćńóśźż]*\s+warto[śs][ćc]|warto[śs][ćc]\s+(?:zam[óo]wienia|szacunkowa))(?:\s+zam[óo]wienia)?\s*(?:\([^)\n]{0,40}\)\s*)?(?:[:–-]\s*|\s)(\d[\d \u00a0.,]{0,30})\s*(PLN|z[łl]|EUR|euro|USD)/i;
 
 /** `1 234 567,89` / `1234567.89` / `1.234.567,89` to integer minor units, or null. */
 export function parseAmountMinor(raw: string): number | null {
