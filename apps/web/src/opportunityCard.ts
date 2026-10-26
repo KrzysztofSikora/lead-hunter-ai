@@ -327,5 +327,13 @@ export function eventDetails(event: ActivityEvent): string[] {
       event.followUpOn ? h.followUpSet(formatCalendarDate(event.followUpOn)) : h.followUpCleared,
     );
   }
+  if (event.type === 'WORK' && event.work) {
+    parts.push(
+      h.workEntry(
+        event.work.minutes === null ? null : strings.insights.hoursMinutes(event.work.minutes),
+        event.work.cost ? formatMinor(event.work.cost.amountMinor, event.work.cost.currency) : null,
+      ),
+    );
+  }
   return parts;
 }

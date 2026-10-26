@@ -3,7 +3,7 @@ import { OpportunityAnalysis, PrefilterRule, ScoreBreakdown } from './analysis.j
 import { Category, Confidence, EvidenceLevel } from './classification.js';
 import { Currency } from './profile.js';
 import { OfferDraft, OfferDraftHistoryItem } from './offer-drafts.js';
-import { calendarDate, Contract, RejectionReason } from './status.js';
+import { calendarDate, Contract, RejectionReason, WorkCost } from './status.js';
 
 export { Category, Confidence, EvidenceLevel };
 
@@ -278,6 +278,9 @@ export const ActivityMetadata = z
     on: calendarDate.nullable().optional(),
     /** Status events: the move cleared a follow-up that was set. */
     followUpCleared: z.literal(true).optional(),
+    /** `WORK` events (S-14 D-6): time spent and/or a cost entered by the operator. */
+    minutes: z.number().int().min(1).max(100_000).optional(),
+    cost: WorkCost.optional(),
   })
   .strict();
 export type ActivityMetadata = z.infer<typeof ActivityMetadata>;
@@ -285,7 +288,7 @@ export type ActivityMetadata = z.infer<typeof ActivityMetadata>;
 export const ActivityEvent = z
   .object({
     id: z.number().int(),
-    type: z.enum(['STATUS_CHANGE', 'NOTE', 'FOLLOW_UP']),
+    type: z.enum(['STATUS_CHANGE', 'NOTE', 'FOLLOW_UP', 'WORK']),
     actor: z.enum(['operator', 'system']),
     fromStatus: BusinessStatus.nullable(),
     toStatus: BusinessStatus.nullable(),
@@ -299,6 +302,11 @@ export const ActivityEvent = z
     followUpOn: calendarDate.nullable(),
     /** Status events only: the move dropped the follow-up that was set (R5). */
     followUpCleared: z.boolean(),
+    /** `WORK` events only (S-14 D-6). */
+    work: z
+      .object({ minutes: z.number().int().nullable(), cost: WorkCost.nullable() })
+      .strict()
+      .nullable(),
     occurredAt: isoInstant,
   })
   .strict();

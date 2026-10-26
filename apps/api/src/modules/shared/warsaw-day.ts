@@ -55,3 +55,32 @@ export function instantToWarsawDate(instant: Date): string {
     dayParts.formatToParts(instant).find((part) => part.type === type)?.value ?? '';
   return `${get('year')}-${get('month')}-${get('day')}`;
 }
+
+const DAY_MS = 86_400_000;
+const dateOf = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+/** S-14: the ISO 8601 week (Monday start) that contains the calendar date `YYYY-MM-DD`. */
+export function isoWeekOf(date: string): { year: number; week: number } {
+  const [year, month, day] = date.split('-').map(Number) as [number, number, number];
+  const utc = Date.UTC(year, month - 1, day);
+  const mondayBased = (new Date(utc).getUTCDay() + 6) % 7;
+  const thursday = new Date(utc + (3 - mondayBased) * DAY_MS);
+  const isoYear = thursday.getUTCFullYear();
+  const week = Math.floor((thursday.getTime() - Date.UTC(isoYear, 0, 1)) / DAY_MS / 7) + 1;
+  return { year: isoYear, week };
+}
+
+/** S-14: the Monday (`YYYY-MM-DD`) on which ISO week `week` of `year` starts. */
+export function isoWeekStartDate(year: number, week: number): string {
+  const jan4 = Date.UTC(year, 0, 4);
+  const mondayOfWeek1 = jan4 - ((new Date(jan4).getUTCDay() + 6) % 7) * DAY_MS;
+  return dateOf(mondayOfWeek1 + (week - 1) * 7 * DAY_MS);
+}
+
+/** S-14: `YYYY-MM-DD` shifted by whole days (pure calendar arithmetic, no DST involved). */
+export function addCalendarDays(date: string, days: number): string {
+  const [year, month, day] = date.split('-').map(Number) as [number, number, number];
+  return dateOf(Date.UTC(year, month - 1, day) + days * DAY_MS);
+}
+
+export { isoWeeksInYear } from '@lead-hunter/contracts';

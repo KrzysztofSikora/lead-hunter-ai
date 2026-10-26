@@ -77,7 +77,7 @@ export interface EvidenceRow {
 /** One `activity_events` row; `metadataJson` is still text here. */
 export interface ActivityRow {
   id: number;
-  type: 'STATUS_CHANGE' | 'NOTE' | 'FOLLOW_UP';
+  type: 'STATUS_CHANGE' | 'NOTE' | 'FOLLOW_UP' | 'WORK';
   actor: 'operator' | 'system';
   fromStatus: BusinessStatus | null;
   toStatus: BusinessStatus | null;
@@ -167,6 +167,8 @@ export interface ActivityRepository {
   ): 'changed' | 'not_found' | 'not_allowed';
   /** False when the opportunity does not exist. */
   addNote(id: number, text: string, at: number): boolean;
+  /** Records a `WORK` event (S-14 D-6); `metadata` is already validated. False when the opportunity does not exist. */
+  addWork(id: number, metadata: string, note: string | null, at: number): boolean;
 }
 
 export interface PaymentRepository {

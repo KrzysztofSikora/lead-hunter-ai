@@ -11,6 +11,7 @@ import {
   type NoteRequest,
   type OfferDraftStatus,
   type PaymentRequest,
+  type WorkRequest,
   type OpportunityDetail,
   type OpportunityList,
   type OpportunityListQuery,
@@ -48,6 +49,7 @@ export interface OpportunityService {
   addNote(id: number, request: NoteRequest): ActionResult;
   setFollowUp(id: number, request: FollowUpRequest): ActionResult;
   addPayment(id: number, request: PaymentRequest): ActionResult;
+  addWork(id: number, request: WorkRequest): ActionResult;
 }
 
 export type ActionResult =
@@ -173,6 +175,7 @@ function toActivity(row: ActivityRow): OpportunityDetail['activity'][number] {
     contract: meta?.contract ?? null,
     followUpOn: row.type === 'FOLLOW_UP' ? (meta?.on ?? null) : null,
     followUpCleared: meta?.followUpCleared === true,
+    work: row.type === 'WORK' ? { minutes: meta?.minutes ?? null, cost: meta?.cost ?? null } : null,
     occurredAt: iso(row.occurredAt),
   };
 }
@@ -361,6 +364,20 @@ export function createOpportunityService({
         clock.now().getTime(),
       );
       return added ? withDetail(id) : { result: 'not_found' };
+    },
+    addWork(id, request) {
+      const metadata = ActivityMetadata.parse({
+        ...(request.minutes !== undefined ? { minutes: request.minutes } : {}),
+        ...(request.cost !== undefined ? { cost: request.cost } : {}),
+      });
+      return activity.addWork(
+        id,
+        JSON.stringify(metadata),
+        request.note ?? null,
+        clock.now().getTime(),
+      )
+        ? withDetail(id)
+        : { result: 'not_found' };
     },
     addNote(id, request) {
       return activity.addNote(id, request.text, clock.now().getTime())

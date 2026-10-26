@@ -43,6 +43,14 @@ export function inputToMinor(text: string): number | string {
   return Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
 }
 
+/** Hours as typed ("1,5", "2") to whole minutes; text that is not a duration stays text. */
+export function hoursToMinutes(text: string): number | string {
+  const match = /^(\d+)(?:[.,](\d{1,2}))?$/.exec(text.trim());
+  if (!match) return text;
+  const hundredths = Number(match[1]) * 100 + Number((match[2] ?? '').padEnd(2, '0'));
+  return Math.round((hundredths * 60) / 100);
+}
+
 function integer(text: string): number | string {
   const trimmed = text.trim();
   return /^\d+$/.test(trimmed) ? Number(trimmed) : text;

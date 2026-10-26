@@ -121,4 +121,17 @@ test('main path: import, analysis, card, offer draft, follow-up, payment, pipeli
   await expect(page.getByRole('heading', { name: 'Skontaktowano się (1)' })).toBeVisible();
   await assertNoOverflow(page);
   await evidence(page, 'pipeline-360.jpg');
+
+  // S-14: the current week counts the recorded facts only; the contact has no outcome yet.
+  await page.getByRole('link', { name: 'Wyniki' }).click();
+  await expect(page.getByRole('heading', { name: 'Wyniki' })).toBeVisible();
+  const insight = (name: string) =>
+    page.locator('dt', { hasText: name }).locator('xpath=following-sibling::dd[1]');
+  await expect(insight('Wysłane oferty')).toHaveText('1');
+  await expect(insight('Pierwszy kontakt')).toHaveText('1');
+  await expect(insight('Odpowiedzi')).toContainText('brak danych');
+  await expect(insight('Odpowiedzi')).toContainText('1 bez wyniku');
+  await expect(insight('Płatności')).toHaveText(/^1\s*1\s500,00\sPLN$/);
+  await assertNoOverflow(page);
+  await evidence(page, 'insights-360.jpg', 'context/changes/insights/evidence');
 });

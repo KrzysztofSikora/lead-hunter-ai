@@ -202,6 +202,7 @@ Baza deweloperska: `apps/api/data/lead-hunter.db`. Migracje: `pnpm db:migrate`.
   zadań do wykonania; harmonogram przebiegów (`DISCOVERY_TIMES`, domyślnie 08:00 i 18:00) z
   historią przebiegów, przebieg przerwany awarią oznaczany jako nieudany; lejek (`/lejek`):
   statusy okazji, kontakt, wygrana i zapis płatności (kwoty w groszach, waluta).
+- **Wyniki:** widok *Wyniki* (`/wyniki`, `GET /api/insights?week=RRRR-Wnn` lub `?month=RRRR-MM`; tygodnie ISO w Europe/Warsaw): przejścia między statusami, wysłane oferty, kontakty, odpowiedzi ze wskaźnikiem (liczonym tylko z kontaktów ze znanym wynikiem), spotkania, wygrane i płatności (suma osobno dla każdej waluty, bez przeliczania), także według źródła i kategorii. Czego nie da się policzyć, pokazuje „brak danych”, nie zero. Czas i koszty pojawiają się tylko, gdy wpiszesz je na karcie okazji (formularz *Czas i koszty*, `POST /api/opportunities/:id/work`); wynik to płatności minus wpisane koszty, tylko w walutach z kosztami.
 - **Źródła RSS/Atom:** widok *Źródła* (`/zrodla`): dodanie gotowego kanału jednym kliknięciem
   (Hacker News „Seeking freelancer", Freelancer.com: nodejs, react, typescript, arduino,
   raspberry-pi, iot, 3d-printing, pcb-layout, ai-automation, Arduino Forum „Jobs and Paid
