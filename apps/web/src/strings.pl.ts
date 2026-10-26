@@ -238,7 +238,6 @@ export const strings = {
     meetings: 'Spotkania',
     wins: 'Wygrane',
     payments: 'Płatności',
-    paymentsCount: (n: number) => `${n}`,
     bySource: 'Według źródła',
     byCategory: 'Według kategorii',
     manualSource: 'Ręczny import',
