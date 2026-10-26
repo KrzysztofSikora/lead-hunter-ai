@@ -121,7 +121,11 @@ export function createBzpAdapter({
     }
   }
 
-  async function discover(config: BzpConfig, since: number): Promise<AdapterOutcome> {
+  async function discover(
+    config: BzpConfig,
+    since: number,
+    resumeAt: string | undefined,
+  ): Promise<AdapterOutcome> {
     const now = clock.now().getTime();
     const items: FeedItem[] = [];
     let skipped = 0;
@@ -133,10 +137,22 @@ export function createBzpAdapter({
       );
       return outcome;
     };
-    for (let day = Math.floor(since / DAY_MS) * DAY_MS; day <= now; day += DAY_MS) {
-      for (let page = 1; ; page += 1) {
+    const firstDay = Math.floor(since / DAY_MS) * DAY_MS;
+    const resumePage = Number(resumeAt);
+    for (let day = firstDay; day <= now; day += DAY_MS) {
+      // R1: a day larger than the cap continues on the next run where this one stopped.
+      const startPage =
+        day === firstDay && Number.isInteger(resumePage) && resumePage >= 1 ? resumePage : 1;
+      for (let page = startPage; ; page += 1) {
         if (requests >= BZP_PAGE_CAP) {
-          return finish({ ok: true, items, skipped, truncated: true, resumeFrom: day });
+          return finish({
+            ok: true,
+            items,
+            skipped,
+            truncated: true,
+            resumeFrom: day,
+            ...(page > 1 ? { resumeAt: String(page) } : {}),
+          });
         }
         requests += 1;
         // A failure drops the pages already read: the next run repeats the window (plan-review 8).
@@ -163,7 +179,7 @@ export function createBzpAdapter({
       if (!parsed.success) return { ok: false, issues: parsed.error.issues.map((i) => i.message) };
       return { ok: true, config: parsed.data, key: 'bzp' };
     },
-    discover: (config, { since }) => discover(config, since),
+    discover: (config, { since, resumeAt }) => discover(config, since, resumeAt),
     async healthCheck(config) {
       const day = Math.floor(clock.now().getTime() / DAY_MS) * DAY_MS;
       const result = await fetchPage(day, 1, 1);

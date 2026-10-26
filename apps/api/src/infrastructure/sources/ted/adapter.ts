@@ -10,6 +10,7 @@ export const TED_ENDPOINT = 'https://api.ted.europa.eu/v3/notices/search';
 /** S-18 D-10: the same spacing as BZP; TED's fair-use limit (700 per minute) is far above it. */
 export const TED_MIN_GAP_MS = 2_000;
 export const TED_PAGE_SIZE = 100;
+/** Requests per day slice: every slice ends with an empty page, so a run-wide cap would always trip. */
 export const TED_PAGE_CAP = 5;
 /** The same per-request limit as BZP (plan-review 13). */
 export const TED_MAX_BYTES = 5 * 1024 * 1024;
@@ -127,7 +128,11 @@ export function createTedAdapter({
     }
   }
 
-  async function discover(config: TedConfig, since: number): Promise<AdapterOutcome> {
+  async function discover(
+    config: TedConfig,
+    since: number,
+    resumeAt: string | undefined,
+  ): Promise<AdapterOutcome> {
     const now = clock.now().getTime();
     const items: FeedItem[] = [];
     let skipped = 0;
@@ -139,13 +144,24 @@ export function createTedAdapter({
       );
       return outcome;
     };
-    for (let day = Math.floor(since / DAY_MS) * DAY_MS; day <= now; day += DAY_MS) {
-      let token: string | null = null;
+    const firstDay = Math.floor(since / DAY_MS) * DAY_MS;
+    for (let day = firstDay; day <= now; day += DAY_MS) {
+      // R1: a day larger than the cap continues on the next run from the stored page token.
+      let pages = 0;
+      let token: string | null = day === firstDay && resumeAt ? resumeAt : null;
       for (;;) {
-        if (requests >= TED_PAGE_CAP) {
-          return finish({ ok: true, items, skipped, truncated: true, resumeFrom: day });
+        if (pages >= TED_PAGE_CAP) {
+          return finish({
+            ok: true,
+            items,
+            skipped,
+            truncated: true,
+            resumeFrom: day,
+            ...(token === null ? {} : { resumeAt: token }),
+          });
         }
         requests += 1;
+        pages += 1;
         // A failure drops the pages already read: the next run repeats the window (plan-review 8).
         const result: Page = await fetchPage(config, day, token, TED_PAGE_SIZE);
         if (!result.ok) return result;
@@ -179,7 +195,7 @@ export function createTedAdapter({
       if (!parsed.success) return { ok: false, issues: parsed.error.issues.map((i) => i.message) };
       return { ok: true, config: parsed.data, key: 'ted' };
     },
-    discover: (config, { since }) => discover(config, since),
+    discover: (config, { since, resumeAt }) => discover(config, since, resumeAt),
     async healthCheck(config) {
       const day = Math.floor(clock.now().getTime() / DAY_MS) * DAY_MS;
       const result = await fetchPage(config, day, null, 1);

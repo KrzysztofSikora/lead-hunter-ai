@@ -151,10 +151,21 @@ function checkTender(item: FeedItem, warn: (field: string) => void): string | nu
   return JSON.stringify(parsed.data);
 }
 
-function readCursor(record: SourceRecord): { seen: string[]; resumeFrom: number | null } {
-  if (record.cursorJson === null) return { seen: [], resumeFrom: null };
+/** Bound on an adapter's in-day position kept in the cursor (a TED token is a short string). */
+const RESUME_AT_MAX = 2_000;
+
+function readCursor(record: SourceRecord): {
+  seen: string[];
+  resumeFrom: number | null;
+  resumeAt: string | null;
+} {
+  if (record.cursorJson === null) return { seen: [], resumeFrom: null, resumeAt: null };
   try {
-    const cursor = JSON.parse(record.cursorJson) as { seen?: unknown; resumeFrom?: unknown };
+    const cursor = JSON.parse(record.cursorJson) as {
+      seen?: unknown;
+      resumeFrom?: unknown;
+      resumeAt?: unknown;
+    };
     return {
       seen: Array.isArray(cursor.seen)
         ? cursor.seen.filter((key): key is string => typeof key === 'string')
@@ -166,9 +177,13 @@ function readCursor(record: SourceRecord): { seen: string[]; resumeFrom: number 
         cursor.resumeFrom < DATE_MAX
           ? cursor.resumeFrom
           : null,
+      resumeAt:
+        typeof cursor.resumeAt === 'string' && cursor.resumeAt.length <= RESUME_AT_MAX
+          ? cursor.resumeAt
+          : null,
     };
   } catch {
-    return { seen: [], resumeFrom: null };
+    return { seen: [], resumeFrom: null, resumeAt: null };
   }
 }
 
@@ -287,7 +302,12 @@ export function createSourceService({
         (record.lastSuccessAt === null
           ? startedAt - FIRST_RUN_LOOKBACK_MS
           : record.lastSuccessAt - SINCE_OVERLAP_MS);
-      const outcome = await adapter.discover(checked.config, { since });
+      const outcome = await adapter.discover(checked.config, {
+        since,
+        ...(previous.resumeFrom !== null && previous.resumeAt !== null
+          ? { resumeAt: previous.resumeAt }
+          : {}),
+      });
       if (!outcome.ok) return fail(outcome);
       const truncated = outcome.truncated === true;
 
@@ -360,6 +380,12 @@ export function createSourceService({
         JSON.stringify({
           seen: kept,
           ...(truncated ? { resumeFrom: outcome.resumeFrom ?? since } : {}),
+          ...(truncated &&
+          outcome.resumeFrom !== undefined &&
+          outcome.resumeAt !== undefined &&
+          outcome.resumeAt.length <= RESUME_AT_MAX
+            ? { resumeAt: outcome.resumeAt }
+            : {}),
         }),
       );
 

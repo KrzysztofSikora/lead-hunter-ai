@@ -17,6 +17,11 @@ export interface FeedItem {
 export interface DiscoverContext {
   /** UTC epoch ms: notices published since then are wanted. */
   since: number;
+  /**
+   * R1: with `since` = a stored `resumeFrom`, the position inside that day where the last run
+   * stopped (opaque to the service); absent means the start of the day.
+   */
+  resumeAt?: string;
 }
 
 export type AdapterOutcome =
@@ -32,6 +37,8 @@ export type AdapterOutcome =
        * `lastSuccessAt`.
        */
       resumeFrom?: number;
+      /** R1: with `resumeFrom`, where inside that day to continue, so a large day still advances. */
+      resumeAt?: string;
     }
   | {
       ok: false;

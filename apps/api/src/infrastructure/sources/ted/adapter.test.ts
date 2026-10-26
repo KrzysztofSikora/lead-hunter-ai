@@ -115,6 +115,36 @@ describe('createTedAdapter (S-18 FR-32 AC2, D-9, D-11, D-19)', () => {
     });
   });
 
+  it('continues a day larger than the cap from the stored token (R1)', async () => {
+    const since = Date.parse('2026-10-25T00:00:00Z');
+    const { adapter } = harness((n) => ({ body: fullPage(`tok-${n}`) }));
+    expect(await adapter.discover(CONFIG, { since })).toMatchObject({
+      truncated: true,
+      resumeFrom: since,
+      resumeAt: `tok-${TED_PAGE_CAP}`,
+    });
+    const next = harness((n) => ({ body: n === 1 ? fullPage('next') : '{"notices":[]}' }));
+    const outcome = await next.adapter.discover(CONFIG, { since, resumeAt: 'tok-5' });
+    expect(next.state.log[0]?.body.iterationNextToken).toBe('tok-5');
+    expect(next.state.log[0]?.body.query).toContain('publication-date>=20261025');
+    expect(next.state.log[2]?.body.query).toContain('publication-date>=20261026');
+    expect(next.state.log[2]?.body).not.toHaveProperty('iterationNextToken');
+    expect(outcome).toMatchObject({ ok: true });
+    expect(outcome.ok && outcome.truncated).toBeUndefined();
+  });
+
+  it('counts the cap per day slice, so three short slices end complete (R3)', async () => {
+    const { adapter, state } = harness((n) => ({
+      body:
+        n % 2 === 1
+          ? '{"notices":[{"publication-number":"x"}],"iterationNextToken":"t"}'
+          : '{"notices":[]}',
+    }));
+    const outcome = await adapter.discover(CONFIG, { since: NOW - 2 * DAY });
+    expect(state.log).toHaveLength(6);
+    expect(outcome.ok && outcome.truncated).toBeUndefined();
+  });
+
   it('is truncated, not complete, when a full page has no token to continue with', async () => {
     const { adapter } = harness(() => ({ body: fullPage(null) }));
     expect(await adapter.discover(CONFIG, { since: NOW })).toMatchObject({

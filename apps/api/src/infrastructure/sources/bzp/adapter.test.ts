@@ -107,6 +107,32 @@ describe('createBzpAdapter (S-18 FR-32 AC1, D-9, D-10, D-18)', () => {
     });
   });
 
+  it('continues a day larger than the cap from the stored page, so later days are reached (R1)', async () => {
+    const since = Date.parse('2026-10-24T00:00:00Z');
+    const pagesAsked = (state: { log: { url: URL }[] }) =>
+      state.log.map(
+        (r) =>
+          `${r.url.searchParams.get('PublicationDateFrom')?.slice(0, 10)}#${r.url.searchParams.get('PageNumber')}`,
+      );
+    // 2026-10-24 has 24 full pages, then a short one; later days are short.
+    const answer = (_n: number, url: URL) => {
+      const day = url.searchParams.get('PublicationDateFrom')?.slice(0, 10);
+      const page = Number(url.searchParams.get('PageNumber'));
+      return { body: day === '2026-10-24' && page < 25 ? fullPage() : '[]' };
+    };
+    const first = harness(answer);
+    const one = await first.adapter.discover(CONFIG, { since });
+    expect(one).toMatchObject({ ok: true, truncated: true, resumeFrom: since, resumeAt: '11' });
+    const second = harness(answer);
+    const two = await second.adapter.discover(CONFIG, { since, resumeAt: '11' });
+    expect(pagesAsked(second.state)[0]).toBe('2026-10-24#11');
+    expect(two).toMatchObject({ ok: true, truncated: true, resumeFrom: since, resumeAt: '21' });
+    const third = harness((n, url) => (n > 0 ? answer(n, url) : {}));
+    const done = await third.adapter.discover(CONFIG, { since, resumeAt: '21' });
+    expect(done).toEqual({ ok: true, items: [], skipped: 0 });
+    expect(pagesAsked(third.state)).toContain('2026-10-26#1');
+  });
+
   it('is complete, not truncated, when the cap is reached exactly at the end', async () => {
     // Window of one day: ten full pages would be truncated, nine plus a short one is complete.
     const { adapter, state } = harness((n) => ({ body: n < 10 ? fullPage() : '[]' }));
