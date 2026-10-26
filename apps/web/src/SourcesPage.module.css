@@ -126,3 +126,40 @@
 .runHead {
   margin: 0 0 0.5rem;
 }
+
+.badge {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: normal;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  padding: 0.1rem 0.4rem;
+}
+
+.filter {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  min-width: 0;
+  border: 1px solid #bbb;
+  border-radius: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter textarea {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+}
+
+.filter button {
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  align-self: flex-start;
+}
+
+.check {
+  display: block;
+}

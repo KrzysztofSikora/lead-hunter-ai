@@ -4,6 +4,7 @@ import {
   CARD_ELEMENTS,
   buildCard,
   eventDetails,
+  prefilterReason,
   type CardItem,
   type CardSection,
 } from './opportunityCard.js';
@@ -132,7 +133,7 @@ const states: Record<string, OpportunityDetail> = {
   skipped: detail({
     analysisStatus: 'SKIPPED',
     businessStatus: 'NEEDS_VERIFICATION',
-    prefilter: { rule: 'spam', matches: 1, language: null },
+    prefilter: { rule: 'spam', matches: 1, language: null, phrase: null },
   }),
 };
 
@@ -317,5 +318,19 @@ describe('eventDetails', () => {
       'ustawiono na 30.10.2026',
     ]);
     expect(eventDetails(followUp)).toEqual(['usunięto']);
+  });
+});
+
+describe('prefilterReason', () => {
+  it('names the matched phrase of a source filter (D-15)', () => {
+    expect(prefilterReason('source_filter', '[FOR HIRE]')).toBe('filtr źródła: [FOR HIRE]');
+  });
+
+  it('says "brak frazy" when no include phrase matched', () => {
+    expect(prefilterReason('source_filter', null)).toBe('filtr źródła: brak frazy');
+  });
+
+  it('keeps the plain label for an ordinary rule', () => {
+    expect(prefilterReason('spam', null)).toBe('wygląda na spam');
   });
 });

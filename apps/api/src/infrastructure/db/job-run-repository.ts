@@ -7,6 +7,7 @@ import { analyses, jobRuns, opportunities, rawSignals, sources } from './schema.
 /** What the analyses of one source run's opportunities add to its stored counters (D-8, D-9). */
 interface Analysed {
   rejected: number;
+  sourceFiltered: number;
   analysed: number;
   analysisFailed: number;
   inputTokens: number;
@@ -101,6 +102,7 @@ export function createJobRunRepository(db: BetterSQLite3Database): JobRunReposit
           analysed: extra?.analysed ?? 0,
           failed: run.failed + (extra?.analysisFailed ?? 0),
           skipped: run.skipped,
+          sourceFiltered: extra?.sourceFiltered ?? 0,
         };
       };
       const costOf = (ids: number[]): JobCost | null => {
@@ -125,6 +127,7 @@ export function createJobRunRepository(db: BetterSQLite3Database): JobRunReposit
                 analysed: sum.analysed + c.analysed,
                 failed: sum.failed + c.failed,
                 skipped: sum.skipped,
+                sourceFiltered: sum.sourceFiltered + c.sourceFiltered,
               }),
               {
                 fetched: 0,
@@ -134,6 +137,7 @@ export function createJobRunRepository(db: BetterSQLite3Database): JobRunReposit
                 analysed: 0,
                 failed: 0,
                 skipped: run.skipped,
+                sourceFiltered: 0,
               },
             )
           : countersOf(run);
@@ -177,6 +181,9 @@ function analysisCounts(db: BetterSQLite3Database, runIds: number[]): Map<number
       rejected: sumOf(
         sql`case when ${opportunities.prefilterRule} is not null and ${opportunities.prefilterRule} <> 'no_text' then 1 else 0 end`,
       ),
+      sourceFiltered: sumOf(
+        sql`case when ${opportunities.prefilterRule} = 'source_filter' then 1 else 0 end`,
+      ),
       analysed: sumOf(
         sql`case when ${opportunities.analysisStatus} = 'COMPLETE' then 1 else 0 end`,
       ),
@@ -193,6 +200,7 @@ function analysisCounts(db: BetterSQLite3Database, runIds: number[]): Map<number
     if (row.runId === null) continue;
     byRun.set(row.runId, {
       rejected: row.rejected,
+      sourceFiltered: row.sourceFiltered,
       analysed: row.analysed,
       analysisFailed: row.analysisFailed,
       inputTokens: 0,

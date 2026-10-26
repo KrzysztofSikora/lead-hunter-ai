@@ -41,6 +41,8 @@ export interface SourceRecord {
   configKey: string;
   presetId: string | null;
   enabled: boolean;
+  /** S-17 D-1: `SourceFilter` JSON, `null` = off and empty. */
+  filterJson: string | null;
   cursorJson: string | null;
   /** UTC epoch ms */
   nextAllowedAt: number | null;
@@ -54,6 +56,7 @@ export interface NewSource {
   configJson: string;
   configKey: string;
   presetId: string | null;
+  filterJson: string | null;
   at: number;
 }
 
@@ -85,7 +88,11 @@ export interface SourceRepository {
   get(id: number): SourceRecord | undefined;
   /** `undefined` when the config key is already taken. */
   insert(source: NewSource): SourceRecord | undefined;
-  setEnabled(id: number, enabled: boolean, at: number): SourceRecord | undefined;
+  update(
+    id: number,
+    patch: { enabled?: boolean; filterJson?: string },
+    at: number,
+  ): SourceRecord | undefined;
   /** D-5: one atomic step; a run also pushes `next_allowed_at` forward by `intervalMs`. */
   claimRun(id: number, now: number, intervalMs: number): ClaimResult;
   /** D-21: a check waits for a pending `next_allowed_at` and for its own short cooldown only. */

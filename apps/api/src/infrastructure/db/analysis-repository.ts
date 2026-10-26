@@ -1,12 +1,12 @@
 import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { ActivityCause } from '@lead-hunter/contracts';
 import type {
   AnalysisRepository,
   PendingOpportunity,
   WaitingOpportunity,
 } from '../../modules/analysis/ports.js';
-import { activityEvents, analyses, offerDrafts, opportunities, rawSignals } from './schema.js';
+import { moveFromNew, recordSystemMove, statusOf } from './system-move.js';
+import { analyses, offerDrafts, opportunities, rawSignals } from './schema.js';
 
 const selection = {
   id: opportunities.id,
@@ -25,42 +25,6 @@ const waiting = and(
   isNotNull(opportunities.prefilterAt),
   isNull(opportunities.prefilterRule),
 );
-
-/** Moves the business status only while it is still `NEW` (D-17). */
-const moveFromNew = (status: string | null) =>
-  sql`CASE WHEN ${opportunities.businessStatus} = 'NEW' AND ${status} IS NOT NULL THEN ${status} ELSE ${opportunities.businessStatus} END`;
-
-type Tx = Parameters<Parameters<BetterSQLite3Database['transaction']>[0]>[0];
-
-/** The status before an update; the system event is written only when it was `NEW` (D-8). */
-const statusOf = (tx: Tx, id: number): string | undefined =>
-  tx
-    .select({ status: opportunities.businessStatus })
-    .from(opportunities)
-    .where(eq(opportunities.id, id))
-    .get()?.status;
-
-function recordSystemMove(
-  tx: Tx,
-  id: number,
-  before: string | undefined,
-  to: string | null,
-  cause: ActivityCause,
-  at: number,
-): void {
-  if (before !== 'NEW' || to === null) return;
-  tx.insert(activityEvents)
-    .values({
-      opportunityId: id,
-      type: 'STATUS_CHANGE',
-      actor: 'system',
-      fromStatus: before,
-      toStatus: to,
-      metadataJson: JSON.stringify(ActivityCause.parse(cause)),
-      occurredAt: at,
-    })
-    .run();
-}
 
 export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRepository {
   const joined = () =>

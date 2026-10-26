@@ -104,7 +104,12 @@ function base(row: OpportunityRow) {
     prefilter:
       row.prefilterAt === null
         ? null
-        : { rule: row.prefilterRule, matches: row.prefilterMatches ?? 0, language: row.language },
+        : {
+            rule: row.prefilterRule,
+            matches: row.prefilterMatches ?? 0,
+            language: row.language,
+            phrase: row.prefilterPhrase,
+          },
   };
 }
 

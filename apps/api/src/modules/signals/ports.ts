@@ -44,6 +44,8 @@ export interface SignalTx {
   insertSignal(signal: NewSignal): number;
   insertOpportunity(primarySignalId: number, at: number): number;
   insertEvidence(evidence: NewEvidence): void;
+  /** S-17 D-5: store a new opportunity as rejected by its source's filter (same transaction). */
+  rejectBySourceFilter(opportunityId: number, phrase: string | null, at: number): void;
 }
 
 export type PageFetchResult =

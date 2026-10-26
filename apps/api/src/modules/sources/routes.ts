@@ -85,7 +85,7 @@ export function registerSourceRoutes(
       },
     },
     async (request, reply) => {
-      const source = service.setEnabled(request.params.id, request.body.enabled);
+      const source = service.update(request.params.id, request.body);
       return source ? source : reply.code(404).send({ error: 'not_found' });
     },
   );

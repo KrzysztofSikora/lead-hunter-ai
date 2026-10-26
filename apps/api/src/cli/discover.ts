@@ -49,7 +49,7 @@ async function main(): Promise<number> {
         process.stdout.write(`${name}: błąd ${result.error?.reason ?? 'internal'}${status}\n`);
       } else {
         process.stdout.write(
-          `${name}: nowe ${result.new}, duplikaty ${result.duplicates}, pominięte ${result.failed}\n`,
+          `${name}: nowe ${result.new}, odrzucone przez filtr źródła ${result.filtered}, duplikaty ${result.duplicates}, pominięte ${result.failed}\n`,
         );
       }
     }

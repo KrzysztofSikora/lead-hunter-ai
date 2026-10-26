@@ -46,6 +46,8 @@ export const sources = sqliteTable(
     configKey: text('config_key').notNull().unique(),
     presetId: text('preset_id'),
     enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+    /** S-17 D-1: `SourceFilter` JSON; `NULL` reads as off and empty. */
+    filterJson: text('filter_json'),
     /** D-3: adapter-owned JSON, e.g. `{ seen: [...] }`. */
     cursorJson: text('cursor_json'),
     /** D-5: the earliest time the next attempt may start (UTC epoch ms). */
@@ -155,6 +157,8 @@ export const opportunities = sqliteTable(
     prefilterRule: text('prefilter_rule'),
     prefilterMatches: integer('prefilter_matches'),
     prefilterAt: integer('prefilter_at'),
+    /** S-17 D-5: the exclude phrase of a source-filter rejection; null for any other rule. */
+    prefilterPhrase: text('prefilter_phrase'),
     language: text('language'),
     analysisProvider: text('analysis_provider'),
     industry: text('industry'),
