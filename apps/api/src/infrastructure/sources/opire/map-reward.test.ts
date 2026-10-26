@@ -56,6 +56,13 @@ describe('mapReward (S-19 D-7, D-15)', () => {
       'https://github.com/a/b/pull/1',
       'https://github.com/a/b/issues/0',
       'https://github.com/a/b/issues/1/',
+      'https://github.com/../user/issues/1',
+      'https://github.com/a/../issues/1',
+      'https://github.com/a/./issues/1',
+      'https://github.com/%2e%2e/b/issues/1',
+      'https://github.com/a?x=/b/issues/1',
+      'https://github.com/a/b?/issues/1',
+      'https://github.com/a/b#/issues/1',
       'not a url',
     ]) {
       expect(mapReward(reward({ url }))).toBe('invalid');

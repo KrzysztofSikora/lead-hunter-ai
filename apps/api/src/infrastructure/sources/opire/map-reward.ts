@@ -1,7 +1,8 @@
 import type { BountyFacts } from '@lead-hunter/contracts';
 import { z } from 'zod';
 
-const ISSUE_URL = /^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/issues\/(\d{1,10})$/;
+const ISSUE_URL =
+  /^https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/(?!\.{1,2}\/)([A-Za-z0-9._-]{1,100})\/issues\/(\d{1,10})$/;
 const MAX_MINOR = 100_000_000_000;
 
 const Reward = z

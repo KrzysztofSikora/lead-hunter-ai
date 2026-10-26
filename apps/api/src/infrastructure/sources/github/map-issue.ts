@@ -3,7 +3,8 @@ import { z } from 'zod';
 import type { FeedItem } from '../../../modules/sources/ports.js';
 import { parseReward } from './reward.js';
 
-const ISSUE_URL = /^https:\/\/github\.com\/([^/\s]+)\/([^/\s]+)\/issues\/(\d{1,10})$/;
+const ISSUE_URL =
+  /^https:\/\/github\.com\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/(?!\.{1,2}\/)([A-Za-z0-9._-]{1,100})\/issues\/(\d{1,10})$/;
 
 const Label = z.union([z.string(), z.object({ name: z.string() }).passthrough()]);
 const Issue = z
