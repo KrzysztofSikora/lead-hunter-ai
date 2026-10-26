@@ -32,7 +32,7 @@ than building on it.
 | S-20 | #35 | analysis-observability | slice | FR-34 | S-05, S-12, S-16 | M | done |
 | S-18 | #32 | public-tenders | slice | FR-32 | S-17 | M | done |
 | S-19 | #33 | code-bounties | slice | FR-33, FR-27 (part) | S-17 | M | todo |
-| S-14 | #15 | insights | slice | FR-19 | S-08 | M | todo |
+| S-14 | #15 | insights | slice | FR-19 | S-08 | M | planned |
 | S-15 | #16 | data-ownership-backup | slice | FR-21, FR-22 | S-08 | M | todo |
 
 ## Items
