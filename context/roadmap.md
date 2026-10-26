@@ -4,7 +4,8 @@ Sources: `context/prd.md`, `context/tech-stack.md`. Order follows the brief (B-5
 vertical slice from a manually imported signal to a recorded payment (S-01…S-08), then automatic
 sources (S-09, S-10 RSS, then S-11 Useme e-mail: planned first, swapped back on 2026-10-25
 because S-11 waits for the operator's `.eml` samples), then the routine (S-12, S-13) and deployment (S-16); demand-only sources (S-17…S-19, added
-2026-10-25 because the first feeds brought mostly job offers, D-15) come next; insights (S-14) and data safety
+2026-10-25 because the first feeds brought mostly job offers, D-15) come next, with S-20 (analysis
+observability, issue #35, D-16) before S-18; insights (S-14) and data safety
 (S-15) come last. The Overview table is in execution order.
 Security that every route depends on (login) comes first, because retrofitting it is costlier
 than building on it.
@@ -28,6 +29,7 @@ than building on it.
 | S-13 | #14 | today-brief | slice | FR-16 | S-08, S-12 | M | done |
 | S-16 | #17 | pi-deployment | slice | FR-23, FR-26, NFR-01…NFR-04 | S-12, S-13 | M | done |
 | S-17 | #31 | demand-sources | slice | FR-04 AC2/AC6 (rev.), FR-31 | S-10, S-12 | M | todo |
+| S-20 | #35 | analysis-observability | slice | FR-34 | S-05, S-12, S-16 | M | todo |
 | S-18 | #32 | public-tenders | slice | FR-32 | S-17 | M | todo |
 | S-19 | #33 | code-bounties | slice | FR-33, FR-27 (part) | S-17 | M | todo |
 | S-14 | #15 | insights | slice | FR-19 | S-08 | M | todo |
@@ -314,6 +316,23 @@ than building on it.
     stored with an `enabled` flag; presets ship sensible defaults (HN: include
     "SEEKING FREELANCER"; Freelancer.com: none; Arduino: exclude "[FOR HIRE]", "looking for work").
     Rejections follow FR-07 AC1 (stored, reason shown, not analysed). (user)
+- Size: M
+
+### S-20 Analysis observability and cancellation (`analysis-observability`)
+- Goal: the operator sees from the phone what the analysis queue is doing, why it is slow, and
+  can cancel it without SSH (issue #35).
+- Covers: FR-34 AC1–AC6.
+- Depends on: S-05, S-12, S-16
+- Acceptance: FR-34 AC1–AC6; tests for state transitions, retry visibility, cancel and paused
+  queue, authorisation and redaction. Human check on the Pi with local Ollama: a running
+  analysis is visible, cancel stops the app's request and retries, the queue stays paused,
+  temperature and load show; evidence in the PR.
+- Unknowns: whether Ollama stops inference when the client closes the connection (`UNVERIFIED`,
+  shown honestly per AC4); where the Pi exposes temperature inside the container
+  (`/sys/class/thermal/...` mount).
+- Decided up front:
+  - Runs before S-18/S-19. (user, D-16)
+  - No token-level progress or ETA; elapsed time against the configured timeout only. (issue #35)
 - Size: M
 
 ### S-18 Public procurement sources (`public-tenders`)

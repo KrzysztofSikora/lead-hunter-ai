@@ -257,6 +257,15 @@ in the Sources view without losing the phrases.
 - AC1: Given configured GitHub search queries (default: open issues labelled bounty/paid, languages from the profile) and an optional token, When discovery runs, Then issues come from the official search API within its rate limits and the stated reward is stored as `sourceBudget` only when the issue states it.
 - AC2: Given the Opire source, When discovery runs, Then active rewards from Opire's public API become signals linking to the GitHub issue; closed issues are skipped.
 
+### FR-34 Analysis observability and cancellation  (Must, covers US-09, B-13, B-34, issue #35)
+The operator sees from the UI, without SSH, what the analysis queue is doing and can stop it.
+- AC1: Given analyses queued or running, When the operator opens the analysis activity view (reachable from the analysis status, readable on a phone), Then it shows queued, active and terminal entries with opportunity link, provider/model, stage, start time, elapsed time, configured timeout, attempt number and retry/backoff state, in bounded history; no token-level progress or completion estimate is shown.
+- AC2: Given a failed attempt, When it is listed, Then it shows a sanitised reason code (timeout, provider unavailable, invalid JSON, schema validation) with timestamp and opportunity link; never keys, session tokens, full source bodies or raw provider responses.
+- AC3: Given an active analysis, When the operator presses "Anuluj analizę", Then the active request and pending retries are aborted, the opportunity and source are kept, the outcome is recorded as cancelled (never as complete), and the queue stays paused until the operator resumes it.
+- AC4: Given a local OpenAI-compatible backend (Ollama), When an analysis is cancelled, Then the UI states that the backend may continue inference until it notices the closed connection, if that cannot be confirmed; the app never stops other model sessions or the Ollama service.
+- AC5: Given a host that exposes CPU temperature and load (Raspberry Pi), When the view is open, Then they are shown with units and measurement time; on hosts without them the view says "niedostępne", never zero.
+- AC6: Given the activity log, When it grows, Then retention is bounded (count and age) and only operator-authenticated requests can read it.
+
 ## Data model (conceptual)
 - **Operator profile** — the FR-01 fields; one record.
 - **Source** — type (manual, rss, imap, later github/search), name, enabled, configuration
@@ -357,6 +366,7 @@ the repo. The 30-day targets (§20) are an experiment, not acceptance criteria.
 | B-13 US-09 failure visibility, retry without duplicates | US-09 | FR-04, FR-18 | |
 | B-14 US-10 weekly channel effectiveness | US-10 | FR-19 | |
 | B-15 §4.1, §5.4 provenance, no guessing missing content | US-02 | FR-02, FR-06 | |
+| issue #35 analysis observability | US-09 | FR-34 | D-16 |
 | B-16 §5.1 source tiers | US-03 | FR-04, FR-05, FR-27, FR-28, FR-31, FR-32, FR-33 | D-01, D-03, D-05, D-15 |
 | B-17 §5.2 adapter contract and RawSignal fields | – | FR-04 | |
 | B-18 §5.3 queries per category, limit duplication | – | FR-04, FR-06 | |
