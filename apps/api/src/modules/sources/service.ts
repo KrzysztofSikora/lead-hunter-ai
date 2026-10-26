@@ -1,9 +1,13 @@
 import {
+  BzpConfig,
   SourceFilter,
+  TedConfig,
+  TenderFacts,
   type CreateSourceRequest,
   type Source,
   type SourceHealth,
   type SourceList,
+  type TenderSettings,
   type SourceRunResult,
   type UpdateSourceRequest,
 } from '@lead-hunter/contracts';
@@ -17,7 +21,9 @@ import type {
   AdapterOutcome,
   AttemptOutcome,
   RunContext,
+  FeedItem,
   SourceAdapter,
+  SourceAdapters,
   SourceRecord,
   SourceRepository,
 } from './ports.js';
@@ -27,13 +33,22 @@ export const CURSOR_MAX_KEYS = 500;
 /** D-21: the shortest gap between two checks of one source. */
 export const CHECK_COOLDOWN_MS = 60_000;
 
+/** S-18 D-9: how far back a run looks before its last success, and on a first run. */
+export const SINCE_OVERLAP_MS = 24 * 3_600_000;
+export const FIRST_RUN_LOOKBACK_MS = 3 * 24 * 3_600_000;
+
+/** Lesson: a date outside this range is a parse error, never stored. */
+const DATE_MIN = Date.UTC(2000, 0, 1);
+const DATE_MAX = Date.UTC(2100, 0, 1);
+
 /** A source's own wait is capped here, so a hostile `Retry-After` cannot lock it for years. */
 export const MAX_SOURCE_BACKOFF_MS = 7 * 24 * 3_600_000;
 
 export interface SourceDeps {
   repository: SourceRepository;
   signals: SignalRepository;
-  adapter: SourceAdapter;
+  /** S-18 D-1: one adapter per source type. */
+  adapters: SourceAdapters;
   clock: Clock;
   minIntervalMs: number;
   /** Called after a run stored new signals, so analysis starts without waiting for its timer. */
@@ -51,14 +66,23 @@ export type CreateOutcome =
   | { kind: 'unknown_preset' }
   | { kind: 'invalid'; issues: string[] };
 
+export type UpdateOutcome =
+  | { kind: 'updated'; source: Source }
+  | { kind: 'not_found' }
+  | { kind: 'not_tender_source' }
+  | { kind: 'invalid'; issues: string[] };
+
 export type RunOutcome = { kind: 'done'; result: SourceRunResult } | Refusal;
 export type CheckOutcome = { kind: 'done'; health: SourceHealth } | Refusal;
 
 export interface SourceService {
   list(): SourceList;
   create(request: CreateSourceRequest): CreateOutcome;
-  /** D-13: `filter` replaces the whole filter; it is validated before it is stored. */
-  update(id: number, patch: UpdateSourceRequest): Source | undefined;
+  /**
+   * D-13: `filter` replaces the whole filter; S-18 D-7: `tender` the tender config. Both are
+   * validated before they are stored.
+   */
+  update(id: number, patch: UpdateSourceRequest): UpdateOutcome;
   run(id: number, context?: RunContext): Promise<RunOutcome>;
   check(id: number): Promise<CheckOutcome>;
   /**
@@ -81,6 +105,47 @@ function parseConfigUrl(record: SourceRecord): string {
   }
 }
 
+function parseConfig(record: SourceRecord): Record<string, unknown> {
+  try {
+    const config: unknown = JSON.parse(record.configJson);
+    return typeof config === 'object' && config !== null ? (config as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** S-18 D-7: the editable part of a tender source's config; null for a feed. */
+function tenderSettings(record: SourceRecord): TenderSettings | null {
+  if (record.type === 'bzp') {
+    const parsed = BzpConfig.safeParse(parseConfig(record));
+    return parsed.success ? { cpvPrefixes: parsed.data.cpvPrefixes, countries: null } : null;
+  }
+  if (record.type === 'ted') {
+    const parsed = TedConfig.safeParse(parseConfig(record));
+    return parsed.success ? parsed.data : null;
+  }
+  return null;
+}
+
+/** S-18 D-2: facts are validated and bounded before they are stored; invalid ones are dropped. */
+function checkTender(item: FeedItem, warn: (field: string) => void): string | null {
+  if (item.tender === undefined) return null;
+  const inRange = (ms: number | null): ms is number =>
+    ms !== null && Number.isFinite(ms) && ms >= DATE_MIN && ms < DATE_MAX;
+  const facts = item.tender;
+  const deadline = facts.deadlineAt === null ? NaN : Date.parse(facts.deadlineAt);
+  const bounded = {
+    ...facts,
+    deadlineAt: inRange(Number.isNaN(deadline) ? null : deadline) ? facts.deadlineAt : null,
+  };
+  const parsed = TenderFacts.safeParse(bounded);
+  if (!parsed.success) {
+    warn(parsed.error.issues[0]?.path.join('.') || 'tender');
+    return null;
+  }
+  return JSON.stringify(parsed.data);
+}
+
 function readSeen(record: SourceRecord): string[] {
   if (record.cursorJson === null) return [];
   try {
@@ -96,7 +161,7 @@ function readSeen(record: SourceRecord): string[] {
 export function createSourceService({
   repository,
   signals,
-  adapter,
+  adapters,
   clock,
   minIntervalMs,
   onSignalCreated,
@@ -111,6 +176,7 @@ export function createSourceService({
       type: record.type,
       name: record.name,
       url: parseConfigUrl(record),
+      tender: tenderSettings(record),
       presetId: record.presetId,
       accessNote: preset?.accessNote ?? MANUAL_ACCESS_NOTE,
       termsUrl: preset?.termsUrl ?? null,
@@ -193,11 +259,20 @@ export function createSourceService({
     };
 
     try {
+      // An unknown stored type is a failure, never a silent skip (S-18 D-1).
+      const adapter = adapters[record.type] as SourceAdapter | undefined;
+      if (!adapter) return fail({ ok: false, reason: 'internal' });
       const config = JSON.parse(record.configJson) as unknown;
       const checked = adapter.validateConfig(config);
       if (!checked.ok) return fail({ ok: false, reason: 'internal' });
-      const outcome = await adapter.discover(checked.config);
+      // D-9: a window that overlaps the last success; the cursor drops what it already saw.
+      const since =
+        record.lastSuccessAt === null
+          ? startedAt - FIRST_RUN_LOOKBACK_MS
+          : record.lastSuccessAt - SINCE_OVERLAP_MS;
+      const outcome = await adapter.discover(checked.config, { since });
       if (!outcome.ok) return fail(outcome);
+      const truncated = outcome.truncated === true;
 
       const stored = readFilter(record.filterJson);
       if (stored.invalid) logger?.warn(`source ${id} ${logHost(record)}: source_filter_invalid`);
@@ -212,6 +287,9 @@ export function createSourceService({
           continue;
         }
         try {
+          const tenderJson = checkTender(item, (field) =>
+            logger?.warn(`source ${id} ${logHost(record)}: tender_invalid ${field}`),
+          );
           const snippet = normaliseSnippet(item.text);
           let canonicalUrl: string | null = null;
           if (item.url !== null) {
@@ -227,7 +305,7 @@ export function createSourceService({
             : ({ pass: true } as const);
           const result = signals.transaction((tx) => {
             const ingested = ingest(tx, {
-              sourceType: 'rss',
+              sourceType: record.type,
               sourceId: id,
               externalId: item.key,
               sourceUrl: item.url,
@@ -239,6 +317,7 @@ export function createSourceService({
               at,
               sourceFact: snippet !== '' ? snippet : (item.url ?? ''),
               jobRunId: runId,
+              tenderJson,
             });
             // D-4: only a new opportunity is rejected; a duplicate keeps whatever status it has.
             if (ingested.result === 'created' && !verdict.pass) {
@@ -262,7 +341,8 @@ export function createSourceService({
       repository.saveCursor(id, JSON.stringify({ seen: kept }));
 
       const finishedAt = clock.now().getTime();
-      const status = counts.failed > 0 ? 'partial' : 'ok';
+      if (truncated) logger?.warn(`source ${id} ${logHost(record)}: page_cap`);
+      const status = counts.failed > 0 || truncated ? 'partial' : 'ok';
       repository.finishRun(runId, { status, at: finishedAt, ...counts });
       repository.finishAttempt(id, { ok: true }, finishedAt);
       logger?.info(
@@ -295,10 +375,12 @@ export function createSourceService({
 
     let outcome: AdapterOutcome;
     try {
-      const checked = adapter.validateConfig(JSON.parse(record.configJson) as unknown);
-      outcome = checked.ok
-        ? await adapter.healthCheck(checked.config)
-        : { ok: false, reason: 'internal' };
+      const adapter = adapters[record.type] as SourceAdapter | undefined;
+      const checked = adapter?.validateConfig(JSON.parse(record.configJson) as unknown);
+      outcome =
+        adapter && checked?.ok
+          ? await adapter.healthCheck(checked.config)
+          : { ok: false, reason: 'internal' };
     } catch {
       outcome = { ok: false, reason: 'internal' };
     }
@@ -346,9 +428,10 @@ export function createSourceService({
       } else {
         ({ name, url } = request);
       }
-      const checked = adapter.validateConfig({ url });
+      const checked = adapters.rss.validateConfig({ url });
       if (!checked.ok) return { kind: 'invalid', issues: checked.issues };
       const inserted = repository.insert({
+        type: 'rss',
         name,
         configJson: JSON.stringify(checked.config),
         configKey: checked.key,
@@ -360,17 +443,38 @@ export function createSourceService({
     },
 
     update(id, patch) {
+      const record = repository.get(id);
+      if (!record) return { kind: 'not_found' };
       // Lesson: validate before storing, not only on read.
       const filter = patch.filter === undefined ? undefined : SourceFilter.parse(patch.filter);
+      let configJson: string | undefined;
+      if (patch.tender !== undefined) {
+        if (record.type === 'rss') return { kind: 'not_tender_source' };
+        const checked =
+          record.type === 'bzp'
+            ? BzpConfig.safeParse({
+                cpvPrefixes: patch.tender.cpvPrefixes,
+                ...(patch.tender.countries ? { countries: patch.tender.countries } : {}),
+              })
+            : TedConfig.safeParse({
+                cpvPrefixes: patch.tender.cpvPrefixes,
+                countries: patch.tender.countries ?? tenderSettings(record)?.countries,
+              });
+        if (!checked.success) {
+          return { kind: 'invalid', issues: checked.error.issues.map((issue) => issue.message) };
+        }
+        configJson = JSON.stringify({ ...parseConfig(record), ...checked.data });
+      }
       const updated = repository.update(
         id,
         {
           ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
           ...(filter === undefined ? {} : { filterJson: JSON.stringify(filter) }),
+          ...(configJson === undefined ? {} : { configJson }),
         },
         clock.now().getTime(),
       );
-      return updated ? toSource(updated) : undefined;
+      return updated ? { kind: 'updated', source: toSource(updated) } : { kind: 'not_found' };
     },
 
     run,

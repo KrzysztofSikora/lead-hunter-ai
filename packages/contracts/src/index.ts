@@ -62,6 +62,7 @@ export {
   SourceFailureReason,
   SourcesStatus,
   SourceType,
+  TenderFacts,
 } from './opportunities.js';
 export type { ImportRequest } from './opportunities.js';
 export {
@@ -86,14 +87,18 @@ export {
   PipelineResponse,
 } from './pipeline.js';
 export {
+  BzpConfig,
   CreateSourceRequest,
   RssConfig,
   Source,
   SourceFilter,
+  SourceKind,
   SourceHealth,
   SourceList,
   SourcePreset,
   SourceRunResult,
+  TedConfig,
+  TenderSettings,
   UpdateSourceRequest,
 } from './sources.js';
 export {

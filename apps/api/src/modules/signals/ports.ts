@@ -18,6 +18,8 @@ export interface NewSignal {
   availability: Availability;
   lastVerifiedAt: number | null;
   jobRunId?: number | null;
+  /** S-18 D-2: validated `TenderFacts` JSON; null for everything but a tender notice. */
+  tenderJson?: string | null;
 }
 
 export interface NewEvidence {

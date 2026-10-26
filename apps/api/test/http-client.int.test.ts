@@ -286,3 +286,79 @@ describe('guarded HTTP client (TR-03, FR-03 AC2/AC4)', () => {
     expect(connections).toBe(0);
   });
 });
+
+describe('guarded HTTP client, POST and per-request limit (S-18 D-11, D-20)', () => {
+  const post = (client: ReturnType<typeof createHttpClient>, url: string, extra = {}) =>
+    client.post(url, {
+      signal: AbortSignal.timeout(5000),
+      accept: 'application/json',
+      contentType: 'application/json',
+      body: '{"query":"cpv=72*"}',
+      ...extra,
+    });
+
+  it('sends the body, the content type and the user agent', async () => {
+    let seen: { method?: string; type?: string; ua?: string; body: string } = { body: '' };
+    handler = (req, res) => {
+      const chunks: Buffer[] = [];
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => {
+        seen = {
+          ...(req.method === undefined ? {} : { method: req.method }),
+          type: req.headers['content-type'],
+          ua: req.headers['user-agent'],
+          body: Buffer.concat(chunks).toString(),
+        };
+        res.end('{"ok":true}');
+      });
+    };
+    const response = await post(permissiveClient(), `http://ok.test:${port}/search`);
+    expect(response.status).toBe(200);
+    expect(Buffer.from(response.body).toString()).toBe('{"ok":true}');
+    expect(seen).toEqual({
+      method: 'POST',
+      type: 'application/json',
+      ua: UA,
+      body: '{"query":"cpv=72*"}',
+    });
+  });
+
+  it('does not follow a redirect: the 3xx comes back as a status', async () => {
+    let followed = false;
+    handler = (req, res) => {
+      if (req.url === '/moved') {
+        res.writeHead(302, { location: '/elsewhere' });
+        res.end();
+      } else {
+        followed = true;
+        res.end('x');
+      }
+    };
+    const response = await post(permissiveClient(), `http://ok.test:${port}/moved`);
+    expect(response.status).toBe(302);
+    expect(followed).toBe(false);
+  });
+
+  it('refuses a blocked address without opening a connection', async () => {
+    const client = createHttpClient({ userAgent: UA, maxBytes: 1024 });
+    expect(await reasonOf(post(client, `http://127.0.0.1:${port}/`))).toBe('blocked_address');
+    const privateClient = createHttpClient({
+      userAgent: UA,
+      maxBytes: 1024,
+      resolve: privateResolver as never,
+    });
+    expect(await reasonOf(post(privateClient, `http://ok.test:${port}/`))).toBe('blocked_address');
+    expect(connections).toBe(0);
+  });
+
+  it('applies the client limit, or the request limit when one is given', async () => {
+    handler = (_req, res) => res.end('x'.repeat(2000));
+    const client = permissiveClient({ maxBytes: 1024 });
+    expect(await reasonOf(post(client, `http://ok.test:${port}/`))).toBe('too_large');
+    const raised = await post(client, `http://ok.test:${port}/`, { maxBytes: 4096 });
+    expect(raised.body.length).toBe(2000);
+    expect(await reasonOf(get(client, `http://ok.test:${port}/`))).toBe('too_large');
+    const got = await get(client, `http://ok.test:${port}/`, 5000, { maxBytes: 4096 });
+    expect(got.body.length).toBe(2000);
+  });
+});

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import type { SourceType } from '@lead-hunter/contracts';
 import { describe, expect, it } from 'vitest';
 import { profile } from '../../../test/helpers/analysis.js';
 import { detectLanguage, prefilter } from './prefilter.js';
@@ -11,7 +12,7 @@ const options = { now, maxAgeDays: 30 };
 const run = (
   text: string,
   overrides: Parameters<typeof profile>[0] = {},
-  signal: { sourceType?: 'manual_text' | 'manual_url'; publishedAt?: number | null } = {},
+  signal: { sourceType?: SourceType; publishedAt?: number | null } = {},
 ) =>
   prefilter(
     {
@@ -71,6 +72,17 @@ describe('prefilter rules (D-6)', () => {
 
   it('does not apply no_profile_match to manual imports', () => {
     expect(run('DEMO: someone needs a cake').rule).toBeNull();
+  });
+
+  it('exempts tender notices from no_profile_match, and nothing else (S-18 D-13)', () => {
+    const text = 'DEMO: Dostawa i wdrożenie systemu dziedzinowego dla urzędu';
+    expect(run(text, {}, { sourceType: 'bzp' }).rule).toBeNull();
+    expect(run(text, {}, { sourceType: 'ted' }).rule).toBeNull();
+    expect(run(text, {}, { sourceType: 'rss' }).rule).toBe('no_profile_match');
+    expect(run('SEEKING WORK: clerk, DEMO', {}, { sourceType: 'bzp' }).rule).toBe('seeking_work');
+    expect(
+      run('DEMO: usługa w PHP', { excludedTechnologies: ['PHP'] }, { sourceType: 'ted' }).rule,
+    ).toBe('excluded_technology');
   });
 
   it('counts distinct profile terms as matches', () => {

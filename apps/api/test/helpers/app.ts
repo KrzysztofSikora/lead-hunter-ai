@@ -36,6 +36,7 @@ import { getGlobalDispatcher } from 'undici';
 import { createHttpClient } from '../../src/infrastructure/sources/http/client.js';
 import { createPageFetcher } from '../../src/infrastructure/sources/manual/page-fetcher.js';
 import { createRobotsCheck } from '../../src/infrastructure/sources/manual/robots.js';
+import type { SourceAdapters } from '../../src/modules/sources/ports.js';
 import { createSourceRuntime } from '../../src/infrastructure/sources/compose.js';
 import type { JobLock } from '../../src/modules/jobs/ports.js';
 import type { JobsService } from '../../src/modules/jobs/service.js';
@@ -103,6 +104,8 @@ export async function buildTestApp(
     /** Another identity or staleness for the job lock (S-12). */
     jobLock?: Partial<Omit<JobLockOptions, 'db' | 'clock'>>;
     heartbeatMs?: number;
+    /** Adapters that replace the real ones, by source type (S-18). */
+    adapters?: Partial<SourceAdapters>;
   } = {},
 ): Promise<{
   app: FastifyInstance;
@@ -154,6 +157,7 @@ export async function buildTestApp(
     http,
     clock,
     sleep: async () => undefined,
+    ...(options.adapters ? { adapters: options.adapters } : {}),
     ...(options.jobLock ? { jobLock: options.jobLock } : {}),
     ...(options.heartbeatMs === undefined ? {} : { heartbeatMs: options.heartbeatMs }),
     ...(options.autoKick ? { onSignalCreated: () => runner.kick() } : {}),

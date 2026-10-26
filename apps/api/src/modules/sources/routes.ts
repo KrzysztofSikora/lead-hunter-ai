@@ -21,6 +21,7 @@ const Refused = z.union([
   z.object({ error: z.literal('disabled') }).strict(),
 ]);
 const CreateRefused = z.object({ error: z.literal('exists') }).strict();
+const NotTenderSource = z.object({ error: z.literal('not_tender_source') }).strict();
 const BadPreset = z.object({ error: z.literal('unknown_preset') }).strict();
 
 function refusal(refused: Refusal) {
@@ -81,12 +82,28 @@ export function registerSourceRoutes(
       schema: {
         params: IdParams,
         body: UpdateSourceRequest,
-        response: { 200: Source, 404: NotFound },
+        response: { 200: Source, 400: z.union([ValidationError, NotTenderSource]), 404: NotFound },
       },
     },
     async (request, reply) => {
-      const source = service.update(request.params.id, request.body);
-      return source ? source : reply.code(404).send({ error: 'not_found' });
+      const outcome = service.update(request.params.id, request.body);
+      switch (outcome.kind) {
+        case 'updated':
+          return outcome.source;
+        case 'not_found':
+          return reply.code(404).send({ error: 'not_found' });
+        case 'not_tender_source':
+          return reply.code(400).send({ error: 'not_tender_source' });
+        case 'invalid':
+          return reply.code(400).send({
+            error: 'validation_failed',
+            fields: outcome.issues.map((message) => ({
+              path: 'tender',
+              code: 'invalid',
+              message,
+            })),
+          });
+      }
     },
   );
 

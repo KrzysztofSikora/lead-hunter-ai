@@ -417,7 +417,7 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Source types, tender facts storage and the POST client
+- [x] Phase 1: Source types, tender facts storage and the POST client
 - [ ] Phase 2: e-Zamówienia BZP adapter (checkpoint)
 - [ ] Phase 3: TED search adapter
 - [ ] Phase 4: Public-tender classification and the card
@@ -428,6 +428,14 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] (Phase 1) Plan says `Source.tender` is `{ cpvPrefixes, countries } | null`; code adds a named
+  `TenderSettings` schema (and `BzpConfig`/`TedConfig`) in `packages/contracts/src/sources.ts`.
+  Same shape, now reusable by the web editor. `SourceService.update` returns a tagged outcome
+  (`updated`, `not_found`, `not_tender_source`, `invalid`) instead of `Source | undefined`, because
+  the route needs the 400 cases; a `tender` patch with bad values answers 400 `validation_failed`.
+- [minor] (Phase 1) `createSourceRuntime` and `buildTestApp` take an `adapters` override (by source
+  type) so integration tests register a fake tender adapter; the `bzp`/`ted` entries of the real
+  registry arrive with Phases 2-3. `EvidenceLevel` stays unchanged until Phase 4, as the phase list says.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

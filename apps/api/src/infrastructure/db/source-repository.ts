@@ -1,4 +1,4 @@
-import type { SourceFailureReason } from '@lead-hunter/contracts';
+import type { SourceFailureReason, SourceKind } from '@lead-hunter/contracts';
 import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type { ClaimResult, SourceRecord, SourceRepository } from '../../modules/sources/ports.js';
@@ -9,7 +9,7 @@ type Row = typeof sources.$inferSelect;
 function toRecord(row: Row): SourceRecord {
   return {
     id: row.id,
-    type: 'rss',
+    type: row.type as SourceKind,
     name: row.name,
     configJson: row.configJson,
     configKey: row.configKey,
@@ -54,7 +54,7 @@ export function createSourceRepository(db: BetterSQLite3Database): SourceReposit
       const row = db
         .insert(sources)
         .values({
-          type: 'rss',
+          type: source.type,
           name: source.name,
           configJson: source.configJson,
           configKey: source.configKey,
@@ -75,6 +75,7 @@ export function createSourceRepository(db: BetterSQLite3Database): SourceReposit
         .set({
           ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
           ...(patch.filterJson === undefined ? {} : { filterJson: patch.filterJson }),
+          ...(patch.configJson === undefined ? {} : { configJson: patch.configJson }),
           updatedAt: at,
         })
         .where(eq(sources.id, id))

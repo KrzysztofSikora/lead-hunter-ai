@@ -95,6 +95,7 @@ const detail = (overrides: Partial<OpportunityDetail>): OpportunityDetail => ({
     fetchedAt: NOW,
     availability: 'NOT_CHECKED',
     lastVerifiedAt: null,
+    tender: null,
     snippet: 'DEMO text',
   },
   evidence: [],

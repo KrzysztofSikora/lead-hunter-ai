@@ -5,6 +5,7 @@ import {
   OpportunityAnalysis,
   checkMove,
   ScoreBreakdown,
+  TenderFacts,
   upgradeStoredAnalysis,
   type FollowUpRequest,
   type NoteRequest,
@@ -60,6 +61,17 @@ const EXCERPT_CHARS = 280;
 const iso = (ms: number): string => new Date(ms).toISOString();
 const isoOrNull = (ms: number | null): string | null => (ms === null ? null : iso(ms));
 
+/** S-18 D-2: stored facts are parsed on read; invalid ones read as absent. */
+function tenderOf(row: OpportunityRow): TenderFacts | null {
+  if (row.tenderJson === null) return null;
+  try {
+    const parsed = TenderFacts.safeParse(JSON.parse(row.tenderJson));
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
 function sourceFacts(row: OpportunityRow) {
   return {
     type: row.sourceType,
@@ -71,6 +83,7 @@ function sourceFacts(row: OpportunityRow) {
     fetchedAt: iso(row.fetchedAt),
     availability: row.availability,
     lastVerifiedAt: isoOrNull(row.lastVerifiedAt),
+    tender: tenderOf(row),
   };
 }
 

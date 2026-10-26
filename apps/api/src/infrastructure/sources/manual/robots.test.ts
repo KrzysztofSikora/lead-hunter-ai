@@ -19,6 +19,7 @@ function setup(answer: () => HttpResponse | Error) {
       if (result instanceof Error) throw result;
       return result;
     },
+    post: () => Promise.reject(new Error('robots.txt is only ever fetched with GET')),
   };
   const robots = createRobotsCheck({
     http,

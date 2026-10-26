@@ -6,6 +6,7 @@ import { createJobsService } from '../../modules/jobs/service.js';
 import type { JobLock } from '../../modules/jobs/ports.js';
 import type { SourceStatusReader } from '../../modules/opportunities/ports.js';
 import type { Clock } from '../../modules/shared/clock.js';
+import type { SourceAdapters } from '../../modules/sources/ports.js';
 import { createSourceService, type SourceService } from '../../modules/sources/service.js';
 import { createJobRunRepository } from '../db/job-run-repository.js';
 import { createSignalRepository } from '../db/signal-repository.js';
@@ -30,6 +31,8 @@ export interface SourceRuntimeDeps {
   /** Tests: another identity or a shorter staleness for the job lock. */
   jobLock?: Partial<Omit<JobLockOptions, 'db' | 'clock'>>;
   heartbeatMs?: number;
+  /** Tests: adapters that replace the real ones, by source type (S-18). */
+  adapters?: Partial<SourceAdapters>;
 }
 
 /** The one place the sources module meets its infrastructure; server, CLI and tests call it. */
@@ -43,13 +46,14 @@ export function createSourceRuntime({
   sleep,
   jobLock,
   heartbeatMs,
+  adapters: overrides,
 }: SourceRuntimeDeps): {
   service: SourceService;
   statusReader: SourceStatusReader;
   jobs: JobsService;
   lock: JobLock;
 } {
-  const adapter = createRssAdapter({
+  const rss = createRssAdapter({
     http,
     robots: createRobotsCheck({ http, userAgentToken: 'LeadHunterAI', clock }),
     clock,
@@ -61,7 +65,9 @@ export function createSourceRuntime({
   const service = createSourceService({
     repository: createSourceRepository(db),
     signals: createSignalRepository(db),
-    adapter,
+    // bzp and ted join the registry with their adapters (S-18 Phases 2-3); until then a stored
+    // tender source fails with `internal`.
+    adapters: { rss, ...overrides } as SourceAdapters,
     clock,
     minIntervalMs: config.sourceMinIntervalMinutes * 60_000,
     ...(onSignalCreated ? { onSignalCreated } : {}),

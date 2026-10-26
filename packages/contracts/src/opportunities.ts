@@ -10,7 +10,14 @@ export { Category, Confidence, EvidenceLevel };
 export const DEFAULT_IMPORT_MAX_TEXT_CHARS = 20_000;
 
 /** S-11 adds `imap`. `manual_fetch`: the text came from a one-off page fetch. */
-export const SourceType = z.enum(['manual_text', 'manual_url', 'manual_fetch', 'rss']);
+export const SourceType = z.enum([
+  'manual_text',
+  'manual_url',
+  'manual_fetch',
+  'rss',
+  'bzp',
+  'ted',
+]);
 export type SourceType = z.infer<typeof SourceType>;
 
 /** Brief §10.1. */
@@ -120,6 +127,32 @@ export type ImportResult = z.infer<typeof ImportResult>;
 
 const isoInstant = z.iso.datetime();
 
+const TENDER_MINOR_MAX = 100_000_000_000;
+
+/** S-18 D-2: what a tender notice states about itself; source facts, never inferred. */
+export const TenderFacts = z
+  .object({
+    noticeId: z.string().min(1).max(100),
+    buyer: z.string().min(1).max(300).nullable(),
+    deadlineAt: isoInstant.nullable(),
+    estimatedValue: z
+      .object({
+        amountMinor: z.number().int().min(0).max(TENDER_MINOR_MAX),
+        currency: Currency,
+        quote: z.string().min(1).max(500),
+      })
+      .strict()
+      .nullable(),
+    cpvCodes: z.array(z.string().regex(/^\d{8}(-\d)?$/)).max(20),
+    procedure: z.string().min(1).max(120).nullable(),
+    country: z
+      .string()
+      .regex(/^[A-Z]{2}$/)
+      .nullable(),
+  })
+  .strict();
+export type TenderFacts = z.infer<typeof TenderFacts>;
+
 /** D-8: what the source said. Nothing here is inferred. */
 export const SourceFacts = z
   .object({
@@ -135,6 +168,8 @@ export const SourceFacts = z
     fetchedAt: isoInstant,
     availability: Availability,
     lastVerifiedAt: isoInstant.nullable(),
+    /** S-18 D-15: null for everything but a tender notice. */
+    tender: TenderFacts.nullable(),
   })
   .strict();
 export type SourceFacts = z.infer<typeof SourceFacts>;

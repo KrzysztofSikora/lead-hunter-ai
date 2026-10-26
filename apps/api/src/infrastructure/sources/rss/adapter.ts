@@ -33,7 +33,7 @@ export function createRssAdapter({
   maxAttempts,
   maxTextChars,
   sleep = defaultSleep,
-}: RssAdapterDeps): SourceAdapter {
+}: RssAdapterDeps): SourceAdapter<RssConfig> {
   async function fetchAndParse(config: RssConfig): Promise<AdapterOutcome> {
     for (let attempt = 1; ; attempt += 1) {
       // D-8: robots.txt, every hop and the body share this attempt's deadline.
