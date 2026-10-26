@@ -5,6 +5,7 @@ import {
   SourceRunResult,
   ValidationError,
   type CreateSourceRequest,
+  type GithubSearchConfig,
   type UpdateSourceRequest,
 } from '@lead-hunter/contracts';
 import { apiFetch } from './client.js';
@@ -52,6 +53,29 @@ export async function updateSource(id: number, patch: UpdateSourceRequest): Prom
   });
   if (!response.ok) throw new Error(`update source failed: ${response.status}`);
   return Source.parse(await response.json());
+}
+
+export type GithubSaveOutcome =
+  Done<Source> | { ok: false; refused: 'invalid'; messages: string[] };
+
+/** S-19 D-11: a 400 carries the server's issues, which the editor shows as they are. */
+export async function updateGithub(
+  id: number,
+  github: GithubSearchConfig,
+): Promise<GithubSaveOutcome> {
+  const response = await apiFetch(`/api/sources/${id}`, {
+    method: 'PATCH',
+    headers: json,
+    body: JSON.stringify({ github }),
+  });
+  if (response.ok) return { ok: true, value: Source.parse(await response.json()) };
+  if (response.status === 400) {
+    const parsed = ValidationError.safeParse(await response.json().catch(() => null));
+    if (parsed.success) {
+      return { ok: false, refused: 'invalid', messages: parsed.data.fields.map((f) => f.message) };
+    }
+  }
+  throw new Error(`update github failed: ${response.status}`);
 }
 
 async function act<T>(

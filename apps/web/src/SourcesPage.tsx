@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import type {
   JobList,
   JobRun,
+  GithubSearchConfig,
   Source,
   SourceFilter,
   SourceList,
@@ -13,6 +14,7 @@ import {
   createSource,
   listSources,
   runSource,
+  updateGithub,
   updateSource,
   type CreateOutcome,
   type Outcome,
@@ -138,6 +140,72 @@ function FilterEditor({ source, onChanged }: { source: Source; onChanged: () => 
   );
 }
 
+/** S-19 D-11: labels and languages of a GitHub source, saved with the button. */
+function GithubEditor({ source, onChanged }: { source: Source; onChanged: () => void }) {
+  const g = t.github;
+  const config = source.github;
+  const [labels, setLabels] = useState(config?.labels.join('\n') ?? '');
+  const [languages, setLanguages] = useState(config?.languages.join('\n') ?? '');
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState<Message | null>(null);
+  if (!config) return null;
+
+  async function save() {
+    setPending(true);
+    setMessage(null);
+    try {
+      const outcome = await updateGithub(source.id, {
+        labels: toPhrases(labels),
+        // The server checks the names against its list; a typo comes back as a 400.
+        languages: toPhrases(languages) as GithubSearchConfig['languages'],
+      });
+      if (outcome.ok) {
+        setLabels(outcome.value.github?.labels.join('\n') ?? '');
+        setLanguages(outcome.value.github?.languages.join('\n') ?? '');
+        setMessage({ kind: 'ok', text: g.saved });
+        onChanged();
+      } else {
+        setMessage({ kind: 'error', text: `${g.invalid} ${outcome.messages.join(' ')}`.trim() });
+      }
+    } catch {
+      setMessage({ kind: 'error', text: g.saveFailed });
+    }
+    setPending(false);
+  }
+
+  return (
+    <fieldset className={styles.filter}>
+      <legend>{g.title}</legend>
+      <div className={styles.field}>
+        <label htmlFor={`labels-${source.id}`}>{g.labelsLabel}</label>
+        <textarea
+          id={`labels-${source.id}`}
+          rows={3}
+          value={labels}
+          onChange={(event) => setLabels(event.target.value)}
+        />
+      </div>
+      <div className={styles.field}>
+        <label htmlFor={`languages-${source.id}`}>{g.languagesLabel}</label>
+        <textarea
+          id={`languages-${source.id}`}
+          rows={3}
+          value={languages}
+          onChange={(event) => setLanguages(event.target.value)}
+        />
+      </div>
+      <button type="button" disabled={pending} onClick={save}>
+        {pending ? g.saving : g.save}
+      </button>
+      {message && (
+        <p role="status" className={message.kind === 'ok' ? styles.ok : styles.error}>
+          {message.text}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
 function SourceItem({ source, onChanged }: { source: Source; onChanged: () => void }) {
   const [pending, setPending] = useState<'run' | 'check' | 'toggle' | null>(null);
   const [message, setMessage] = useState<Message | null>(null);
@@ -217,6 +285,12 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
             </>
           )}
         </dd>
+        {source.type !== 'rss' && (
+          <>
+            <dt>{t.endpoint}</dt>
+            <dd>{source.url}</dd>
+          </>
+        )}
         <dt>{t.enabled}</dt>
         <dd>{source.enabled ? 'tak' : 'nie'}</dd>
         <dt>{t.health}</dt>
@@ -240,6 +314,7 @@ function SourceItem({ source, onChanged }: { source: Source; onChanged: () => vo
           </>
         )}
       </dl>
+      {source.github && <GithubEditor source={source} onChanged={onChanged} />}
       <FilterEditor source={source} onChanged={onChanged} />
       <div className={styles.actions}>
         <button type="button" disabled={busy || !source.enabled} onClick={() => perform('run')}>

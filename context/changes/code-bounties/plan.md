@@ -447,13 +447,15 @@ guard (D-10).
 - [x] Phase 2: Reward parsing and the bounty guard rules
 - [x] Phase 3: GitHub search adapter and preset
 - [x] Phase 4: Opire adapter and preset
-- [ ] Phase 5: Sources view editor, source policy and test plan
+- [x] Phase 5: Sources view editor, source policy and test plan
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 3) One real run of the GitHub preset without a token: record the run result and the request count, and compare one signal with its issue page — run: add the preset in the Sources view, enable only it, `pnpm discover` — evidence: none (the sandbox proxy refuses api.github.com); save to `evidence/github-run.txt` without token or personal data
 - [ ] (Phase 3) Then one run with a read-only, public-data `GITHUB_TOKEN` in `.env`: check that no 403 occurs and that the response fits the size limit — run: `pnpm discover` — evidence: none (same file)
 - [ ] (Phase 4) One real run of the Opire preset: record the real response shape against `map-reward.ts` (field names, envelope, unit), the counts of open, closed and skipped rewards, and one signal compared with its issue; replace the synthetic fixture with a trimmed real one if the shape differs — run: add the preset in the Sources view, enable only it, `pnpm discover` — evidence: none (the sandbox proxy refuses api.opire.dev); save to `evidence/opire-run.txt`
+- [ ] (Phase 5) Sources view at phone width: add both presets, change the GitHub languages to `TypeScript` only and save; judge the wording of the editor and the access notes — run: `docker compose up --build`, Sources view at 360 px — evidence: none (no browser session in this run); save screenshot to `evidence/sources-editor.png`
+- [ ] (Phase 5) Read the GitHub and Opire entries in `docs/source-policy.md` against their current terms, then tick or correct each `DO WERYFIKACJI` item (Opire response shape, unit and terms; GitHub terms) — run: open the two terms pages — evidence: none
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -470,6 +472,9 @@ guard (D-10).
 - [minor] Phase 4: rewards already in the cursor are left out of the outcome (not returned as items), so the second run's `fetched` counts only unseen and skipped rewards; no GitHub check is made for them.
 - [minor] Phase 4: a failed check that is neither 404/410 nor rate-limited (e.g. 500) counts as `skipped` and is not remembered, so the run is `partial` and the reward is checked again next run. A `rate_limited` check fails the whole run (D-8), dropping items found before it; they come back next run because nothing was remembered.
 - [minor] Phase 4: the Opire list request maps 429 to `rate_limited` and other non-2xx to `http_status`, without the GitHub helper's backoff (one request per run).
+- [REVIEW] Phase 5: `pnpm docker:build` and `pnpm docker:smoke` could not run (no Docker in the sandbox). Phase 5 changes no Dockerfile, compose file or API route; CI's `image` job is the gate for them.
+- [minor] Phase 5: the test plan already used TR-26/TR-27/TR-28, so the API-shape-drift row is TR-29. The plan's "reward.ts" mutation target is added as a third module; `pnpm mutation` was not run (not part of this phase's checks).
+- [minor] Phase 5: `SourcesPage.test.tsx` is a component test although the test plan's cookbook says not to add them; the phase's Files list asks for it explicitly, and the editor's request shape and 400 display have no other automated cover.
 - [FOLLOW-UP] Re-check stored bounty signals when their issue closes, and enrich a stored
   duplicate with a reward that a later source states (D-12 B).
 - [FOLLOW-UP] Read issue comments for bot-stated amounts (Algora), within the core rate limit.

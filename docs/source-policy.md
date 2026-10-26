@@ -65,6 +65,44 @@ ręczną kontrolę (patrz `context/changes/rss-sources/plan.md`, *Human checks*)
 - **Limity:** wspólne reguły wyżej. Domyślny filtr źródła odrzuca wpisy zawierające `[FOR HIRE]`
   lub `looking for work`.
 
+### GitHub: wyszukiwanie zgłoszeń z nagrodą (`github-bounties`)
+- **Dostęp:** oficjalne API `GET https://api.github.com/search/issues`. Zapytanie składa się
+  tylko ze skonfigurowanych etykiet (domyślnie `bounty`, `paid`, `💎 Bounty`) i języków
+  (z profilu, najwyżej 5; jedno zapytanie na język): `is:issue is:open archived:false`, strona 1,
+  `per_page=30`, od najnowszych. Operator zmienia etykiety i języki w widoku Źródła.
+- **Regulamin:** <https://docs.github.com/en/site-policy/github-terms/github-terms-of-service>
+  i zasady API. `DO WERYFIKACJI` przez operatora względem aktualnych stron.
+- **Limity:** 10 zapytań wyszukiwania na minutę bez tokenu, 30 z tokenem; odstęp między
+  zapytaniami przebiegu pilnuje tego limitu. Limit (także wtórny) kończy się jawnym błędem
+  `rate_limited`, nigdy „brak wyników".
+- **Token:** `GITHUB_TOKEN` w `.env` jest opcjonalny. Tylko do odczytu, tylko dane publiczne
+  (bez zakresów, token klasyczny lub szczegółowy bez uprawnień). Nigdy w logach, odpowiedziach
+  API, bazie ani w zapytaniu do innego hosta. Bez tokenu adapter działa anonimowo.
+- **robots.txt:** nie sprawdzany. Dostęp idzie przez udokumentowane API, a `robots.txt` hosta API
+  wyklucza roboty z całego hosta, więc kontrola zablokowałaby oficjalne API (S-19 D-13).
+- **Zapisujemy:** adres zgłoszenia (`html_url`), tytuł, skrócony tekst, datę utworzenia, czas
+  pobrania, skrót treści oraz fakt nagrody (kwota i waluta w jednostkach groszowych), jeśli
+  etykieta, tytuł lub linia nagrody w treści ją podaje. Bez autora i bez komentarzy. Bez
+  podanej kwoty `sourceBudget` zostaje pusty.
+- **Nakładanie się:** to samo zgłoszenie z GitHub i z Opire ma ten sam adres kanoniczny, więc
+  drugie źródło dodaje tylko `REPEAT_IMPORT`. Wygrywa źródło, które zobaczyło je pierwsze,
+  razem z jego faktem nagrody (S-19 D-12).
+
+### Opire: nagrody za zgłoszenia (`opire-rewards`)
+- **Dostęp:** publiczne API `https://api.opire.dev/rewards` (aktywne nagrody), potem dla każdej
+  nowej nagrody jedno zapytanie do API GitHub o zgłoszenie (najwyżej 20 na przebieg, odstęp 1 s;
+  60 zapytań na godzinę bez tokenu). Nagroda ze zgłoszeniem zamkniętym lub brakującym jest
+  pomijana, liczona i logowana, nie jest błędem. Zapytanie do Opire nigdy nie niesie tokenu GitHub.
+- **Regulamin:** <https://opire.dev>. `DO WERYFIKACJI` przez operatora: czy regulamin dopuszcza
+  automatyczny odczyt API oraz czy kształt odpowiedzi i jednostka kwoty zgadzają się z
+  `map-reward.ts` (opis pochodzi z materiałów osób trzecich). Jeśli odczyt jest zabroniony,
+  preset zostaje wycofany (znacznik „preset wycofany").
+- **Limity:** `FETCH_TIMEOUT_MS`, `FETCH_MAX_BYTES`, wspólny odstęp między przebiegami źródła.
+- **Token:** jak wyżej (opcjonalny `GITHUB_TOKEN`, tylko odczyt, dane publiczne).
+- **robots.txt:** nie sprawdzany (publiczne API platformy; S-19 D-13).
+- **Zapisujemy:** adres zgłoszenia GitHub, tytuł, skrócony tekst, datę utworzenia zgłoszenia,
+  kwotę nagrody jako fakt nagrody. Nakładanie się z GitHub: jak wyżej.
+
 ### RSS: kanał dodany ręcznie
 - **Dostęp:** dowolny adres RSS/Atom podany przez operatora, te same reguły.
 - **Regulamin:** operator sprawdza, czy serwis zezwala na odczyt kanału; aplikacja tego nie
