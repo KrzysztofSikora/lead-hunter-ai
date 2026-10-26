@@ -7,6 +7,8 @@ import { openDb } from './infrastructure/db/client.js';
 import { randomTokenSource } from './infrastructure/auth/token-source.js';
 import { verifyPassword } from './infrastructure/auth/scrypt-password.js';
 import { createActivityRepository } from './infrastructure/db/activity-repository.js';
+import { createRunnerState } from './infrastructure/db/runner-state-repository.js';
+import { createHostMetrics } from './infrastructure/host/host-metrics.js';
 import { createAnalysisRepository } from './infrastructure/db/analysis-repository.js';
 import {
   createLlmProvider,
@@ -90,6 +92,8 @@ async function main(): Promise<void> {
     dailyLimit: config.analysisDailyLimit,
     maxAgeDays: config.prefilterMaxAgeDays,
     ...llmRunnerDeps(config.llm),
+    runnerState: createRunnerState(db),
+    hostMetrics: createHostMetrics(),
     onError: (error) =>
       logger.error(`analysis drain failed: ${error instanceof Error ? error.message : 'error'}`),
   });

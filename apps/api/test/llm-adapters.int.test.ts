@@ -246,6 +246,31 @@ describe('Anthropic adapter', () => {
     expect(requests).toHaveLength(1);
   });
 
+  it('reads Retry-After into the error and maps an abort to cancelled (S-20)', async () => {
+    reply(
+      ANTHROPIC,
+      MESSAGES,
+      429,
+      { type: 'error', error: { type: 'x', message: 'slow' } },
+      {
+        'retry-after': '7',
+      },
+    );
+    const limited = await anthropic()
+      .analyzeOpportunity(input)
+      .catch((e: unknown) => e);
+    expect(limited).toBeInstanceOf(ProviderError);
+    expect(limited).toMatchObject({ kind: 'rate_limited', retryAfterMs: 7000 });
+
+    intercept(ANTHROPIC, MESSAGES)
+      .reply(200, JSON.stringify(json('anthropic-valid.json')))
+      .delay(500);
+    const controller = new AbortController();
+    const pending = anthropic().analyzeOpportunity(input, { signal: controller.signal });
+    controller.abort();
+    expect(await pending.catch((e: unknown) => e)).toMatchObject({ kind: 'cancelled' });
+  });
+
   it('times out', async () => {
     intercept(ANTHROPIC, MESSAGES)
       .reply(200, JSON.stringify(json('anthropic-valid.json')))

@@ -6,7 +6,12 @@ import {
   hasSubcontractCue,
   matchTerms,
 } from '../../modules/analysis/cues.js';
-import type { AnalysisInput, LlmProvider, ProviderOutput } from '../../modules/analysis/ports.js';
+import {
+  type AnalysisInput,
+  type LlmProvider,
+  ProviderError,
+  type ProviderOutput,
+} from '../../modules/analysis/ports.js';
 import type { OfferDrafter, OfferInput } from '../../modules/offers/ports.js';
 import { OFFER_PROMPT_VERSION } from './offer-prompt.js';
 
@@ -99,8 +104,13 @@ export class MockProvider implements LlmProvider, OfferDrafter {
   readonly promptVersion = 'mock-rules-1';
   readonly offerPromptVersion = `mock-${OFFER_PROMPT_VERSION}`;
   readonly demo = true;
+  readonly timeoutMs = 0;
 
-  analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
+  analyzeOpportunity(
+    input: AnalysisInput,
+    options?: { signal?: AbortSignal },
+  ): Promise<ProviderOutput> {
+    if (options?.signal?.aborted) return Promise.reject(new ProviderError('cancelled'));
     return Promise.resolve({
       output: this.analyse(input),
       usage: { inputTokens: null, outputTokens: null },

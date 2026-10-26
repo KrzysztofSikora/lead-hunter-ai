@@ -220,6 +220,8 @@ export const AnalysisServiceStatus = z
     analysedToday: z.number().int(),
     waiting: z.number().int(),
     limitReached: z.boolean(),
+    /** FR-34 AC3: the operator cancelled an analysis and the queue waits for "Wznów kolejkę". */
+    paused: z.boolean(),
     /** D-13 (S-05): what is being used and whether the budget lets it run. */
     model: z.string().nullable(),
     paid: z.boolean(),
@@ -250,3 +252,110 @@ export const AnalysisRequestRefused = z
   .object({ error: z.enum(['prefiltered', 'not_configured']) })
   .strict();
 export type AnalysisRequestRefused = z.infer<typeof AnalysisRequestRefused>;
+
+/**
+ * FR-34 AC2, D-8 (S-20): a closed set, so a view of the analysis queue cannot leak a raw error,
+ * a response body or source text.
+ */
+export const AnalysisReasonCode = z.enum([
+  'timeout',
+  'provider_unavailable',
+  'rate_limited',
+  'auth',
+  'bad_request',
+  'refusal',
+  'truncated',
+  'empty',
+  'invalid_json',
+  'schema_validation',
+  'output_rejected',
+  'internal_error',
+  'cancelled',
+]);
+export type AnalysisReasonCode = z.infer<typeof AnalysisReasonCode>;
+
+const ActivityTitle = z.string().max(120);
+
+/** The entry the runner works on now (FR-34 AC1). */
+export const AnalysisActiveEntry = z
+  .object({
+    opportunityId: z.number().int(),
+    title: ActivityTitle,
+    provider: z.enum(['mock', 'anthropic', 'openai-compatible']),
+    model: z.string(),
+    stage: z.enum(['requesting', 'backoff', 'saving']),
+    startedAt: z.iso.datetime(),
+    /** The timeout applies per request, so elapsed time is compared from here. */
+    attemptStartedAt: z.iso.datetime(),
+    attempt: z.number().int().min(1),
+    maxAttempts: z.number().int().min(1),
+    /** Set while `stage` is `backoff`. */
+    nextAttemptAt: z.iso.datetime().nullable(),
+    /** Why the previous attempt failed, while a retry is pending or running. */
+    lastReason: AnalysisReasonCode.nullable(),
+  })
+  .strict();
+export type AnalysisActiveEntry = z.infer<typeof AnalysisActiveEntry>;
+
+export const AnalysisHistoryEntry = z
+  .object({
+    opportunityId: z.number().int(),
+    title: ActivityTitle,
+    provider: z.enum(['mock', 'anthropic', 'openai-compatible']),
+    model: z.string(),
+    outcome: z.enum(['complete', 'failed', 'cancelled']),
+    /** Set for `failed` and `cancelled`. */
+    reason: AnalysisReasonCode.nullable(),
+    /** A stored result was copied; no provider was called. */
+    reused: z.boolean(),
+    attempts: z.number().int().min(0),
+    startedAt: z.iso.datetime(),
+    finishedAt: z.iso.datetime(),
+  })
+  .strict();
+export type AnalysisHistoryEntry = z.infer<typeof AnalysisHistoryEntry>;
+
+/** FR-34 AC5: a value that could not be read is `null`, never 0. */
+export const HostSnapshot = z
+  .object({
+    temperatureC: z.number().nullable(),
+    load1: z.number().nullable(),
+    cpuCount: z.number().int().nullable(),
+    measuredAt: z.iso.datetime(),
+  })
+  .strict();
+export type HostSnapshot = z.infer<typeof HostSnapshot>;
+
+export const AnalysisActivity = z
+  .object({
+    /** Server time, so a client with a wrong clock still shows the right elapsed time. */
+    now: z.iso.datetime(),
+    paused: z.boolean(),
+    active: AnalysisActiveEntry.nullable(),
+    queued: z
+      .object({
+        total: z.number().int(),
+        items: z.array(
+          z.object({ opportunityId: z.number().int(), title: ActivityTitle }).strict(),
+        ),
+      })
+      .strict(),
+    /** Newest first; bounded by count and age, and empty after an app restart (D-2). */
+    history: z.array(AnalysisHistoryEntry),
+    /** Per-request limit in ms; 0 when the provider has none. */
+    timeoutMs: z.number().int().min(0),
+    /** FR-34 AC4: a local backend may keep computing after the app closed the connection. */
+    backendMayContinue: z.boolean(),
+    host: HostSnapshot,
+  })
+  .strict();
+export type AnalysisActivity = z.infer<typeof AnalysisActivity>;
+
+/** FR-34 AC3, D-5: cancel is idempotent and always pauses; `cancelled` says whether a request was aborted. */
+export const AnalysisCancelResult = z
+  .object({ cancelled: z.boolean(), paused: z.literal(true) })
+  .strict();
+export type AnalysisCancelResult = z.infer<typeof AnalysisCancelResult>;
+
+export const AnalysisResumeResult = z.object({ paused: z.literal(false) }).strict();
+export type AnalysisResumeResult = z.infer<typeof AnalysisResumeResult>;

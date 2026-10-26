@@ -67,3 +67,9 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Seen in: demand-sources, R2
 - Scope: integration tests for settings with an `enabled` flag
 - Status: proposed in the PR for demand-sources
+
+## Assert the exact outcome of a race test, and check it fails when the guard it names is removed
+- Why: a test whose assertion accepts either branch (`<= 1`) passed while the guard it was written for was never exercised.
+- Seen in: analysis-observability, R2
+- Scope: `apps/api/test/**`
+- Status: proposed in the PR for analysis-observability

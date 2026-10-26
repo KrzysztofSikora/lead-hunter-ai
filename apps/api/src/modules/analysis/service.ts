@@ -1,5 +1,7 @@
 import {
   ANALYSIS_SCHEMA_VERSION,
+  type AnalysisActivity,
+  type AnalysisReasonCode,
   type AnalysisServiceStatus,
   OpportunityAnalysis,
   ScoreBreakdown,
@@ -11,18 +13,42 @@ import type { ModelPrice } from '@lead-hunter/config';
 import { startOfWarsawDay, startOfWarsawMonth } from '../shared/warsaw-day.js';
 import { scoreAnalysis } from '../scoring/score.js';
 import { budgetGate, costMicroUsd, type BudgetBlock } from './budget.js';
+import { createActivityTracker } from './activity.js';
 import { guardAnalysis } from './output-guard.js';
 import { prefilter } from './prefilter.js';
+import { MAX_ATTEMPTS, nextDelay } from './retry-policy.js';
 import type {
   AnalysisInput,
   AnalysisRepository,
   CompletedAnalysis,
   FailedAnalysis,
+  HostMetrics,
   LlmProvider,
   ProfileReader,
+  RunnerState,
   WaitingOpportunity,
 } from './ports.js';
 import { ProviderError } from './ports.js';
+
+/** Waits `ms`; an aborted `signal` ends the wait early (it resolves, the caller checks the signal). */
+export type Sleep = (ms: number, signal: AbortSignal) => Promise<void>;
+
+const realSleep: Sleep = (ms, signal) =>
+  new Promise((resolve) => {
+    if (signal.aborted) return resolve();
+    const done = (): void => {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    signal.addEventListener('abort', done, { once: true });
+  });
+
+/** D-2 (S-20): the activity history is bounded by count and age. */
+const HISTORY_MAX_ENTRIES = 100;
+const HISTORY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const QUEUE_PREVIEW = 20;
 
 export interface AnalysisDeps {
   repository: AnalysisRepository;
@@ -37,6 +63,12 @@ export interface AnalysisDeps {
   budget?: { monthlyCapMicroUsd: number | null; price: ModelPrice | null };
   /** Values an answer must not contain, i.e. the API key (D-9). */
   secrets?: string[];
+  /** Backoff between attempts (D-1); tests inject one they can hold open. */
+  sleep?: Sleep;
+  /** Whether the operator paused the queue; absent means it is never paused across restarts. */
+  runnerState?: RunnerState;
+  /** Temperature and load for the activity view; absent means "niedostępne". */
+  hostMetrics?: HostMetrics;
   /** Receives drain failures; must not log source text. */
   onError: (error: unknown) => void;
 }
@@ -52,6 +84,15 @@ export interface AnalysisRunner {
   status(): AnalysisServiceStatus;
   /** D-10: puts one opportunity back in the queue and kicks the runner. */
   requeue(id: number, force: boolean): 'queued' | 'prefiltered' | 'not_configured' | 'not_found';
+  /** FR-34: what the queue is doing now, what waits and what finished lately. */
+  activity(): Promise<AnalysisActivity>;
+  /**
+   * FR-34 AC3: aborts the app's own request and pending retries, and pauses the queue until
+   * `resume()`. `cancelled` is false when no request was in flight (D-5).
+   */
+  cancel(): { cancelled: boolean };
+  /** Clears the pause and runs the queue. */
+  resume(): void;
   /** Resolves when no drain is in flight. */
   idle(): Promise<void>;
 }
@@ -74,11 +115,40 @@ const PROVIDER_WIDE: ReadonlySet<ProviderError['kind']> = new Set([
 
 type Outcome = 'continue' | 'stop';
 
+/** D-8: the one place a stored or shown failure becomes a code from the closed set. */
+function providerReason(error: unknown): AnalysisReasonCode {
+  if (error instanceof SyntaxError) return 'invalid_json';
+  if (!(error instanceof ProviderError)) return 'provider_unavailable';
+  switch (error.kind) {
+    case 'unavailable':
+      return 'provider_unavailable';
+    case 'not_json':
+      return 'invalid_json';
+    default:
+      return error.kind;
+  }
+}
+
 const reasonOf = (error: unknown): string =>
   (error instanceof Error ? error.message : String(error)).slice(0, REASON_MAX);
 
 export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
   const { repository, provider, clock } = deps;
+  const sleep = deps.sleep ?? realSleep;
+  let pausedInMemory = false;
+  const runnerState: RunnerState = deps.runnerState ?? {
+    isPaused: () => pausedInMemory,
+    setPaused: (paused) => {
+      pausedInMemory = paused;
+    },
+  };
+  /** The call in flight, while `cancel()` may still stop it (not once the provider answered). */
+  let cancellable: AbortController | undefined;
+  const tracker = createActivityTracker({
+    clock,
+    maxEntries: HISTORY_MAX_ENTRIES,
+    maxAgeMs: HISTORY_MAX_AGE_MS,
+  });
 
   function runPrefilter(): void {
     const pending = repository.pendingWithoutPrefilter();
@@ -198,13 +268,29 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       schemaVersion: ANALYSIS_SCHEMA_VERSION,
       at,
     };
-    const fail = (error: string, paid?: Pick<FailedAnalysis, 'usage' | 'costMicroUsd'>) =>
+    const fail = (
+      error: string,
+      code: AnalysisReasonCode,
+      paid?: Pick<FailedAnalysis, 'usage' | 'costMicroUsd'>,
+    ) => {
       repository.saveFailed({ ...meta, error, ...paid });
+      tracker.finish('failed', code);
+    };
+    const entry = {
+      opportunityId: row.id,
+      title: row.title,
+      provider: active.name,
+      model: active.model,
+    };
 
     try {
-      if (!row.force && tryReuse(row, active, at)) return 'continue';
+      if (!row.force && tryReuse(row, active, at)) {
+        tracker.recordReused(entry);
+        return 'continue';
+      }
 
       if (blockedNow(active, spentThisMonth().microUsd) !== null) return 'stop';
+      tracker.start({ ...entry, maxAttempts: MAX_ATTEMPTS });
 
       const profile = deps.profile.get();
       const input: AnalysisInput = {
@@ -220,63 +306,95 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
         },
       };
 
+      const controller = new AbortController();
+      cancellable = controller;
+      // D-3: the operator's cancel is stored as a failed analysis with the code `cancelled`.
+      const cancelledOut = (): Outcome => {
+        repository.saveFailed({ ...meta, error: 'cancelled' });
+        tracker.finish('cancelled', 'cancelled');
+        return 'stop';
+      };
       let provided;
-      try {
-        provided = await active.analyzeOpportunity(input);
-      } catch (error) {
-        // A JSON.parse SyntaxError quotes the model's text, so it is stored as a code, not a message.
-        const notJson =
-          error instanceof SyntaxError ||
-          (error instanceof ProviderError && error.kind === 'not_json');
-        // A refusal, truncation or non-JSON answer was billed: its usage counts against the cap (R2).
-        const usage = error instanceof ProviderError ? error.usage : undefined;
-        fail(
-          notJson ? 'invalid_output: not_json' : `provider_error: ${reasonOf(error)}`,
-          usage && {
-            usage,
-            costMicroUsd: active.paid ? costMicroUsd(usage, deps.budget?.price ?? null) : 0,
-          },
-        );
-        return error instanceof ProviderError && PROVIDER_WIDE.has(error.kind)
-          ? 'stop'
-          : 'continue';
+      for (let attempt = 1; ; attempt += 1) {
+        tracker.attempt(attempt);
+        try {
+          // An answer that resolved is kept even if the abort raced it: it was billed (R1).
+          provided = await active.analyzeOpportunity(input, { signal: controller.signal });
+          break;
+        } catch (error) {
+          // An abort can surface as any error, so the signal decides, not the error class.
+          if (controller.signal.aborted) return cancelledOut();
+          const delay = error instanceof ProviderError ? nextDelay(attempt, error) : 'give_up';
+          if (delay !== 'give_up') {
+            tracker.backoff(new Date(clock.now().getTime() + delay), providerReason(error));
+            await sleep(delay, controller.signal);
+            if (controller.signal.aborted) return cancelledOut();
+            continue;
+          }
+          // A JSON.parse SyntaxError quotes the model's text, so it is stored as a code, not a message.
+          const notJson =
+            error instanceof SyntaxError ||
+            (error instanceof ProviderError && error.kind === 'not_json');
+          // A refusal, truncation or non-JSON answer was billed: its usage counts against the cap (R2).
+          const usage = error instanceof ProviderError ? error.usage : undefined;
+          fail(
+            notJson ? 'invalid_output: not_json' : `provider_error: ${reasonOf(error)}`,
+            providerReason(error),
+            usage && {
+              usage,
+              costMicroUsd: active.paid ? costMicroUsd(usage, deps.budget?.price ?? null) : 0,
+            },
+          );
+          return error instanceof ProviderError && PROVIDER_WIDE.has(error.kind)
+            ? 'stop'
+            : 'continue';
+        }
       }
 
+      cancellable = undefined;
       // The call is billed from here on, so a rejected answer is stored with its cost too.
       const cost = active.paid ? costMicroUsd(provided.usage, deps.budget?.price ?? null) : 0;
       const billed = { usage: provided.usage, costMicroUsd: cost };
 
       const echoed = JSON.stringify(provided.output) ?? '';
       if ((deps.secrets ?? []).some((secret) => secret !== '' && echoed.includes(secret))) {
-        fail('invalid_output: secret_echo', billed);
+        fail('invalid_output: secret_echo', 'output_rejected', billed);
         return 'continue';
       }
 
       const parsed = OpportunityAnalysis.safeParse(provided.output);
       if (!parsed.success) {
         const paths = [...new Set(parsed.error.issues.map((i) => i.path.join('.') || '(root)'))];
-        fail(`invalid_output: ${paths.join(', ')}`, billed);
+        fail(`invalid_output: ${paths.join(', ')}`, 'schema_validation', billed);
         return 'continue';
       }
 
+      tracker.saving();
       const rejected = complete(
         row,
         { ...meta, usage: provided.usage, costMicroUsd: cost, reusedFromAnalysisId: null },
         parsed.data,
       );
-      if (rejected) fail(rejected, billed);
+      if (rejected) fail(rejected, 'output_rejected', billed);
+      else tracker.finish('complete', null);
       return 'continue';
     } catch (error) {
       // After the provider answered: a failed save must not leave the row at the head of the queue.
-      fail(`internal_error: ${reasonOf(error)}`);
+      fail(`internal_error: ${reasonOf(error)}`, 'internal_error');
       return 'continue';
+    } finally {
+      cancellable = undefined;
     }
   }
 
   async function drainOnce(): Promise<void> {
     runPrefilter();
     if (!provider) return;
-    while (repository.countSince(startOfWarsawDay(clock.now()).getTime()) < deps.dailyLimit) {
+    // Checked per item: a cancel that lands between two items must not start the next call.
+    while (
+      !runnerState.isPaused() &&
+      repository.countSince(startOfWarsawDay(clock.now()).getTime()) < deps.dailyLimit
+    ) {
       const [next] = repository.nextWaiting(1);
       if (!next) return;
       if ((await analyseOne(next, provider)) === 'stop') return;
@@ -334,6 +452,7 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
         analysedToday,
         waiting: repository.waitingCount(),
         limitReached: analysedToday >= deps.dailyLimit,
+        paused: runnerState.isPaused(),
       };
     },
     requeue(id, force) {
@@ -343,6 +462,45 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
       }
       drain().catch(deps.onError);
       return 'queued';
+    },
+    async activity() {
+      const now = clock.now();
+      const host = (await deps.hostMetrics?.read()) ?? {
+        temperatureC: null,
+        load1: null,
+        cpuCount: null,
+        measuredAt: now,
+      };
+      const active = tracker.active();
+      return {
+        now: now.toISOString(),
+        paused: runnerState.isPaused(),
+        active,
+        // The entry in flight is still `PENDING` until its result is saved, but it is not queued.
+        queued: {
+          total: Math.max(0, repository.waitingCount() - (active ? 1 : 0)),
+          items: repository
+            .waitingPreview(QUEUE_PREVIEW + 1)
+            .filter((item) => item.id !== active?.opportunityId)
+            .slice(0, QUEUE_PREVIEW)
+            .map((item) => ({ opportunityId: item.id, title: item.title.slice(0, 120) })),
+        },
+        history: tracker.history(),
+        timeoutMs: provider?.timeoutMs ?? 0,
+        backendMayContinue: provider?.name === 'openai-compatible',
+        host: { ...host, measuredAt: host.measuredAt.toISOString() },
+      };
+    },
+    cancel() {
+      runnerState.setPaused(true);
+      const running = cancellable;
+      cancellable = undefined;
+      running?.abort();
+      return { cancelled: running !== undefined };
+    },
+    resume() {
+      runnerState.setPaused(false);
+      kickDrain();
     },
     idle: () => inFlight ?? Promise.resolve(),
   };

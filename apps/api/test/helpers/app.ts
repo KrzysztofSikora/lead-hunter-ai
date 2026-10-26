@@ -7,6 +7,7 @@ import { afterEach } from 'vitest';
 import { buildApp, type AppDeps } from '../../src/app.js';
 import { hashPassword, verifyPassword } from '../../src/infrastructure/auth/scrypt-password.js';
 import { createActivityRepository } from '../../src/infrastructure/db/activity-repository.js';
+import { createRunnerState } from '../../src/infrastructure/db/runner-state-repository.js';
 import { createAnalysisRepository } from '../../src/infrastructure/db/analysis-repository.js';
 import {
   createLlmProvider,
@@ -21,8 +22,12 @@ import {
   createOfferDraftRepository,
   createOfferSourceReader,
 } from '../../src/infrastructure/db/offer-draft-repository.js';
-import { createAnalysisRunner, type AnalysisRunner } from '../../src/modules/analysis/service.js';
-import type { LlmProvider } from '../../src/modules/analysis/ports.js';
+import {
+  createAnalysisRunner,
+  type AnalysisRunner,
+  type Sleep,
+} from '../../src/modules/analysis/service.js';
+import type { LlmProvider, RunnerState } from '../../src/modules/analysis/ports.js';
 import { createProfileService } from '../../src/modules/profile/service.js';
 import { createPaymentRepository } from '../../src/infrastructure/db/payment-repository.js';
 import { createOpportunityRepository } from '../../src/infrastructure/db/opportunity-repository.js';
@@ -103,6 +108,10 @@ export async function buildTestApp(
     /** Another identity or staleness for the job lock (S-12). */
     jobLock?: Partial<Omit<JobLockOptions, 'db' | 'clock'>>;
     heartbeatMs?: number;
+    /** The analysis backoff wait; a no-op unless a test holds it open (S-20). */
+    sleep?: Sleep;
+    /** Wraps the stored pause flag, to land a cancel at an exact point of the drain. */
+    wrapRunnerState?: (real: RunnerState) => RunnerState;
   } = {},
 ): Promise<{
   app: FastifyInstance;
@@ -132,6 +141,8 @@ export async function buildTestApp(
     dailyLimit: config.analysisDailyLimit,
     maxAgeDays: config.prefilterMaxAgeDays,
     ...llmRunnerDeps(config.llm),
+    sleep: options.sleep ?? (async () => undefined),
+    runnerState: (options.wrapRunnerState ?? ((real) => real))(createRunnerState(db)),
     onError: () => undefined,
   });
   // Pages go through the real fetcher; the global MockAgent answers (nothing leaves the machine).
