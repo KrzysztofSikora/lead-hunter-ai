@@ -15,6 +15,8 @@ import { registerAuth } from './modules/auth/routes.js';
 import type { AuthDeps } from './modules/auth/service.js';
 import { registerDigestRoutes } from './modules/digest/routes.js';
 import type { DigestDeps } from './modules/digest/service.js';
+import { registerInsightsRoutes } from './modules/insights/routes.js';
+import type { InsightsDeps } from './modules/insights/service.js';
 import { registerHealthRoutes } from './modules/health/routes.js';
 import type { HealthProbe } from './modules/health/ports.js';
 import { registerOfferRoutes } from './modules/offers/routes.js';
@@ -39,6 +41,7 @@ export interface AppDeps {
   opportunities: OpportunityDeps;
   pipeline: PipelineDeps;
   digest: DigestDeps;
+  insights: InsightsDeps;
   analysis: AnalysisRouteDeps;
   offers: OfferService;
   sources: SourceService;
@@ -90,6 +93,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerOpportunityRoutes(app, deps.opportunities);
   registerPipelineRoutes(app, deps.pipeline);
   registerDigestRoutes(app, deps.digest);
+  registerInsightsRoutes(app, deps.insights);
   registerAnalysisRoutes(app, deps.analysis);
   registerOfferRoutes(app, deps.offers);
   registerSourceRoutes(app, deps.sources, deps.jobs);

@@ -29,6 +29,7 @@ import { runMigrations } from './infrastructure/db/migrate.js';
 import { createPaymentRepository } from './infrastructure/db/payment-repository.js';
 import { createOpportunityRepository } from './infrastructure/db/opportunity-repository.js';
 import { createDigestRepository } from './infrastructure/db/digest-repository.js';
+import { createInsightsRepository } from './infrastructure/db/insights-repository.js';
 import { createPipelineRepository } from './infrastructure/db/pipeline-repository.js';
 import { createProfileRepository } from './infrastructure/db/profile-repository.js';
 import { createSignalRepository } from './infrastructure/db/signal-repository.js';
@@ -159,6 +160,7 @@ async function main(): Promise<void> {
       pipeline: createPipelineRepository(db),
       clock,
     },
+    insights: { repository: createInsightsRepository(db), clock },
     analysis: runner,
     offers,
     sources: sourceRuntime.service,
