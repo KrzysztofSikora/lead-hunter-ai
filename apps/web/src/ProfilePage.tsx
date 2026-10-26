@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { type Currency } from '@lead-hunter/contracts';
 import styles from './ProfilePage.module.css';
+import { EXPORT_URL } from './api/data.js';
 import { getProfile, saveProfile, type FieldError } from './api/profile.js';
 import {
   formToProfile,
@@ -244,119 +245,130 @@ export function ProfilePage() {
   const listError = errors.find((error) => error.path === 'rateRanges');
 
   return (
-    <form className={styles.form} onSubmit={submit} noValidate>
-      <h2>
-        {t.title}
-        {example && <span className={styles.badge}>{t.example}</span>}
-      </h2>
-      {example && <p>{t.exampleHint}</p>}
+    <>
+      <form className={styles.form} onSubmit={submit} noValidate>
+        <h2>
+          {t.title}
+          {example && <span className={styles.badge}>{t.example}</span>}
+        </h2>
+        {example && <p>{t.exampleHint}</p>}
 
-      <section>
-        <h3>{t.sections.skills}</h3>
-        {textarea('skills')}
-        <div className={styles.field}>
-          <label htmlFor="experience">{t.fields.experience}</label>
-          <textarea
-            id="experience"
-            rows={5}
-            value={form.experience}
-            onChange={(event) => update({ experience: event.target.value })}
-            {...errorProps('experience', 'experience')}
-          />
-          {errorLine('experience', 'experience')}
-        </div>
-        {textarea('serviceTypes')}
-      </section>
-
-      <section>
-        <h3>{t.sections.preferences}</h3>
-        {textarea('preferredTechnologies')}
-        {textarea('industries')}
-        {checks('billingModels', BILLING, t.billingModels)}
-        {checks('workModes', MODES, t.workModes)}
-        {textarea('languages')}
-        {textarea('countries')}
-      </section>
-
-      <section>
-        <h3>{t.sections.constraints}</h3>
-        {textarea('excludedTechnologies')}
-        {textarea('excludedCategories')}
-        {money('minimumJobValue')}
-        <div className={styles.field}>
-          <label htmlFor="weeklyHours">{t.fields.weeklyHours}</label>
-          <input
-            id="weeklyHours"
-            type="text"
-            inputMode="numeric"
-            value={form.weeklyHours}
-            onChange={(event) => update({ weeklyHours: event.target.value })}
-            {...errorProps('weeklyHours', 'weeklyHours')}
-          />
-          {errorLine('weeklyHours', 'weeklyHours')}
-        </div>
-      </section>
-
-      <section>
-        <h3>{t.sections.rates}</h3>
-        <div className={styles.field}>
-          <p>{t.fields.rateRanges}</p>
-          {form.rateRanges.map(rateRow)}
-          <button
-            type="button"
-            disabled={form.rateRanges.length >= MAX_RATE_RANGES}
-            onClick={() =>
-              update({
-                rateRanges: [
-                  ...form.rateRanges,
-                  { unit: 'HOUR', currency: 'PLN', min: '', max: '' },
-                ],
-              })
-            }
-          >
-            {t.fields.addRate}
-          </button>
-          {listError && (
-            <p id="rateRanges-error" className={styles.error}>
-              {errorText(listError)}
-            </p>
-          )}
-        </div>
-        {money('monthlyRevenueGoal')}
-        <fieldset className={styles.field} {...errorProps('effortSplit', 'effortSplit')}>
-          <legend>{t.fields.effortSplit}</legend>
-          <div className={styles.row}>
-            <label htmlFor="directRevenuePercent">{t.fields.directRevenuePercent}</label>
-            <input
-              id="directRevenuePercent"
-              type="text"
-              inputMode="numeric"
-              value={form.directRevenuePercent}
-              onChange={(event) => update({ directRevenuePercent: event.target.value })}
+        <section>
+          <h3>{t.sections.skills}</h3>
+          {textarea('skills')}
+          <div className={styles.field}>
+            <label htmlFor="experience">{t.fields.experience}</label>
+            <textarea
+              id="experience"
+              rows={5}
+              value={form.experience}
+              onChange={(event) => update({ experience: event.target.value })}
+              {...errorProps('experience', 'experience')}
             />
-            <label htmlFor="productHypothesisPercent">{t.fields.productHypothesisPercent}</label>
-            <input
-              id="productHypothesisPercent"
-              type="text"
-              inputMode="numeric"
-              value={form.productHypothesisPercent}
-              onChange={(event) => update({ productHypothesisPercent: event.target.value })}
-            />
+            {errorLine('experience', 'experience')}
           </div>
-          {errorLine('effortSplit', 'effortSplit')}
-        </fieldset>
-      </section>
+          {textarea('serviceTypes')}
+        </section>
 
-      <div className={styles.actions}>
-        <button type="submit" disabled={save === 'saving'}>
-          {save === 'saving' ? t.saving : t.save}
-        </button>
-        <p role="status" className={save === 'saved' ? styles.ok : styles.error}>
-          {save === 'saved' && t.saved}
-          {save === 'failed' && t.saveFailed}
-          {save === 'invalid' && t.hasErrors}
+        <section>
+          <h3>{t.sections.preferences}</h3>
+          {textarea('preferredTechnologies')}
+          {textarea('industries')}
+          {checks('billingModels', BILLING, t.billingModels)}
+          {checks('workModes', MODES, t.workModes)}
+          {textarea('languages')}
+          {textarea('countries')}
+        </section>
+
+        <section>
+          <h3>{t.sections.constraints}</h3>
+          {textarea('excludedTechnologies')}
+          {textarea('excludedCategories')}
+          {money('minimumJobValue')}
+          <div className={styles.field}>
+            <label htmlFor="weeklyHours">{t.fields.weeklyHours}</label>
+            <input
+              id="weeklyHours"
+              type="text"
+              inputMode="numeric"
+              value={form.weeklyHours}
+              onChange={(event) => update({ weeklyHours: event.target.value })}
+              {...errorProps('weeklyHours', 'weeklyHours')}
+            />
+            {errorLine('weeklyHours', 'weeklyHours')}
+          </div>
+        </section>
+
+        <section>
+          <h3>{t.sections.rates}</h3>
+          <div className={styles.field}>
+            <p>{t.fields.rateRanges}</p>
+            {form.rateRanges.map(rateRow)}
+            <button
+              type="button"
+              disabled={form.rateRanges.length >= MAX_RATE_RANGES}
+              onClick={() =>
+                update({
+                  rateRanges: [
+                    ...form.rateRanges,
+                    { unit: 'HOUR', currency: 'PLN', min: '', max: '' },
+                  ],
+                })
+              }
+            >
+              {t.fields.addRate}
+            </button>
+            {listError && (
+              <p id="rateRanges-error" className={styles.error}>
+                {errorText(listError)}
+              </p>
+            )}
+          </div>
+          {money('monthlyRevenueGoal')}
+          <fieldset className={styles.field} {...errorProps('effortSplit', 'effortSplit')}>
+            <legend>{t.fields.effortSplit}</legend>
+            <div className={styles.row}>
+              <label htmlFor="directRevenuePercent">{t.fields.directRevenuePercent}</label>
+              <input
+                id="directRevenuePercent"
+                type="text"
+                inputMode="numeric"
+                value={form.directRevenuePercent}
+                onChange={(event) => update({ directRevenuePercent: event.target.value })}
+              />
+              <label htmlFor="productHypothesisPercent">{t.fields.productHypothesisPercent}</label>
+              <input
+                id="productHypothesisPercent"
+                type="text"
+                inputMode="numeric"
+                value={form.productHypothesisPercent}
+                onChange={(event) => update({ productHypothesisPercent: event.target.value })}
+              />
+            </div>
+            {errorLine('effortSplit', 'effortSplit')}
+          </fieldset>
+        </section>
+
+        <div className={styles.actions}>
+          <button type="submit" disabled={save === 'saving'}>
+            {save === 'saving' ? t.saving : t.save}
+          </button>
+          <p role="status" className={save === 'saved' ? styles.ok : styles.error}>
+            {save === 'saved' && t.saved}
+            {save === 'failed' && t.saveFailed}
+            {save === 'invalid' && t.hasErrors}
+          </p>
+        </div>
+      </form>
+      <section className={styles.data}>
+        <h3>{t.yourData}</h3>
+        <p>{t.yourDataHint}</p>
+        <p>
+          <a href={EXPORT_URL} download>
+            {t.exportData}
+          </a>
         </p>
-      </div>
-    </form>
+      </section>
+    </>
   );
 }

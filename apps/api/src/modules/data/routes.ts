@@ -1,4 +1,4 @@
-import { ApiError, ValidationError } from '@lead-hunter/contracts';
+import { ApiError, DataExport, ValidationError } from '@lead-hunter/contracts';
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
@@ -18,5 +18,17 @@ export function registerDataRoutes(app: FastifyInstance, service: DataService): 
       service.deleteOpportunity(request.params.id)
         ? reply.code(204).send(null)
         : reply.code(404).send({ error: 'not_found' }),
+  );
+
+  // S-15 D-8: built in memory first, so an error never sends a partial file.
+  app.withTypeProvider<ZodTypeProvider>().get(
+    '/api/export',
+    { schema: { response: { 200: DataExport } } },
+    async (_request, reply) => {
+      const { body, date } = service.exportData();
+      return reply
+        .header('content-disposition', `attachment; filename="lead-hunter-export-${date}.json"`)
+        .send(body);
+    },
   );
 }

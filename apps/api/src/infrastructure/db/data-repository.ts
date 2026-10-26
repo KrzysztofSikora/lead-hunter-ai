@@ -1,7 +1,197 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq, getTableColumns, sql } from 'drizzle-orm';
+import type { SQLiteColumn, SQLiteTable } from 'drizzle-orm/sqlite-core';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import type { DataRepository } from '../../modules/data/ports.js';
-import { analyses, offerDrafts, opportunities, rawSignals } from './schema.js';
+import type { DataRepository, ExportTables } from '../../modules/data/ports.js';
+import {
+  activityEvents,
+  analyses,
+  offerDrafts,
+  operatorProfile,
+  opportunities,
+  opportunityEvidence,
+  payments,
+  rawSignals,
+  sources,
+} from './schema.js';
+
+/**
+ * S-15 D-8, TR-12: the export reads an explicit column list per table. A column added later is not
+ * exported until someone puts it in `exported` or `withheld`; `data-export.int.test.ts` fails until then.
+ */
+export const EXPORT_COLUMNS: Record<string, { exported: string[]; withheld: string[] }> = {
+  operator_profile: {
+    exported: ['schemaVersion', 'data', 'isExample', 'updatedAt'],
+    withheld: ['id'],
+  },
+  sources: {
+    exported: [
+      'id',
+      'type',
+      'name',
+      'configJson',
+      'configKey',
+      'presetId',
+      'enabled',
+      'filterJson',
+      'lastAttemptAt',
+      'lastSuccessAt',
+      'createdAt',
+      'updatedAt',
+    ],
+    withheld: ['cursorJson', 'nextAllowedAt', 'lastErrorReason', 'lastErrorStatus', 'lastErrorAt'],
+  },
+  raw_signals: {
+    exported: [
+      'id',
+      'sourceType',
+      'sourceId',
+      'externalId',
+      'sourceUrl',
+      'canonicalUrl',
+      'title',
+      'snippet',
+      'publishedAt',
+      'fetchedAt',
+      'contentHash',
+      'availability',
+      'lastVerifiedAt',
+      'jobRunId',
+      'tenderJson',
+    ],
+    withheld: [],
+  },
+  opportunities: {
+    exported: [
+      'id',
+      'primarySignalId',
+      'businessStatus',
+      'analysisStatus',
+      'category',
+      'evidenceLevel',
+      'score',
+      'confidence',
+      'createdAt',
+      'updatedAt',
+      'lastVerifiedAt',
+      'prefilterRule',
+      'prefilterMatches',
+      'prefilterAt',
+      'prefilterPhrase',
+      'language',
+      'analysisProvider',
+      'industry',
+      'workMode',
+      'countries',
+      'amountMaxMinor',
+      'amountCurrency',
+      'analysisForce',
+      'followUpAt',
+    ],
+    withheld: [],
+  },
+  analyses: {
+    exported: [
+      'id',
+      'opportunityId',
+      'status',
+      'provider',
+      'model',
+      'promptVersion',
+      'schemaVersion',
+      'resultJson',
+      'breakdownJson',
+      'guardNotesJson',
+      'error',
+      'inputTokens',
+      'outputTokens',
+      'costMicroUsd',
+      'reusedFromAnalysisId',
+      'createdAt',
+    ],
+    withheld: [],
+  },
+  opportunity_evidence: {
+    exported: [
+      'id',
+      'opportunityId',
+      'rawSignalId',
+      'evidenceType',
+      'sourceFact',
+      'sourceUrl',
+      'canonicalUrl',
+      'contentHash',
+      'extractedAt',
+    ],
+    withheld: [],
+  },
+  activity_events: {
+    exported: [
+      'id',
+      'opportunityId',
+      'type',
+      'actor',
+      'fromStatus',
+      'toStatus',
+      'reason',
+      'note',
+      'metadataJson',
+      'occurredAt',
+    ],
+    withheld: [],
+  },
+  payments: {
+    exported: ['id', 'opportunityId', 'amountMinor', 'currency', 'paidAt', 'note', 'createdAt'],
+    withheld: [],
+  },
+  offer_drafts: {
+    exported: [
+      'id',
+      'opportunityId',
+      'status',
+      'language',
+      'subject',
+      'messageMarkdown',
+      'proposalMarkdown',
+      'contentJson',
+      'guardNotesJson',
+      'provider',
+      'model',
+      'promptVersion',
+      'schemaVersion',
+      'analysed',
+      'error',
+      'inputTokens',
+      'outputTokens',
+      'costMicroUsd',
+      'createdAt',
+      'updatedAt',
+      'statusChangedAt',
+    ],
+    withheld: [],
+  },
+};
+
+/** Tables the export does not read at all (D-8): sessions, runtime state, dedup keys, spend. */
+export const WITHHELD_TABLES = [
+  'app_meta',
+  'sessions',
+  'job_runs',
+  'job_locks',
+  'signal_identities',
+  'deleted_usage',
+];
+
+/** `select` of the allowlisted columns of `table`. */
+function pick(table: SQLiteTable, name: string): Record<string, SQLiteColumn> {
+  const all = getTableColumns(table) as Record<string, SQLiteColumn>;
+  return Object.fromEntries(
+    (EXPORT_COLUMNS[name]?.exported ?? []).map((key) => {
+      const column = all[key];
+      if (!column) throw new Error(`export column ${name}.${key} does not exist`);
+      return [key, column];
+    }),
+  );
+}
 
 export function createDataRepository(db: BetterSQLite3Database): DataRepository {
   return {
@@ -35,6 +225,32 @@ export function createDataRepository(db: BetterSQLite3Database): DataRepository 
         },
         { behavior: 'immediate' },
       );
+    },
+    /** One deferred read transaction: all tables come from the same snapshot. */
+    exportAll() {
+      return db.transaction((tx): ExportTables => {
+        const profile = tx
+          .select(pick(operatorProfile, 'operator_profile'))
+          .from(operatorProfile)
+          .get();
+        const all = (table: SQLiteTable, name: string) =>
+          tx
+            .select(pick(table, name))
+            .from(table)
+            .orderBy(sql`id`)
+            .all() as Record<string, unknown>[];
+        return {
+          profile: (profile as Record<string, unknown> | undefined) ?? null,
+          sources: all(sources, 'sources'),
+          signals: all(rawSignals, 'raw_signals'),
+          opportunities: all(opportunities, 'opportunities'),
+          evidence: all(opportunityEvidence, 'opportunity_evidence'),
+          analyses: all(analyses, 'analyses'),
+          offerDrafts: all(offerDrafts, 'offer_drafts'),
+          events: all(activityEvents, 'activity_events'),
+          payments: all(payments, 'payments'),
+        };
+      });
     },
   };
 }

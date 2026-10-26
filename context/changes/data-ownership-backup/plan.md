@@ -263,16 +263,21 @@ The operator owns their data and can get it back after a failure:
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Delete an opportunity (API, spend kept)
-- [ ] Phase 2: Export and the UI (delete button, export link)
+- [x] Phase 2: Export and the UI (delete button, export link)
 - [ ] Phase 3: Backup command and daily job
 - [ ] Phase 4: Retention
 - [ ] Phase 5: Restore procedure, tested in CI
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 2) At phone width the *Usuń okazję* two-step confirm on a card reads clearly and cannot be hit by accident — run: `docker compose up --build`, open an opportunity, narrow the window to ~375 px, tap *Usuń okazję*, then *Anuluj* — evidence: none (Chromium is not installed in the autonomous run; take screenshots with `E2E_EVIDENCE=1 pnpm e2e` after `pnpm exec playwright install chromium` if wanted)
+- [ ] (Phase 2) The *Eksportuj dane (JSON)* link in *Profil* downloads `lead-hunter-export-<date>.json` that opens as JSON — run: `docker compose up --build`, log in, open *Profil*, click the link — evidence: none (the response is asserted in `apps/api/test/data-export.int.test.ts`)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] Plan-review #4: the phase 2 component test (`OpportunityPage.test.tsx`) stays although `test-plan.md:25` says no component tests in `apps/web`; precedents exist (`OpportunitiesPage.test.tsx`, `SourcesPage.test.tsx`) and it tests only the exported `DeleteOpportunity` two-step control. Screenshots would come only from an `E2E_EVIDENCE=1` run, which this run could not make (no Chromium).
+- [minor] The phase 1 test sent notes as `{ note }`; the contract is `{ text }`, so the request was silently a 400. Fixed in `data-delete.int.test.ts` (the export test asserts the 200).
+- [minor] Export profile row: `profile` is `{ schemaVersion, data, isExample, updatedAt }` with the stored `OperatorProfile` under `data` (D-8 names no shape for it).
 - [minor] Plan-review #7 (D-2, draft path): when the opportunity is gone, both the successful and the failed draft path answer `404` (`insert` returns `null`, the service returns `not_found`); asserted for both in `data-delete.int.test.ts`.
 - [minor] Plan-review #5: the second evidence row in the phase 1 test comes from a real duplicate import, not a direct insert.
 - [minor] Plan-review #10: FK line numbers in *Findings* are off by a few lines (`analyses.opportunity_id` is `schema.ts:194`, evidence 228, events 249, identities 272, payments 288, drafts 312); the code is unaffected.

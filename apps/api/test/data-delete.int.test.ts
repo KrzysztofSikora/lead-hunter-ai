@@ -52,7 +52,7 @@ describe('deleting an opportunity (FR-21 AC1)', () => {
     await t.runner.drain();
     await t.call('POST', `/api/opportunities/${first}/status`, { status: 'SAVED' });
     await t.call('POST', `/api/opportunities/${first}/status`, { status: 'CONTACTED' });
-    await t.call('POST', `/api/opportunities/${first}/notes`, { note: 'DEMO notatka' });
+    await t.call('POST', `/api/opportunities/${first}/notes`, { text: 'DEMO notatka' });
     await t.call('PUT', `/api/opportunities/${first}/follow-up`, { on: '2026-01-05' });
     expect(
       (
