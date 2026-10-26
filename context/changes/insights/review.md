@@ -1,7 +1,18 @@
 # Review: insights
 
-Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (1065 passed), e2e ok (5 passed), image not run (no Docker daemon in this environment; the diff touches no Docker files), image smoke not run (same) · Round: 1
+Verdict: APPROVE
+Gates: typecheck ok, lint ok, unit tests ok (1065 passed), e2e ok (5 passed), image not run (no Docker daemon in this environment; the diff touches no Docker files), image smoke not run (same) · Round: 2
+
+## Round 2 (re-review after fix-review)
+Commits since round 1: `d28ae40` (R1), `26ba30a` (R2), `940ca50` (lesson), `5886114` (triage). No other code changed.
+
+| Finding | Check | Result |
+|---------|-------|--------|
+| R1 | `apps/api/test/insights.int.test.ts:270-296` now inserts an `opportunity_evidence` row (`REPEAT_IMPORT`, as `modules/signals/ingest.ts:66` does) linking a Feed B signal to the opportunity; the opportunity has three transitions, so an evidence-based attribution would add a Feed B group and fail `before.bySource == [Feed A]` and `after.bySource` length 1; the new assertion ties the Feed A group to the totals; `corrected` renamed to `before` | fixed |
+| R2 | `grep -rn paymentsCount apps/web/src` finds nothing | fixed |
+| Lesson | `context/lessons.md` gains the R1 rule, `Status: proposed in the PR for insights`, same shape as the other entries | ok |
+
+No new findings in round 2.
 
 ## Plan vs diff
 | File | Status | Note |
@@ -17,12 +28,12 @@ Gates: typecheck ok, lint ok, unit tests ok (1065 passed), e2e ok (5 passed), im
 | `apps/api/src/infrastructure/db/activity-repository.ts` | done | `addWork` |
 | `apps/api/src/modules/opportunities/{ports,service,routes}.ts` | done | `POST /api/opportunities/:id/work`, metadata parsed before insert (lesson) |
 | `apps/api/src/app.ts`, `apps/api/src/server.ts`, `apps/api/test/helpers/app.ts` | done | wiring |
-| `apps/api/test/insights.int.test.ts` | done | four cases; the D-8 case does not build the situation it names (R1) |
+| `apps/api/test/insights.int.test.ts` | done | four cases; D-8 case links the second source through `opportunity_evidence` (R1 fixed in round 2) |
 | `apps/api/test/opportunity-actions.int.test.ts` | absent | planned "only if" a shape it asserts changed; not needed |
 | `apps/web/src/api/insights.ts` | done | |
 | `apps/web/src/InsightsPage.tsx`, `InsightsPage.module.css` | done | D-12 |
 | `apps/web/src/App.tsx` | done | route and nav |
-| `apps/web/src/strings.pl.ts` | done | one unused string (R2); `formatMinor` sign fix logged |
+| `apps/web/src/strings.pl.ts` | done | unused string removed (R2 fixed); `formatMinor` sign fix logged |
 | `apps/web/src/CardPipeline.tsx` | done | "Czas i koszty" form |
 | `apps/web/src/api/opportunities.ts` | done | `addWork` |
 | `apps/web/src/opportunityCard.ts` | done | `WORK` history line |
@@ -41,8 +52,8 @@ Gates: typecheck ok, lint ok, unit tests ok (1065 passed), e2e ok (5 passed), im
 | Correctness | ok | Checked D-2…D-10 against `checkMove`: contacts, replies via `skipped`, latest-WON wins, per-currency sums, `[from, to)` Warsaw bounds, year-end keys; no wrong number found |
 | Design | ok | Follows the digest module pattern; pure calculator over fact rows; contract in one file |
 | Safety | ok | Query and body strict Zod schemas, metadata validated before insert, notes not logged, route behind auth (TR-13 test) |
-| Tests | concern | The D-8 "second source" test never attaches the second source's signal to the opportunity (R1) |
-| Simplicity | ok | One unused string (R2) |
+| Tests | ok | Round 2: the D-8 test now links Feed B through `opportunity_evidence` (R1 fixed) |
+| Simplicity | ok | Round 2: the unused string is gone (R2 fixed) |
 | Plan fidelity | ok | Every divergence is logged under Deviations |
 | Agent decisions | ok | D-1/D-10 (`Insights` shape) live in `packages/contracts/src/insights.ts`; D-6 in `WorkRequest`/`ActivityMetadata` and `addWork`; option B (a table) would replace only the repository's `workEntries` and `addWork` |
 
