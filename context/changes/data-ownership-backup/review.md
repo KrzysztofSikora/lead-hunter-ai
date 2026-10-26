@@ -95,4 +95,4 @@ Extra check this round: a throwaway vitest probe, removed afterwards and not com
 - Fix: Add a third `notExists` to the retention query: an `offer_drafts` row for the opportunity with `updated_at >= before`. `insert` and `update` both set `updated_at`. Add a retention test: rejected 100 days ago, draft generated yesterday → kept. Update the *Risks* line in the plan ("or a note, work entry or offer draft").
 - Effort: small
 - Lesson candidate: no (covered by the R1 lesson already proposed)
-- Decision: open
+- Decision: fixed (7bfdb9f)
