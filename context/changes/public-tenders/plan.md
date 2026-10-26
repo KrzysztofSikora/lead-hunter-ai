@@ -427,7 +427,7 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 - [x] Phase 2: e-Zamówienia BZP adapter (checkpoint)
 - [x] Phase 3: TED search adapter
 - [x] Phase 4: Public-tender classification and the card
-- [ ] Phase 5: Sources view tender config and source policy
+- [x] Phase 5: Sources view tender config and source policy
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
@@ -435,6 +435,8 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 
 - [ ] (Phase 3) One real TED run: result, one sample signal against its notice page, the response shape against `ted/map-notice.ts` and `ted/query.ts` (field names, the `buyer-country` alpha-3 filter and date syntax in the query, date/time forms, multilingual objects, value fields, the link), requests per run and the page size in bytes — run: `pnpm db:migrate && pnpm dev`, add "TED — przetargi IT w Polsce" in Sources and press run, or `pnpm discover` with only it enabled; correct `ted/map-notice.ts` / `ted/query.ts` if the shape differs — evidence: none (needs the real API; the implementing session could not reach it).
 - [ ] (Phase 4) Open one analysed BZP card at phone width: deadline (Warsaw time), buyer and value read correctly and "Przetarg publiczny" is clear — run: `pnpm db:migrate && pnpm dev`, run the BZP source, analyse, open the card — evidence: none (needs a real run; the card is unit-tested in `opportunityCard.test.ts`).
+- [ ] (Phase 5) In the Sources view add both tender presets, change the BZP prefixes to `72, 48` and save; try `7` and a country such as `US` on TED and read the server messages; check that the editor and access wording is clear at phone width — run: `pnpm db:migrate && pnpm dev`, open Źródła — evidence: none (component-tested in `SourcesPage.test.tsx`; needs a person to judge the wording).
+- [ ] (Phase 5) Read the BZP and TED entries in `docs/source-policy.md` against the APIs' current terms pages and tick or correct every `DO WERYFIKACJI` item (terms and licence, the TED fair-use scope, the field and parameter names after the Phase 2-3 checks) — run: open `docs/source-policy.md`, sections "API: e-Zamówienia…" and "API: TED…" — evidence: none (the session could not reach the terms pages).
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -459,6 +461,9 @@ no hiring-cue downgrade (D-3, D-6). The runner passes the row's `sourceType` and
 - [minor] (Phase 4) Plan-review 13 / D-23: for a tender source the guard confirms `buyerConfirmed` only when the model's buyer is contained in `TenderFacts.buyer` (the notice's field), never from the text, so a forged `Zamawiający:` line confirms nothing. No tender facts or no buyer gives `false`.
 - [minor] (Phase 4) A tender with no stated value gets `sourceBudget = null` and a guard note only when the model had invented one. Plan-review 9: `INSUFFICIENT_DATA` returns before the tender rules (no evidence level); the card still reads `source.tender`. Tested.
 - [minor] (Phase 4) The card shows the tender block as origin items (`tender`, `tenderBuyer`, `tenderDeadline`, `tenderValue`, `tenderNotice`); "nie podano" only for `valueState: 'absent'`, a missed value is `unknown` (D-22). `docs/scoring.md` documents the row and the guard rule.
+- [minor] (Phase 5) No sources flow exists in `e2e/`, so the plan's fallback applies: a component test (`SourcesPage.test.tsx`) covers the editor (PATCH body, upper-cased countries, server issues kept next to the typed values, generic failure). The editor sends `countries` only for TED; BZP sends `{ cpvPrefixes }`. The API URL row appears for tender sources only.
+- [minor] (Phase 5) `pnpm docker:build` and `pnpm docker:smoke` could not run: no Docker daemon in this session. The phase changes no Dockerfile input beyond web sources; the gates must run in the review step or CI.
+- [minor] (Phase 5) `test-plan.md` gets a new risk row TR-28 (API shapes of the tender sources) instead of reusing TR-17, whose scope is feed formats.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

@@ -60,6 +60,7 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 | TR-25 (none) | Pre-filter lets "SEEKING WORK" posts or excluded categories reach the LLM; daily limits ignored | M | M | unit | pre-filter rule table; limit counters with fake clock | planned (S-04, S-05) |
 | TR-26 (human) | Image does not build or the container cannot start (native better-sqlite3, non-root permissions, volume) | M | M | image + human | CI `docker build` and `docker:smoke` on every PR; S-16 human check on the Pi with evidence | covered (S-16: container-smoke; Pi build human) |
 | TR-27 (human) | Footprint too large for the Pi 4 (NFR-01, NFR-02) | M | L | human | S-16 measurements with seeded 10 000 signals | planned (S-16 human checks, evidence in changes/pi-deployment/evidence/) |
+| TR-28 (human) | API response shape of the tender sources (e-Zamówienia BZP, TED) differs from the documented one: wrong field, date form or notice URL, an over-limit answer read as "no results", a missed value shown as "nie podano" | M | H | unit + human | synthetic responses in the documented shape (`tenders/`, marked `UNVERIFIED`) through each `map-notice.ts`; 403/429/5xx/truncated runs are explicit errors or `partial`; the first real run per API is a human check that corrects the mapper and replaces the fixture | planned (S-18 human checks, Phases 2-3) |
 
 ## Not tested (and why)
 - **Real third-party services in automated tests** (hnrss.org, WWR, Useme mail, Anthropic,
@@ -122,7 +123,9 @@ Tool setup (done in F-01, configuration fixed here): `@stryker-mutator/core` and
 - **Clock:** services take a `Clock` port; tests use `fakeClock(iso)`; scheduler tests use the
   fake clock with the `Europe/Warsaw` zone.
 - **Fixtures:** `apps/api/test/fixtures/` — `feeds/` (recorded hnrss and WWR responses, from the
-  S-10 human check; synthetic edge cases marked `synthetic-` in the file name), `pages/`,
+  S-10 human check; synthetic edge cases marked `synthetic-` in the file name), `tenders/`
+  (one BZP and one TED page, synthetic and `UNVERIFIED` until the S-18 human checks replace
+  them with trimmed real responses, buyers as `DEMO`), `pages/`,
   `email/` (anonymised `.eml` from the operator, S-11), `llm/` (recorded and synthetic provider
   responses, incl. invalid JSON and injection cases). Every fixture is fictional or anonymised
   and marked `DEMO` where it is shown in the UI; no real person, rate or client.

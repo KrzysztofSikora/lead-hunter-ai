@@ -147,7 +147,8 @@
   gap: 0.5rem;
 }
 
-.filter textarea {
+.filter textarea,
+.filter input[type='text'] {
   box-sizing: border-box;
   width: 100%;
   font: inherit;
