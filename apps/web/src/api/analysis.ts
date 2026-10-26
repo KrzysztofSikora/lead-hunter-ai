@@ -1,4 +1,10 @@
-import { AnalysisRequestRefused, AnalysisServiceStatus } from '@lead-hunter/contracts';
+import {
+  AnalysisActivity,
+  AnalysisCancelResult,
+  AnalysisRequestRefused,
+  AnalysisResumeResult,
+  AnalysisServiceStatus,
+} from '@lead-hunter/contracts';
 import { apiFetch } from './client.js';
 
 export async function getAnalysisStatus(): Promise<AnalysisServiceStatus> {
@@ -20,4 +26,24 @@ export async function requestAnalysis(id: number, force: boolean): Promise<Reque
   if (response.status === 404) return 'not_found';
   if (response.status === 409) return AnalysisRequestRefused.parse(await response.json()).error;
   throw new Error(`analysis request failed: ${response.status}`);
+}
+
+/** FR-34: queue, active entry, bounded history and host metrics. */
+export async function getAnalysisActivity(): Promise<AnalysisActivity> {
+  const response = await apiFetch('/api/analysis/activity');
+  if (response.status !== 200) throw new Error(`analysis activity failed: ${response.status}`);
+  return AnalysisActivity.parse(await response.json());
+}
+
+/** FR-34 AC3: aborts the app's own request and pauses the queue. */
+export async function cancelAnalysis(): Promise<AnalysisCancelResult> {
+  const response = await apiFetch('/api/analysis/cancel', { method: 'POST' });
+  if (response.status !== 200) throw new Error(`analysis cancel failed: ${response.status}`);
+  return AnalysisCancelResult.parse(await response.json());
+}
+
+export async function resumeAnalysis(): Promise<AnalysisResumeResult> {
+  const response = await apiFetch('/api/analysis/resume', { method: 'POST' });
+  if (response.status !== 200) throw new Error(`analysis resume failed: ${response.status}`);
+  return AnalysisResumeResult.parse(await response.json());
 }

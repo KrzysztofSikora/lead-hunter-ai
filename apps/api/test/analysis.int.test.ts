@@ -26,6 +26,7 @@ class RecordingProvider implements LlmProvider {
   readonly promptVersion = 'recording-1';
   readonly demo = true;
   readonly paid = false;
+  readonly timeoutMs = 0;
   readonly inputs: AnalysisInput[] = [];
   private readonly inner = new MockProvider();
 
@@ -415,6 +416,7 @@ describe('GET /api/analysis/status (D-11)', () => {
       analysedToday: 1,
       waiting: 2,
       limitReached: true,
+      paused: false,
       model: 'mock-rules',
       paid: false,
       blocked: null,
@@ -440,6 +442,7 @@ describe('GET /api/analysis/status (D-11)', () => {
       demo: false,
       analysedToday: 0,
       limitReached: false,
+      paused: false,
     });
   });
 });

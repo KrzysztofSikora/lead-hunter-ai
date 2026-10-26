@@ -50,7 +50,7 @@ R4-R6 are new and all come from the R1/R3 fix. I demonstrated R4 and R5 with scr
 | `apps/web/src/SourcesPage.tsx`, `.module.css`, `api/sources.ts`, `SourcesPage.test.tsx` | done | tender editor |
 | `e2e/` | absent | no sources flow exists; plan's fallback (component test) applies, logged |
 | `docs/source-policy.md` | done | BZP, TED, Baza Konkurencyjności, D-16 and manual-first rule |
-| `context/test-plan.md` | done | TR-28 and `tenders/` fixtures (logged) |
+| `context/test-plan.md` | done | TR-29 and `tenders/` fixtures (logged) |
 | `context/roadmap.md` | done | status |
 | `context/lessons.md` | unplanned | two proposed lessons from R1 and R2, in their own commit |
 

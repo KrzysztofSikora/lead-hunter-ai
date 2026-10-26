@@ -587,6 +587,7 @@ describe('jobs API (FR-17, FR-18)', () => {
       promptVersion: real.promptVersion,
       demo: real.demo,
       paid: real.paid,
+      timeoutMs: 0,
       analyzeOpportunity(input) {
         calls += 1;
         if (calls === 1) return Promise.reject(new Error('provider down'));

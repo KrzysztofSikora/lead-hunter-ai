@@ -32,12 +32,14 @@ export class OpenAiCompatibleProvider implements LlmProvider, OfferDrafter {
   readonly offerPromptVersion = OFFER_PROMPT_VERSION;
   readonly model: string;
   readonly paid: boolean;
+  readonly timeoutMs: number;
   private readonly jsonMode: 'json_object' | 'off';
   private readonly client: OpenAI;
 
   constructor(options: OpenAiCompatibleOptions) {
     this.model = options.model;
     this.paid = options.paid;
+    this.timeoutMs = options.timeoutMs;
     this.jsonMode = options.jsonMode;
     this.client = new OpenAI({
       apiKey: options.apiKey ?? 'not-needed',
@@ -47,26 +49,37 @@ export class OpenAiCompatibleProvider implements LlmProvider, OfferDrafter {
     });
   }
 
-  analyzeOpportunity(input: AnalysisInput): Promise<ProviderOutput> {
-    return this.request(systemPrompt(), buildUserMessage(input), MAX_TOKENS);
+  analyzeOpportunity(
+    input: AnalysisInput,
+    options?: { signal?: AbortSignal },
+  ): Promise<ProviderOutput> {
+    return this.request(systemPrompt(), buildUserMessage(input), MAX_TOKENS, options?.signal);
   }
 
   draftOffer(input: OfferInput): Promise<ProviderOutput> {
     return this.request(offerSystemPrompt(), buildOfferUserMessage(input), OFFER_MAX_TOKENS);
   }
 
-  private async request(system: string, user: string, maxTokens: number): Promise<ProviderOutput> {
+  private async request(
+    system: string,
+    user: string,
+    maxTokens: number,
+    signal?: AbortSignal,
+  ): Promise<ProviderOutput> {
     let response;
     try {
-      response = await this.client.chat.completions.create({
-        model: this.model,
-        max_tokens: maxTokens,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: user },
-        ],
-        ...(this.jsonMode === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
-      });
+      response = await this.client.chat.completions.create(
+        {
+          model: this.model,
+          max_tokens: maxTokens,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          ...(this.jsonMode === 'json_object' ? { response_format: { type: 'json_object' } } : {}),
+        },
+        signal ? { signal } : undefined,
+      );
     } catch (error) {
       throw toProviderError(error);
     }

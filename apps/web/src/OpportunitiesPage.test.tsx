@@ -23,6 +23,7 @@ const status = {
   analysedToday: 0,
   waiting: 0,
   limitReached: false,
+  paused: false,
 };
 const list = { items: [], page: 1, pageSize: 20, total: 0, sources: { checked: 0, errors: [] } };
 
