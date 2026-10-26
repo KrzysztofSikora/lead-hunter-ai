@@ -1,44 +1,51 @@
 # Review: data-ownership-backup
 
 Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (83 files, 1114 tests), image not run (environment: `pnpm install` inside the build fails with SELF_SIGNED_CERT_IN_CHAIN from the sandbox proxy), image smoke not run (needs the image), e2e not run (environment: the Chromium download fails), mutation n/a (S-15 is not a mutation target) · Round: 1
+Gates: typecheck ok, lint ok, unit tests ok (83 files, 1116 tests), image not run (environment: no Docker daemon in this sandbox), image smoke not run (needs the image), e2e not run (environment: Playwright Chromium not installed), mutation n/a (S-15 is not a mutation target) · Round: 2
 
-Extra checks this review ran: `pnpm build`, then the built `node apps/api/dist/cli/backup.js` against a temp `DATA_DIR`. The copy was written, the same-second rerun was refused with exit 1, and a `BACKUP_DIR` below a regular file failed with exit 1. The new smoke step 5/5 is still unexecuted, as the plan's `[REVIEW]` line says.
+Re-review after `/fix-review` (commits `eccd401`, `66796f8`, `18fa4c3`, `5fa91c0`).
+
+- R1 is fixed as described: the retention query now skips rows with a `NOTE` or `WORK` event at or after `before`, and the new test covers a note added yesterday.
+- R4 is fixed: `cli/backup.ts` no longer imports `runMigrations`, and it exits 1 with `brak bazy` when the database file is missing (new CLI test).
+- R3 is fixed: the *Risks* line is in `plan.md`.
+- R2 is deferred with a `[FOLLOW-UP]` in *Deviations*.
+
+Extra check this round: a throwaway vitest probe, removed afterwards and not committed. It took an opportunity `REJECTED` 100 days ago, generated an offer draft for it one day ago (`201`), then ran `runDaily()`. Result: `removed 1`, so the opportunity and its new draft are gone (R5).
 
 ## Plan vs diff
 | File | Status | Note |
 |------|--------|------|
 | `apps/api/src/infrastructure/db/schema.ts`, `migrations/0013_old_pride.sql`, `meta/*` | done | `deleted_usage` plus its index; additive |
-| `apps/api/src/infrastructure/db/data-repository.ts` | done | Delete, retention and export; the column allowlist answers plan-review #3 |
+| `apps/api/src/infrastructure/db/data-repository.ts` | done | Delete, retention and export. Round 2 adds the `NOTE`/`WORK` guard (R1); drafts are still not considered (R5) |
 | `apps/api/src/infrastructure/db/analysis-repository.ts` | done | Sums from `deleted_usage`; D-2 paths |
 | `apps/api/src/infrastructure/db/offer-draft-repository.ts`, `modules/offers/{ports,service}.ts` | done | `insert` returns `number \| null`; both paths answer `not_found` |
 | `apps/api/src/modules/data/{ports,service,routes}.ts` | done | |
 | `apps/api/src/modules/data/export-rows.ts` (+ test) | done | |
 | `apps/api/src/app.ts`, `apps/api/src/server.ts` | done | |
 | `packages/contracts/src/{data,index}.ts` | done | |
-| `apps/web/src/api/data.ts`, `OpportunityPage.tsx` (+ css, test), `ProfilePage.tsx` (+ css), `strings.pl.ts` | done | `ProfilePage.tsx` is mostly re-indentation (wrapped in a fragment) |
+| `apps/web/src/api/data.ts`, `OpportunityPage.tsx` (+ css, test), `ProfilePage.tsx` (+ css), `strings.pl.ts` | done | |
 | `packages/config/src/env.ts` (+ test), `.env.example` | done | |
-| `apps/api/src/infrastructure/backup/sqlite-backup.ts` | done | Deviations logged (single step, `journal_mode = DELETE`, same-second refusal) |
+| `apps/api/src/infrastructure/backup/sqlite-backup.ts` | done | Deviations logged |
 | `apps/api/src/infrastructure/scheduler/schedule.ts` (+ test) | done | |
-| `apps/api/src/cli/backup.ts`, `apps/api/package.json`, `package.json` | done | |
+| `apps/api/src/cli/backup.ts`, `apps/api/package.json`, `package.json` | diverged | No longer migrates (R4 fix). The plan's *Modules* line still says "opens the DB, migrates", so the review decision covers it; no *Deviations* entry needed |
 | `CLAUDE.md` | done | |
 | `README.md` | done | |
-| `scripts/container-smoke.sh` | done | Restores in place (logged); never executed |
-| `apps/api/test/{data-delete,data-export,backup,retention,restore}.int.test.ts`, `cli.int.test.ts` | done | |
-| `apps/api/test/helpers/app.ts`, `apps/api/test/offer-draft-repository.int.test.ts` | unplanned | Test wiring for `data` and the `number \| null` return; trivial |
-| `.gitignore` | unplanned | `!apps/api/src/modules/data/`, logged under *Deviations* |
-| `context/roadmap.md` | unplanned | Status column only |
+| `scripts/container-smoke.sh` | done | Restores in place (logged); still never executed (`[REVIEW]` line) |
+| `apps/api/test/{data-delete,data-export,backup,retention,restore}.int.test.ts`, `cli.int.test.ts` | done | Round 2 adds the note-retention test and the missing-database CLI test |
+| `apps/api/test/helpers/app.ts`, `apps/api/test/offer-draft-repository.int.test.ts` | unplanned | Test wiring; trivial |
+| `.gitignore` | unplanned | Logged under *Deviations* |
+| `context/roadmap.md`, `context/lessons.md` | unplanned | Status column; proposed lesson from R1 |
 
 ## Areas
 | Area | Result | One-line reason |
 |------|--------|-----------------|
-| Correctness | concern | Retention can delete a row the operator wrote a note on today (R1) |
-| Design | ok | Clean ports, one `remove` routine for delete and retention, and the allowlist test forces a decision for every new column |
-| Safety | ok | The export reads no sessions, hash or keys (TR-12 test); the session cookie is SameSite strict; the backup refuses to overwrite a copy |
-| Tests | concern | The D-2 failed-analysis path and the cost carried on a late save are untested (R2) |
-| Simplicity | concern | The unknown-cost rule now exists in five places (R2) |
-| Plan fidelity | concern | Plan-review #8 (history effects, rows returning as `NEW`) was not added to *Risks* (R3) |
-| Agent decisions | ok | D-1 (`deleted_usage`) and D-8 (allowlist) each live in one place and could be swapped as claimed |
+| Correctness | concern | Retention still deletes a closed row whose offer draft was generated or edited within the period (R5) |
+| Design | ok | Clean ports, and one `remove` routine serves both delete and retention |
+| Safety | ok | The export leaves out secrets (TR-12 test), and the backup CLI no longer touches the schema |
+| Tests | concern | Late-save cost paths untested (R2, deferred); no retention test for draft activity (R5) |
+| Simplicity | concern | The unknown-cost rule exists in five places (R2, deferred) |
+| Plan fidelity | ok | The R3 *Risks* line was added; the R4 change is recorded through this review |
+| Agent decisions | ok | D-1 and D-8 each live in one place; D-4's "last change" now covers notes and work but not drafts (R5) |
 
 ## Findings
 ### R1: Retention ignores notes and work entries, so it deletes rows the operator just touched
@@ -80,3 +87,12 @@ Extra checks this review ran: `pnpm build`, then the built `node apps/api/dist/c
 - Effort: small
 - Lesson candidate: no
 - Decision: fixed (66796f8)
+
+### R5: Retention still ignores offer-draft activity, so a draft generated or edited yesterday is deleted
+- Severity: major
+- Where: `apps/api/src/infrastructure/db/data-repository.ts:234` (`deleteClosedBefore`); `apps/api/src/infrastructure/db/offer-draft-repository.ts:25` (`insert`), `:83` (`update`)
+- Problem: The R1 fix added only `NOTE` and `WORK` events. Generating a draft (`POST /api/opportunities/:id/offer-drafts`) and saving or acting on one (`act` → `repository.update`) write `offer_drafts` rows, but they do not move `opportunities.updated_at` and add no activity event. `moveForward` does not move a `REJECTED`/`EXPIRED` row, because that move is not forward. The service lets the operator generate a draft for a closed opportunity. The probe in this round reproduced the problem: `REJECTED` 100 days ago, then a draft generated one day ago (`201`, a billed provider call when the provider is paid), then `runDaily()` gave `retention: removed 1 opportunities`. The draft the operator just asked for is gone. The proposed lesson from R1 says to list every write path that does not move the column, and the fix did not go through `offer_drafts`.
+- Fix: Add a third `notExists` to the retention query: an `offer_drafts` row for the opportunity with `updated_at >= before`. `insert` and `update` both set `updated_at`. Add a retention test: rejected 100 days ago, draft generated yesterday → kept. Update the *Risks* line in the plan ("or a note, work entry or offer draft").
+- Effort: small
+- Lesson candidate: no (covered by the R1 lesson already proposed)
+- Decision: open
