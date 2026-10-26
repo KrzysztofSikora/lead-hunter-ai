@@ -191,3 +191,30 @@ describe('parseReward: cost', () => {
     expect(performance.now() - started).toBeLessThan(1_000);
   });
 });
+
+describe('parseReward: amounts that are not the reward (R1)', () => {
+  it.each([
+    'Support invoices over $1,000',
+    '[Bounty] Fix rounding for $5 items',
+    'Fix the $5 rounding bug, bounty welcome',
+  ])('title %s is unknown', (text) => {
+    expect(title(text)).toBeNull();
+  });
+
+  it.each([
+    'The paid plan costs $10',
+    'We pay $5 per test case',
+    'Bounty: $200 AUD',
+    'Bounty: 200 USDC',
+    'Bounty $: 50',
+  ])('body %s is unknown', (line) => {
+    expect(body(line)).toBeNull();
+  });
+
+  it.each(['[$200] Fix it', '($200) Fix it', '$200 Fix it', 'Bounty: $200 Fix it'])(
+    'title %s is the reward',
+    (text) => {
+      expect(title(text)).toMatchObject({ amountMinor: 20_000 });
+    },
+  );
+});

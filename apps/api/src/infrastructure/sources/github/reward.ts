@@ -18,8 +18,15 @@ const MAX_MAJOR_UNITS = 1_000_000_000;
 const KEYWORD =
   /(?<![\p{L}\p{N}])(?:bount(?:y|ies)|rewards?|nagrod\p{L}*|pay|paid|budget|płac\p{L}*|płatn\p{L}*)(?![\p{L}\p{N}])/iu;
 const RATE =
-  /\/\s?(?:h|hr|hour|hours|mo|month|week|wk|day|year|yr|godz|mies)(?![\p{L}\p{N}])|per\s+(?:hour|month|week|day|year)|hourly|monthly|miesięcznie|godzinowo/iu;
+  /\/\s?(?:h|hr|hour|hours|mo|month|week|wk|day|year|yr|godz|mies)(?![\p{L}\p{N}])|per\s+\p{L}|hourly|monthly|miesięcznie|godzinowo/iu;
 const NOT_A_REWARD = /sponsor|credit/iu;
+
+/** What may stand between a reward word and its amount: punctuation, numbers, a linking word. */
+const GAP = String.raw`(?:[^\p{L}\p{N}]|\d|(?<![\p{L}])(?:is|are|issue|of|jest|są|wynosi)(?![\p{L}]))`;
+const KEYWORD_BEFORE = new RegExp(String.raw`${KEYWORD.source}${GAP}{0,25}$`, 'iu');
+const KEYWORD_AFTER = new RegExp(String.raw`^[^\p{L}\p{N}]{0,15}${KEYWORD.source}`, 'iu');
+/** A currency code other than the three we know follows the amount (`AUD`, `CAD`, `USDC`). */
+const OTHER_CODE = /^\s?(?!USD|EUR|PLN)[A-Z]{3,4}(?![\p{L}])/u;
 
 const NUMBER = String.raw`\d{1,3}(?:[ ,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?`;
 const TOKEN = new RegExp(String.raw`(?<![\d.,])(${NUMBER})(?!\d)(k(?![\p{L}\p{N}]))?`, 'gu');
@@ -53,7 +60,7 @@ function majorUnits(token: string): number {
 }
 
 /** `null` stands for a refusal of the whole parse, `[]` for a line without an amount. */
-function amountsIn(line: string): ParsedReward[] | null {
+function amountsIn(line: string, where: 'label' | 'title' | 'body'): ParsedReward[] | null {
   if (hasForeignDollar(line)) return null;
   const found: ParsedReward[] = [];
   for (const match of line.matchAll(TOKEN)) {
@@ -70,6 +77,19 @@ function amountsIn(line: string): ParsedReward[] | null {
     const from = before ? start - before[0].length : start;
     if (after) end += after[0].length;
     if (/^\s*(?:[-–—]|to\b|do\b)\s*[$€]?\s?\d/iu.test(line.slice(end))) return null;
+    if (OTHER_CODE.test(line.slice(end))) return null;
+    // Only a label is a reward by itself; elsewhere the amount must sit next to a reward word.
+    if (where !== 'label') {
+      const head = line.slice(0, from);
+      const reward =
+        KEYWORD_BEFORE.test(head) ||
+        KEYWORD_AFTER.test(line.slice(end)) ||
+        (where === 'title' && (head.trim() === '' || /[[(]\s*$/u.test(head)));
+      if (!reward) {
+        if (where === 'body') return null;
+        continue;
+      }
+    }
     const major = majorUnits(token) * (match[2] ? 1000 : 1);
     const quote = line.slice(from, end).trim();
     if (!(major > 0) || major > MAX_MAJOR_UNITS) return null;
@@ -87,10 +107,17 @@ function amountsIn(line: string): ParsedReward[] | null {
  * distinct amount and currency gives a reward; anything ambiguous gives `null`.
  */
 export function parseReward({ labels, title, body }: RewardInput): ParsedReward | null {
-  const lines = [...labels, title, ...body.split(/\r?\n/u).filter((line) => KEYWORD.test(line))];
+  const lines = [
+    ...labels.map((line) => ({ line, where: 'label' as const })),
+    { line: title, where: 'title' as const },
+    ...body
+      .split(/\r?\n/u)
+      .filter((line) => KEYWORD.test(line))
+      .map((line) => ({ line, where: 'body' as const })),
+  ];
   let first: ParsedReward | null = null;
-  for (const line of lines) {
-    const amounts = amountsIn(line);
+  for (const { line, where } of lines) {
+    const amounts = amountsIn(line, where);
     if (amounts === null) return null;
     if (amounts.length === 0) continue;
     if (RATE.test(line) || NOT_A_REWARD.test(line)) return null;
