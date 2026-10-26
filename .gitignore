@@ -23,3 +23,4 @@ config/profile.local.*
 
 # Local database files
 data/
+!apps/api/src/modules/data/

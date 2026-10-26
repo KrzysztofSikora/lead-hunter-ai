@@ -13,6 +13,8 @@ import { registerJobRoutes, type ScheduleInfo } from './modules/jobs/routes.js';
 import type { JobsService } from './modules/jobs/service.js';
 import { registerAuth } from './modules/auth/routes.js';
 import type { AuthDeps } from './modules/auth/service.js';
+import { registerDataRoutes } from './modules/data/routes.js';
+import type { DataService } from './modules/data/service.js';
 import { registerDigestRoutes } from './modules/digest/routes.js';
 import type { DigestDeps } from './modules/digest/service.js';
 import { registerInsightsRoutes } from './modules/insights/routes.js';
@@ -44,6 +46,7 @@ export interface AppDeps {
   insights: InsightsDeps;
   analysis: AnalysisRouteDeps;
   offers: OfferService;
+  data: DataService;
   sources: SourceService;
   jobs: JobsService;
   schedule: ScheduleInfo;
@@ -96,6 +99,7 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   registerInsightsRoutes(app, deps.insights);
   registerAnalysisRoutes(app, deps.analysis);
   registerOfferRoutes(app, deps.offers);
+  registerDataRoutes(app, deps.data);
   registerSourceRoutes(app, deps.sources, deps.jobs);
   registerJobRoutes(app, { jobs: deps.jobs, schedule: deps.schedule });
 

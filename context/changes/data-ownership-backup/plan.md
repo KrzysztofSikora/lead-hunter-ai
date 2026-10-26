@@ -262,7 +262,7 @@ The operator owns their data and can get it back after a failure:
 
 ## Progress
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
-- [ ] Phase 1: Delete an opportunity (API, spend kept)
+- [x] Phase 1: Delete an opportunity (API, spend kept)
 - [ ] Phase 2: Export and the UI (delete button, export link)
 - [ ] Phase 3: Backup command and daily job
 - [ ] Phase 4: Retention
@@ -273,6 +273,12 @@ The operator owns their data and can get it back after a failure:
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
+- [minor] Plan-review #7 (D-2, draft path): when the opportunity is gone, both the successful and the failed draft path answer `404` (`insert` returns `null`, the service returns `not_found`); asserted for both in `data-delete.int.test.ts`.
+- [minor] Plan-review #5: the second evidence row in the phase 1 test comes from a real duplicate import, not a direct insert.
+- [minor] Plan-review #10: FK line numbers in *Findings* are off by a few lines (`analyses.opportunity_id` is `schema.ts:194`, evidence 228, events 249, identities 272, payments 288, drafts 312); the code is unaffected.
+- [minor] `.gitignore` has `data/`, which hid the new module `apps/api/src/modules/data/`; added the negation `!apps/api/src/modules/data/`.
+- [minor] `POST /api/opportunities/:id/payments` answers `200` (not `201`); the phase 1 test asserts what the route does.
+- Plan-review majors (answered before implementing, per lesson): #3 phase 2 uses an explicit per-table column allowlist in `data-repository.ts` plus a test comparing `getTableColumns` with allowlist + "not exported" list; #1 phase 3 bounds the writer in the test and passes a large `progress` page count / aborts after bounded restarts; #2 phase 5 restores from a backup of a DB migrated only up to an earlier journal entry and asserts `0013` applies, and the smoke restores in place on the same volume.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

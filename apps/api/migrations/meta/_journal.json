@@ -92,6 +92,13 @@
       "when": 1793000865955,
       "tag": "0012_fresh_molten_man",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1793043838945,
+      "tag": "0013_old_pride",
+      "breakpoints": true
     }
   ]
 }

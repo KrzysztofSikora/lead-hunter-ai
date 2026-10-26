@@ -83,8 +83,11 @@ export interface OfferDraftChanges {
 }
 
 export interface OfferDraftRepository {
-  /** Returns the new id. A `FAILED` row is stored with `insert` too. */
-  insert(draft: NewOfferDraft, at: number): number;
+  /**
+   * Returns the new id. A `FAILED` row is stored with `insert` too. Returns null when the
+   * opportunity was deleted meanwhile: nothing is stored but the usage (S-15 D-2).
+   */
+  insert(draft: NewOfferDraft, at: number): number | null;
   get(id: number): OfferDraftRow | undefined;
   /** The newest non-`FAILED` draft of the opportunity. */
   current(opportunityId: number): OfferDraftRow | undefined;

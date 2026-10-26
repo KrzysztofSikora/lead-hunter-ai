@@ -203,8 +203,12 @@ export function createOfferService(deps: OfferDeps): OfferService {
       error: string,
       billed?: { usage: ProviderOutput['usage']; cost: number | null },
     ): GenerateResult => {
-      stored('FAILED', { error, ...(billed ? { usage: billed.usage, cost: billed.cost } : {}) });
-      return { result: 'failed', reason: error };
+      const id = stored('FAILED', {
+        error,
+        ...(billed ? { usage: billed.usage, cost: billed.cost } : {}),
+      });
+      // S-15 D-2: the opportunity was deleted while the provider ran.
+      return id === null ? { result: 'not_found' } : { result: 'failed', reason: error };
     };
     const priceOf = (usage: ProviderOutput['usage']) =>
       active.paid ? costMicroUsd(usage, deps.budget?.price ?? null) : 0;
@@ -241,12 +245,13 @@ export function createOfferService(deps: OfferDeps): OfferService {
       const checked = OfferDraftContent.safeParse(guarded.content);
       if (!checked.success) return fail('invalid_output: guard', billed);
 
-      stored('DRAFT', {
+      const id = stored('DRAFT', {
         content: checked.data,
         notes: guarded.notes,
         usage: billed.usage,
         cost: billed.cost,
       });
+      if (id === null) return { result: 'not_found' };
     } catch {
       return fail('internal_error', billed);
     }

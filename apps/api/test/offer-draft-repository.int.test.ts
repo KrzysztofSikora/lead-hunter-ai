@@ -56,7 +56,7 @@ describe('offer draft repository (S-07 D-1)', () => {
   it('the newest non-failed row is current, failed ones are never current', () => {
     const { repo, id } = setup();
     repo.insert(draft(id, { subject: 'first' }), 100);
-    const second = repo.insert(draft(id, { subject: 'second' }), 200);
+    const second = repo.insert(draft(id, { subject: 'second' }), 200)!;
     repo.insert(draft(id, { status: 'FAILED', error: 'not_json' }), 300);
 
     expect(repo.current(id)?.id).toBe(second);
@@ -66,7 +66,7 @@ describe('offer draft repository (S-07 D-1)', () => {
 
   it('updates only while the status is still the expected one', () => {
     const { repo, id } = setup();
-    const row = repo.insert(draft(id), 100);
+    const row = repo.insert(draft(id), 100)!;
 
     expect(repo.update(row, 'DRAFT', { status: 'REVIEWED', subject: 'edited' }, 200)).toBe(true);
     expect(repo.update(row, 'DRAFT', { status: 'REVIEWED' }, 300)).toBe(false);

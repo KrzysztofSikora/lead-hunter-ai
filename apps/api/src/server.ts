@@ -16,6 +16,8 @@ import {
   llmRunnerDeps,
   offerDrafterDeps,
 } from './infrastructure/llm/create-provider.js';
+import { createDataRepository } from './infrastructure/db/data-repository.js';
+import { createDataService } from './modules/data/service.js';
 import { createOfferService } from './modules/offers/service.js';
 import { createOpportunityService } from './modules/opportunities/service.js';
 import {
@@ -163,6 +165,7 @@ async function main(): Promise<void> {
     insights: { repository: createInsightsRepository(db), clock },
     analysis: runner,
     offers,
+    data: createDataService({ repository: createDataRepository(db), clock }),
     sources: sourceRuntime.service,
     jobs: sourceRuntime.jobs,
     schedule: {
