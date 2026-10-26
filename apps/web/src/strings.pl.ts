@@ -654,6 +654,11 @@ export const strings = {
       followUpSet: (on: string) => `ustawiono na ${on}`,
       followUpCleared: 'usunięto',
       followUpDropped: 'follow-up usunięty przy zmianie statusu',
+      work: 'Czas i koszty',
+      workEntry: (minutes: string | null, cost: string | null) =>
+        [minutes ? `czas: ${minutes}` : null, cost ? `koszt: ${cost}` : null]
+          .filter((part) => part !== null)
+          .join(' · '),
     },
     pipeline: {
       followUpTitle: 'Follow-up',
@@ -674,6 +679,16 @@ export const strings = {
       paidOnInvalid: 'Podaj poprawną datę płatności.',
       paymentNoteLabel: 'Notatka do płatności',
       paymentSave: 'Zapisz płatność',
+      workTitle: 'Czas i koszty',
+      workHint:
+        'Wpisane ręcznie; trafiają do widoku Wyniki. Wpis ma datę zapisu i nie da się go zmienić.',
+      workHoursLabel: 'Czas (godziny, np. 1,5)',
+      workHoursInvalid: 'Podaj czas w godzinach, np. 1,5 (od 1 minuty do 100 000 minut).',
+      workCostLabel: 'Koszt',
+      workCostInvalid: 'Podaj koszt większy od zera, np. 120,00.',
+      workEmpty: 'Podaj czas albo koszt.',
+      workNoteLabel: 'Notatka do wpisu',
+      workSave: 'Zapisz czas i koszt',
     },
     detectedEntry: 'Wykryto',
     empty: {

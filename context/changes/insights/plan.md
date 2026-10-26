@@ -237,11 +237,12 @@ Observably true when done:
 - [x] Phase 1: Insights API for weeks and months
 - [x] Phase 2: Time and cost entries
 - [x] Phase 3: Wyniki view
-- [ ] Phase 4: Time and cost form on the card, docs
+- [x] Phase 4: Time and cost form on the card, docs
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
 - [ ] (Phase 3) *Wyniki* at 360 px: totals readable, per-source table scrolls inside its box without page scroll, wording of the reply line ("X z Y z wynikiem (Z bez wyniku)") and of "brak danych" — run: `pnpm dev`, log in, open `/wyniki` at 360 px after an import → draft → "Oznacz jako wysłane" → payment — evidence: `context/changes/insights/evidence/insights-360.jpg`
+- [ ] (Phase 4) Time and cost form: enter "1,5" h and "120" PLN on a card → history shows "czas: 1 h 30 min · koszt: 120,00 zł"; *Wyniki* → Miesiąc shows 1 h 30 min, the cost and the result in PLN only — run: `pnpm dev`, open `/okazje/<id>`, section *Czas i koszty*, then `/wyniki` — evidence: none (API path covered by `apps/api/test/insights.int.test.ts`)
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -253,6 +254,7 @@ Observably true when done:
 - [minor] (Phase 2) `WorkCost` is defined once in `status.ts` and reused by `ActivityMetadata` and `WorkRequest`; an unreadable `WORK` metadata row counts as no entry. The `OpportunityPage` history label for `WORK` stays in Phase 4 (plan-review 4).
 - [minor] (Phase 3) `formatMinor` printed a negative amount as `-1,-50`; `net` (payments − costs) may be negative (D-10), so it now formats the sign once (`strings.pl.ts`, row added to `strings.pl.test.ts`).
 - [minor] (Phase 3) The e2e step asserts `offersSent` 1, `contacted` 1, "brak danych" with "1 bez wyniku", the payment sum and no overflow (plan-review 1, 10). With no known outcome the reply line reads "0 z 0 z wynikiem (1 bez wyniku)", which is awkward; wording is a human check.
+- [minor] (Phase 4) `hoursToMinutes` (hours with comma → whole minutes) is in `profileForm.ts` next to `inputToMinor`, with a one-line unit test; the WORK history line has one `eventDetails` test row (plan-review 4: `OpportunityPage.tsx` label added).
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

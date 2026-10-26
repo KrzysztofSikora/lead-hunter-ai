@@ -293,6 +293,13 @@ describe('eventDetails', () => {
     ]);
   });
 
+  it('shows the time and cost of a work entry', () => {
+    const work = { minutes: 90, cost: { amountMinor: 12000, currency: 'PLN' as const } };
+    expect(
+      eventDetails({ ...event, type: 'WORK', fromStatus: null, toStatus: null, work }),
+    ).toEqual([expect.stringMatching(/^czas: 1 h 30 min · koszt: 120,00/)]);
+  });
+
   it('shows nothing extra for a plain move', () => {
     expect(eventDetails(event)).toEqual([]);
   });

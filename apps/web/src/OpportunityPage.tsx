@@ -251,7 +251,9 @@ function History({ events, createdAt }: { events: ActivityEvent[]; createdAt: st
             ? h.note
             : event.type === 'FOLLOW_UP'
               ? h.followUp
-              : h.statusChange}{' '}
+              : event.type === 'WORK'
+                ? h.work
+                : h.statusChange}{' '}
           ({h[event.actor]})
           {event.type === 'STATUS_CHANGE' && event.toStatus && (
             <>
