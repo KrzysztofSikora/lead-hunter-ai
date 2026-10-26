@@ -1,7 +1,11 @@
 # Review: demand-sources
 
-Verdict: APPROVE WITH FOLLOW-UPS
-Gates: typecheck ok, lint ok, unit tests ok (63 files, 896 tests), e2e ok (5/5), image not run (no Docker daemon in this environment), image smoke not run (needs the image) · Round: 1
+Verdict: APPROVE
+Gates: typecheck ok, lint ok, unit tests ok (896 tests), e2e ok (5/5), image not run (no Docker daemon in this environment), image smoke not run (needs the image) · Round: 2
+
+Round 2 (re-review after `/fix-review`, commits `a68292f`, `09dca0f`, `b9db994`, `b8e7539`,
+`6b83568`): every round-1 finding marked `fixed` was checked against the code (see *Round 2
+verification*). No new findings.
 
 Base: `main` (`3f6136e`), which `HEAD` (`0d647cc`, "Merge main into change/demand-sources") already
 contains, so `git diff main HEAD` is the change. No `mutation.md` exists for this change.
@@ -16,7 +20,7 @@ contains, so `git diff main HEAD` is the change. No `mutation.md` exists for thi
 | `packages/contracts/src/jobs.ts` | done | `JobCounters.sourceFiltered` |
 | `packages/contracts/src/index.ts` | unplanned | exports `SourceFilter`; needed |
 | `apps/api/src/infrastructure/db/schema.ts` | done | `sources.filter_json`, `opportunities.prefilter_phrase` |
-| `apps/api/migrations/0010_*.sql`, `0011_*.sql` | diverged | Plan: one migration per phase. After the merge with `main` (whose own 0010 is offer-drafts) both columns are in one regenerated `0011_mean_zaran.sql` (+ snapshot, journal). Additive, nullable; correct. Not logged under *Deviations* |
+| `apps/api/migrations/0010_*.sql`, `0011_*.sql` | done | Round 1: diverged (not logged). Round 2: logged as a `[minor]` deviation; one regenerated `0011_mean_zaran.sql`, additive and nullable |
 | `apps/api/src/modules/sources/presets.ts` | done | new `PRESETS`, `WITHDRAWN_PRESETS`; HN default is `exclude: ['SEEKING WORK']` per the `[REVIEW]` deviation |
 | `apps/api/src/modules/sources/source-filter.ts` (+ test) | done | `readFilter` returns `{ filter, invalid }` (logged `[minor]`); `applySourceFilter` per D-3 |
 | `apps/api/src/modules/sources/ports.ts`, `service.ts` | done | `update`, preset filter copied on create, verdict before `ingest`, rejection only on `created` in the same transaction |
@@ -28,26 +32,35 @@ contains, so `git diff main HEAD` is the change. No `mutation.md` exists for thi
 | `apps/api/src/infrastructure/db/job-run-repository.ts` | done | `sourceFiltered` live and summed into cycles |
 | `apps/api/src/cli/discover.ts` | done | prints `odrzucone przez filtr źródła N` |
 | `apps/api/test/fixtures/feeds/synthetic-{freelancer,discourse}.xml`, `parse-feed.test.ts` | done | `DEMO`, both shapes parsed |
-| `apps/api/test/sources.int.test.ts` | done | call sites moved; withdrawn, defaults, AC1–AC3, HN default, PATCH cases. The "filter off passes to FR-07" case is missing (R2) |
+| `apps/api/test/sources.int.test.ts` | done | call sites moved; withdrawn, defaults, AC1–AC3 plus filter off (round 2), HN default, PATCH cases |
 | `apps/api/test/jobs.int.test.ts` | done | call sites moved; `sourceFiltered` on run and cycle |
 | `apps/web/src/opportunityCard.ts` (+ test) | done | `prefilterReason(rule, phrase)` (logged `[minor]`) |
 | `apps/web/src/OpportunitiesPage.tsx`, `OpportunityPage.tsx` | done | reason in list and history |
 | `apps/web/src/SourcesPage.tsx`, `SourcesPage.module.css`, `strings.pl.ts` | done | filter block, badge, run message, counter label |
 | `apps/web/src/api/sources.ts` | done | `updateSource(id, patch)` |
-| `docs/source-policy.md` | done | new presets, withdrawn marks, "Filtr źródła" section; one stale line (R3) |
-| `README.md` | absent | Plan: touch only if it lists presets. After the merge it does (`README.md:156`, `:206`, `:220`) and still offers WWR (R3) |
-| `context/changes/demand-sources/{plan,plan-review,pr-body}.md` | done | workflow artifacts |
+| `docs/source-policy.md` | done | new presets, withdrawn marks, "Filtr źródła" section; HN line and first-source-wins sentence fixed in round 2 |
+| `README.md` | done | Round 1: absent (still offered WWR). Round 2: adapter table, *Źródła RSS/Atom* bullet and human checks list the S-17 presets and the source filter |
+| `context/lessons.md` | unplanned | two `proposed` lessons from R1 and R2; expected output of `/fix-review` |
+| `context/changes/demand-sources/{plan,plan-review,pr-body}.md` | done | workflow artifacts; plan gained D-19 and the merged-migration deviation |
 
 ## Areas
 | Area | Result | One-line reason |
 |------|--------|-----------------|
-| Correctness | concern | AC1–AC3 hold for one source, but a rejection is global to the opportunity, so overlapping sources give order-dependent results (R1) |
+| Correctness | ok | AC1–AC3 hold; cross-source order dependence is now an explicit decision (D-19), documented for the operator (R1) |
 | Design | ok | rejection reuses `prefilter_rule` and every existing guard; helpers shared via `system-move.ts`; filter isolated in one pure module |
 | Safety | ok | filter validated with Zod at the route and again before storing; bounded lists; linear substring match; no transform in response schemas; invalid stored JSON logged by source id only |
-| Tests | concern | the filter-off branch of `service.run` is never exercised with phrases that would reject (R2) |
+| Tests | ok | the filter-off branch is exercised with phrases that would reject; replacing `filter.enabled ? … : pass` with "always apply" fails the AC test (checked in round 2) |
 | Simplicity | ok | small diff per concern; editor stays local to `SourcesPage.tsx` |
-| Plan fidelity | ok | deviations logged; migration merge and README not logged (R3) |
+| Plan fidelity | ok | deviations logged, including the migration merge and the corrected README note |
 | Agent decisions | ok | each costly decision (D-1, D-2, D-5, D-6, D-7, D-9, D-11, D-13, D-16) lives in one schema, column or file and can be swapped as claimed |
+
+## Round 2 verification
+| Finding | Check | Result |
+|---------|-------|--------|
+| R1 | D-19 row in *Decisions* (first source wins, alternative B recorded); `docs/source-policy.md` *Kiedy* names the Freelancer.com case; the AC test's misleading comment replaced and now cites D-4/D-19 | fixed |
+| R2 | AC test PATCHes `enabled: false` with phrases kept, serves `DEMO [FOR HIRE] Garden lights` (matches `exclude`, misses `include`), asserts `new: 1, filtered: 0` and `NEW`/`PENDING` without `source_filter`. Temporarily mutating `service.ts:225` to always apply the filter made this test fail; file restored | fixed |
+| R3 | README lines 156, 206-209, 222 list Freelancer.com and Arduino Forum and mention the source filter; `docs/source-policy.md:40` names the `hn-freelance` default and FR-07 for older sources; deviation added and the README note corrected | fixed |
+| R4 | `SourcesPage.tsx:80-84` resets both drafts from the `Source` returned by `updateSource` (parsed with `Source.parse`) only on the button path (`done` non-null); the checkbox path keeps the draft (plan-review R2 #7) | fixed |
 
 ## Findings
 ### R1: A source-filter rejection is global, so overlapping sources decide each other's items by run order
