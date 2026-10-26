@@ -93,8 +93,12 @@ function Active({ data, now }: { data: AnalysisActivity; now: number }) {
         <dd>{t.stages[entry.stage]}</dd>
         <dt>{t.started}</dt>
         <dd>{formatWarsaw(entry.startedAt)}</dd>
-        <dt>{t.elapsed}</dt>
-        <dd>{t.elapsedOf(formatDuration(elapsed), formatTimeout(data.timeoutMs))}</dd>
+        {entry.stage === 'requesting' && (
+          <>
+            <dt>{t.elapsed}</dt>
+            <dd>{t.elapsedOf(formatDuration(elapsed), formatTimeout(data.timeoutMs))}</dd>
+          </>
+        )}
         <dt>{t.attempt}</dt>
         <dd>{t.attemptOf(entry.attempt, entry.maxAttempts)}</dd>
         {entry.nextAttemptAt && (
