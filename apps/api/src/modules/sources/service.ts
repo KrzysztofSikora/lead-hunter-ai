@@ -6,6 +6,7 @@ import {
   TedConfig,
   TenderFacts,
   type CreateSourceRequest,
+  type OperatorProfile,
   type SourceKind,
   type Source,
   type SourceHealth,
@@ -18,6 +19,7 @@ import type { Clock } from '../shared/clock.js';
 import { canonicalizeUrl, contentHash, normaliseSnippet } from '../signals/identity.js';
 import { ingest } from '../signals/ingest.js';
 import type { SignalRepository } from '../signals/ports.js';
+import { languagesFromProfile } from './github-languages.js';
 import { MANUAL_ACCESS_NOTE, PRESETS, WITHDRAWN_PRESETS } from './presets.js';
 import { applySourceFilter, readFilter } from './source-filter.js';
 import type {
@@ -54,6 +56,8 @@ export interface SourceDeps {
   adapters: SourceAdapters;
   clock: Clock;
   minIntervalMs: number;
+  /** S-19 D-20: the operator profile, for the default languages of a new GitHub source. */
+  profile?: { get(): OperatorProfile };
   /** Called after a run stored new signals, so analysis starts without waiting for its timer. */
   onSignalCreated?: () => void;
   /** Source id, host, reason and counts only; never item text (FR-24 AC2). */
@@ -219,6 +223,7 @@ export function createSourceService({
   adapters,
   clock,
   minIntervalMs,
+  profile,
   onSignalCreated,
   logger,
 }: SourceDeps): SourceService {
@@ -520,13 +525,19 @@ export function createSourceService({
         if (!preset) return { kind: 'unknown_preset' };
         ({ name, type } = preset);
         // S-18 D-7: a tender preset carries the default CPV prefixes (and countries) instead of a URL.
-        config =
-          preset.tender === null
-            ? { url: preset.url }
-            : {
-                cpvPrefixes: preset.tender.cpvPrefixes,
-                ...(preset.tender.countries ? { countries: preset.tender.countries } : {}),
-              };
+        if (preset.github !== null) {
+          config = {
+            labels: preset.github.labels,
+            languages: profile ? languagesFromProfile(profile.get()) : [],
+          };
+        } else if (preset.tender !== null) {
+          config = {
+            cpvPrefixes: preset.tender.cpvPrefixes,
+            ...(preset.tender.countries ? { countries: preset.tender.countries } : {}),
+          };
+        } else {
+          config = { url: preset.url };
+        }
         presetId = preset.id;
         filterJson = JSON.stringify(preset.filter);
       } else {

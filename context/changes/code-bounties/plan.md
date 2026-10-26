@@ -552,12 +552,15 @@ Unchanged `SourceFailureReason` values:
 <!-- One line per phase. /implement ticks it in the phase's own commit. -->
 - [x] Phase 1: Source types, bounty facts storage and the token header
 - [x] Phase 2: Reward parsing and the bounty guard rules
-- [ ] Phase 3: GitHub search adapter and preset (checkpoint)
+- [x] Phase 3: GitHub search adapter and preset (checkpoint)
 - [ ] Phase 4: Opire adapter and preset
 - [ ] Phase 5: Sources view editor, source policy and test plan
 
 ## Human checks
 <!-- Filled by /implement: one open checkbox per human check, with how to run it and evidence. -->
+- [ ] (Phase 3) One real run of the GitHub preset without a token: record the run result, the request count, the response size and one signal compared with its issue page; confirm a newly labelled old issue appears (D-4 `sort=updated`) — run: add the preset in the Sources view, then `pnpm discover` with only it enabled (no `GITHUB_TOKEN`) — evidence: `context/changes/code-bounties/evidence/github-run.txt` (not produced: `api.github.com` is unreachable from the session)
+- [ ] (Phase 3) One run with a read-only, public-data `GITHUB_TOKEN`: no 403 occurs — run: set `GITHUB_TOKEN` in `.env`, `pnpm discover` — evidence: `context/changes/code-bounties/evidence/github-run.txt` (no token, no personal data in it)
+- [ ] (Phase 3) If the real response differs from the synthetic fixtures in `apps/api/test/fixtures/bounties/`, replace them with trimmed anonymised recordings (the roadmap's "recorded responses") — run: compare `/search/issues` output with `github-search-*.json` — evidence: the replaced fixtures
 
 ## Deviations
 <!-- [minor] / [REVIEW] / [FOLLOW-UP] / [STUCK] entries, see autonomy.md section 3 -->
@@ -582,6 +585,17 @@ Unchanged `SourceFailureReason` values:
   the level and the budget. `context/test-plan.md` lists it; drop the row to undo.
 - [minor] (Phase 2) `GuardOrigin.bounty` is optional, so callers without it (RSS, manual, BZP,
   TED) are unchanged without edits.
+- [minor] (Phase 3) `buildTestApp` gained `sourceSleep` (replaces the no-op wait of the source
+  adapters), so the integration test can see the 6 100 / 2 100 ms spacing on the injected clock.
+- [minor] (Phase 3) The Bounty cases went into the existing `bounty-sources.int.test.ts` as a second
+  `describe` with its own `setupGithub` (the real adapter through `MockAgent`), next to the
+  fake-adapter cases of Phases 1–2.
+- [minor] (Phase 3) A GitHub search that returns the same issue for two languages stores it once
+  (the adapter dedupes by key within a run); the first language's `Język (wyszukiwanie)` line wins.
+- [minor] (Phase 3) The preset's `github` default carries `languages: []`; `create` replaces them
+  with `languagesFromProfile` (D-20), so the contract field only supplies the labels.
+- [minor] (Phase 3) Plan's 503 row: a 503 that persists after `maxAttempts` is `rate_limited` with
+  status 503 (the TED/BZP convention), not `http_status`.
 
 ## Review response
 <!-- revise mode only: one line per plan-review finding and what changed -->

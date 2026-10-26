@@ -113,6 +113,8 @@ export async function buildTestApp(
     adapters?: Partial<SourceAdapters>;
     /** Receives the source service's log lines (S-19). */
     sourceLogger?: { info(message: string): void; warn(message: string): void };
+    /** Replaces the no-op wait of the source adapters, to see their spacing (S-19). */
+    sourceSleep?: (ms: number) => Promise<void>;
     /** The analysis backoff wait; a no-op unless a test holds it open (S-20). */
     sleep?: Sleep;
     /** Wraps the stored pause flag, to land a cancel at an exact point of the drain. */
@@ -169,7 +171,8 @@ export async function buildTestApp(
     config,
     http,
     clock,
-    sleep: async () => undefined,
+    sleep: options.sourceSleep ?? (async () => undefined),
+    profile: { get: () => profileService.get().profile },
     ...(options.adapters ? { adapters: options.adapters } : {}),
     ...(options.sourceLogger ? { logger: options.sourceLogger } : {}),
     ...(options.jobLock ? { jobLock: options.jobLock } : {}),

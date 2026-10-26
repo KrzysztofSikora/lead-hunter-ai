@@ -50,6 +50,7 @@ describe('presets (S-17 D-7, D-9, D-11)', () => {
       'arduino-jobs',
       'bzp-it',
       'ted-pl-it',
+      'github-bounties',
     ]);
   });
 });

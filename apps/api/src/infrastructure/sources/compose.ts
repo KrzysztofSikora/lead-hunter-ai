@@ -1,4 +1,5 @@
 import type { Config } from '@lead-hunter/config';
+import type { OperatorProfile } from '@lead-hunter/contracts';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import { hostname } from 'node:os';
 import type { JobsService } from '../../modules/jobs/service.js';
@@ -16,6 +17,8 @@ import { createJobLock, type JobLockOptions } from '../scheduler/job-lock.js';
 import type { HttpClient } from './http/client.js';
 import { createRobotsCheck } from './manual/robots.js';
 import { createBzpAdapter } from './bzp/adapter.js';
+import { createGithubApi } from './github/api.js';
+import { createGithubAdapter } from './github/adapter.js';
 import { createTedAdapter } from './ted/adapter.js';
 import { createRssAdapter } from './rss/adapter.js';
 
@@ -23,7 +26,11 @@ export interface SourceRuntimeDeps {
   db: BetterSQLite3Database;
   config: Pick<
     Config,
-    'fetchTimeoutMs' | 'importMaxTextChars' | 'sourceMinIntervalMinutes' | 'sourceMaxAttempts'
+    | 'fetchTimeoutMs'
+    | 'importMaxTextChars'
+    | 'sourceMinIntervalMinutes'
+    | 'sourceMaxAttempts'
+    | 'github'
   >;
   http: HttpClient;
   clock: Clock;
@@ -35,6 +42,8 @@ export interface SourceRuntimeDeps {
   heartbeatMs?: number;
   /** Tests: adapters that replace the real ones, by source type (S-18). */
   adapters?: Partial<SourceAdapters>;
+  /** S-19 D-20: the profile reader for the default languages of a GitHub source; the CLI passes none. */
+  profile?: { get(): OperatorProfile };
 }
 
 /** The one place the sources module meets its infrastructure; server, CLI and tests call it. */
@@ -49,6 +58,7 @@ export function createSourceRuntime({
   jobLock,
   heartbeatMs,
   adapters: overrides,
+  profile,
 }: SourceRuntimeDeps): {
   service: SourceService;
   statusReader: SourceStatusReader;
@@ -82,12 +92,27 @@ export function createSourceRuntime({
     ...(sleep ? { sleep } : {}),
     ...(logger ? { logger } : {}),
   });
+  // S-19 D-5: one instance, so the request spacing holds across the bounty adapters.
+  const githubApi = createGithubApi({
+    http,
+    clock,
+    token: config.github.token,
+    timeoutMs: config.fetchTimeoutMs,
+    maxAttempts: config.sourceMaxAttempts,
+    ...(sleep ? { sleep } : {}),
+  });
+  const github = createGithubAdapter({
+    api: githubApi,
+    maxTextChars: config.importMaxTextChars,
+    ...(logger ? { logger } : {}),
+  });
   const service = createSourceService({
     repository: createSourceRepository(db),
     signals: createSignalRepository(db),
-    adapters: { rss, bzp, ted, ...overrides } as SourceAdapters,
+    adapters: { rss, bzp, ted, github, ...overrides } as SourceAdapters,
     clock,
     minIntervalMs: config.sourceMinIntervalMinutes * 60_000,
+    ...(profile ? { profile } : {}),
     ...(onSignalCreated ? { onSignalCreated } : {}),
     ...(logger ? { logger } : {}),
   });

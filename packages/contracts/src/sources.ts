@@ -227,6 +227,8 @@ export const SourcePreset = z
     filter: SourceFilter,
     /** S-18 D-7: default CPV prefixes and countries of a tender preset; null for a feed. */
     tender: TenderSettings.nullable(),
+    /** S-19 D-4: default labels of the GitHub preset (its languages come from the profile); null otherwise. */
+    github: GithubSearchConfig.nullable(),
   })
   .strict();
 export type SourcePreset = z.infer<typeof SourcePreset>;
