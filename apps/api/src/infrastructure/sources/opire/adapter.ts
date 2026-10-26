@@ -69,13 +69,17 @@ export function createOpireAdapter({
         const { owner, repo, number } = reward.ref;
         const issue = await github.get(`/repos/${owner}/${repo}/issues/${number}`);
         if (!issue.ok) {
-          // A limit stops the run; any other failed check is retried next time (not remembered).
+          // A limit stops the run; so does any other failed check except a missing issue (R2,
+          // D-17): a header-less secondary limit must not be hit another 19 times.
           if (issue.reason === 'rate_limited') return issue;
           if (issue.httpStatus === 404 || issue.httpStatus === 410) {
             missing += 1;
             checkedKeys.push(reward.key);
-          } else skipped += 1;
-          continue;
+            continue;
+          }
+          skipped += 1;
+          truncated = true;
+          break;
         }
         // The reward's own key is remembered even if the answer names another issue (v1 R5).
         checkedKeys.push(reward.key);

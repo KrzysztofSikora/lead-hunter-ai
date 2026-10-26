@@ -732,6 +732,20 @@ describe('Opire rewards through the source loop (S-19 Phase 4, FR-33 AC2)', () =
     });
   });
 
+  it('stops at a header-less 403 on the third check and remembers the first two (R2)', async () => {
+    const { call, addOpire, clock } = await setupOpire();
+    const id = await addOpire();
+    issueAnswer = () => (checked.length >= 3 ? { status: 403 } : { body: ISSUE_CLOSED });
+    expect(await run(call, id)).toMatchObject({ status: 'partial' });
+    expect(checked).toHaveLength(3);
+    clock.advance(2 * HOUR);
+    checked.length = 0;
+    issueAnswer = () => ({ body: ISSUE_CLOSED });
+    await run(call, id);
+    // The two answered checks are not asked again: 3 of the 5 rewards are left.
+    expect(checked).toHaveLength(3);
+  });
+
   it('shows an Opire HTTP error and a non-list body as explicit errors', async () => {
     const { call, addOpire, clock } = await setupOpire();
     const id = await addOpire();
