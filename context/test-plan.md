@@ -44,7 +44,7 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 | TR-09 (human) | A failing source empties or corrupts previous results, or stops other sources | H | M | integration | `MockAgent`: one feed 500/timeout/invalid XML, another OK → partial run, previous signals untouched, `lastError` set | covered (S-10: `sources.int.test.ts` “records an explicit error per failing source…”) |
 | TR-10 (none) | Aggressive retries on 429/503 (ignores `Retry-After`, violates per-source interval) | M | M | unit + integration | backoff schedule with fake clock; `Retry-After` seconds and HTTP-date; number of requests counted on `MockAgent` | covered (S-10: `sources.int.test.ts` “backs off on 429/503…”; no unit test, budget none) |
 | TR-11 (test) | Scheduler runs twice, skips or doubles across DST, or duplicates after restart; stale lock blocks forever | H | M | unit + integration | fake clock across 2027-03-28 and 2026-10-25 / 2027-10-31 in Europe/Warsaw: exactly one run at 08:00 and 18:00; concurrent start refused; lock with dead owner released on start; manual + scheduled overlap refused | planned (S-12) |
-| TR-12 (test) | Secrets in logs, API responses, export or the repository (API keys, IMAP password, session cookie, password hash) | H | M | integration + CI | canary values in config (`sk-LEAK-CANARY`, `imap-LEAK-CANARY`) → scan captured log output, `/api/health`, `/api/sources`, export JSON: none contain them; CI step fails if `.env`, `*.db`, backups or logs are tracked | partial (S-05: LLM key canary in DB rows, status and detail; F-01 log scan; S-20: canaries for key, source body and internal error never in the activity view; S-11, S-15 pending) |
+| TR-12 (test) | Secrets in logs, API responses, export or the repository (API keys, IMAP password, session cookie, password hash) | H | M | integration + CI | canary values in config (`sk-LEAK-CANARY`, `imap-LEAK-CANARY`) → scan captured log output, `/api/health`, `/api/sources`, export JSON: none contain them; CI step fails if `.env`, `*.db`, backups or logs are tracked | partial (S-05: LLM key canary in DB rows, status and detail; F-01 log scan; S-20: canaries for key, source body and internal error never in the activity view; S-19: the `GITHUB_TOKEN` canary (`ghp_TOKEN-LEAK-CANARY`) never in logs, `/api/sources`, stored rows or the Opire request; S-11, S-15 pending) |
 | TR-13 (test) | API reachable without a session; LAN exposure without a password; login brute force | H | M | integration | every registered route except health/login returns 401 without a session (test iterates the route table); start with LAN flag and no hash → refuses; 401 after logout; throttle after N failures | covered (S-01) |
 | TR-14 (test) | Status rules broken: WON counted as paid, illegal transitions, rejection without reason, follow-up sent automatically | H | M | unit + integration | transition table (allowed forward skips, back moves need a note, terminal states); payment is a separate event; report separates sent/won/paid | covered (S-08) |
 | TR-15 (none) | Reports show zeros or assumed outcomes instead of "brak danych"; currencies summed together | M | M | unit | insights calculator with partial data; per-currency sums; reply rate with zero offers → "brak danych" | planned (S-14) |
@@ -62,6 +62,7 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 | TR-27 (human) | Footprint too large for the Pi 4 (NFR-01, NFR-02) | M | L | human | S-16 measurements with seeded 10 000 signals | planned (S-16 human checks, evidence in changes/pi-deployment/evidence/) |
 | TR-28 (test) | Cancelling an analysis leaves a request running, loses the opportunity, or the queue resumes by itself; the activity view leaks raw errors or source text | M | M | integration + unit | gated fake provider: cancel during request and during backoff → signal fired, no further call, opportunity and signal kept, `analyses` row `FAILED`/`cancelled`, paused flag survives a new runner, resume runs the queue; canaries absent from the response; host metrics table with `null` never 0 | covered (S-20: analysis-activity.int.test.ts, host-metrics.test.ts; Pi behaviour of Ollama is a human check) |
 | TR-29 (human) | API response shape of the tender sources (e-Zamówienia BZP, TED) differs from the documented one: wrong field, date form or notice URL, an over-limit answer read as "no results", a missed value shown as "nie podano" | M | H | unit + human | synthetic responses in the documented shape (`tenders/`, marked `UNVERIFIED`) through each `map-notice.ts`; 403/429/5xx/truncated runs are explicit errors or `partial`; the first real run per API is a human check that corrects the mapper and replaces the fixture | planned (S-18 human checks, Phases 2-3) |
+| TR-30 (human) | API response shape of the bounty sources (GitHub search, Opire) differs from the documented or described one: wrong field, envelope or reward unit, a rate limit or an over-limit answer read as "no results", a closed issue kept, a reward the issue does not state shown as a budget | M | H | unit + human | synthetic responses in the documented shape (`bounties/`, marked `DEMO`/`UNVERIFIED`) through `map-issue.ts` and `map-reward.ts`; `parseReward` refuses ambiguous amounts; 403/429/5xx/truncated runs are explicit errors or `partial`; the first real run per API is a human check that corrects the mapper and replaces the fixture | planned (S-19 human checks, Phases 3-4) |
 
 ## Not tested (and why)
 - **Real third-party services in automated tests** (hnrss.org, WWR, Useme mail, Anthropic,
@@ -98,13 +99,14 @@ Impact × likelihood: H/M/L. **Budget**: `test` = automated test required; `huma
 - `pnpm docker:build` = `docker build -t lead-hunter-ai:local .`.
 
 ## Mutation targets
-Only two modules, where a weak test would let a costly bug through (user decision: mutation
+Only three modules, where a weak test would let a costly bug through (user decision: mutation
 testing only where needed).
 
 | Module | Why | Target score | CI (report / break at N%) |
 |--------|-----|--------------|---------------------------|
 | `apps/api/src/modules/scoring/rubric.ts`, `score.ts` | the number the operator acts on; caps and sums (TR-05) | 80 % | report |
 | `apps/api/src/infrastructure/sources/http/address-guard.ts` | SSRF blocklist and redirect checks (TR-03) | 90 % | report |
+| `apps/api/src/infrastructure/sources/github/reward.ts` | the amount that becomes a signal's budget and a `DIRECT_REQUEST` (S-19 D-7; added by that change as a `[REVIEW]` deviation from the two-module decision) | 80 % | report |
 
 File names are the intended layout; the plan of each slice may rename them and must then update
 this table.
@@ -126,7 +128,9 @@ Tool setup (done in F-01, configuration fixed here): `@stryker-mutator/core` and
 - **Fixtures:** `apps/api/test/fixtures/` — `feeds/` (recorded hnrss and WWR responses, from the
   S-10 human check; synthetic edge cases marked `synthetic-` in the file name), `tenders/`
   (one BZP and one TED page, synthetic and `UNVERIFIED` until the S-18 human checks replace
-  them with trimmed real responses, buyers as `DEMO`), `pages/`,
+  them with trimmed real responses, buyers as `DEMO`), `bounties/` (GitHub search and issue
+  responses and one Opire list, synthetic and `UNVERIFIED` until the S-19 human checks replace
+  them with trimmed real ones), `pages/`,
   `email/` (anonymised `.eml` from the operator, S-11), `llm/` (recorded and synthetic provider
   responses, incl. invalid JSON and injection cases). Every fixture is fictional or anonymised
   and marked `DEMO` where it is shown in the UI; no real person, rate or client.

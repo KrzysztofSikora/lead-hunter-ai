@@ -81,6 +81,33 @@ export async function updateTender(
   throw new Error(`update tender failed: ${response.status}`);
 }
 
+export type GithubOutcome =
+  | Done<Source>
+  | { ok: false; refused: 'invalid'; fields: FieldError[] }
+  | { ok: false; refused: 'not_github_source' };
+
+/** S-19 D-11: saves the labels and languages of a GitHub source; the server's issues come back as fields. */
+export async function updateGithub(
+  id: number,
+  github: NonNullable<UpdateSourceRequest['github']>,
+): Promise<GithubOutcome> {
+  const response = await apiFetch(`/api/sources/${id}`, {
+    method: 'PATCH',
+    headers: json,
+    body: JSON.stringify({ github }),
+  });
+  if (response.ok) return { ok: true, value: Source.parse(await response.json()) };
+  if (response.status === 400) {
+    const body = await response.json().catch(() => null);
+    const parsed = ValidationError.safeParse(body);
+    if (parsed.success) return { ok: false, refused: 'invalid', fields: parsed.data.fields };
+    if ((body as { error?: string } | null)?.error === 'not_github_source') {
+      return { ok: false, refused: 'not_github_source' };
+    }
+  }
+  throw new Error(`update github failed: ${response.status}`);
+}
+
 async function act<T>(
   id: number,
   action: 'run' | 'check',

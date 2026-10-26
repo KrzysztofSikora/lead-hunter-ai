@@ -35,6 +35,12 @@ export interface GetOptions {
   beforeHop?: (url: URL) => Promise<void>;
   /** S-18 D-20: a larger (or smaller) body limit than the client's, for one API request. */
   maxBytes?: number;
+  /**
+   * S-19 D-9: extra request headers (the GitHub token). Sent on the first hop and on same-origin
+   * hops only; once a redirect leaves the origin they are dropped for good, also on a later hop
+   * back.
+   */
+  headers?: Record<string, string>;
 }
 
 /** S-18 D-11: a JSON POST (TED search). It follows no redirects: a 3xx comes back as a status. */
@@ -169,6 +175,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
     signal: AbortSignal;
     accept: string;
     maxBytes?: number;
+    extraHeaders?: Record<string, string>;
     method?: 'GET' | 'POST';
     contentType?: string;
     body?: string;
@@ -183,6 +190,7 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         method: input.method ?? 'GET',
         signal,
         headers: {
+          ...input.extraHeaders,
           'user-agent': options.userAgent,
           accept,
           'accept-encoding': 'identity',
@@ -216,13 +224,17 @@ export function createHttpClient(options: HttpClientOptions): HttpClient {
         throw new HttpFetchError('blocked_url');
       }
       try {
+        const origin = current.origin;
+        let keepHeaders = getOptions.headers !== undefined;
         for (let redirects = 0; ; redirects += 1) {
           const failure = checkTarget(current, isAllowed);
           if (failure) throw new HttpFetchError(failure);
+          if (current.origin !== origin) keepHeaders = false;
           await getOptions.beforeHop?.(current);
           const result = await hop(current, {
             signal: getOptions.signal,
             accept: getOptions.accept,
+            ...(keepHeaders && getOptions.headers ? { extraHeaders: getOptions.headers } : {}),
             ...(getOptions.maxBytes === undefined ? {} : { maxBytes: getOptions.maxBytes }),
           });
           if (result.redirect === undefined) {

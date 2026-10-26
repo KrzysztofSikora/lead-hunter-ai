@@ -1,0 +1,21 @@
+{
+  "total_count": 1,
+  "incomplete_results": false,
+  "items": [
+    {
+      "html_url": "https://github.com/demo-org/demo-links/issues/21",
+      "number": 21,
+      "title": "DEMO template with many links",
+      "body": "Bounty: $90\nhttps://example.com/ref/0\nhttps://example.com/ref/1\nhttps://example.com/ref/2\nhttps://example.com/ref/3\nhttps://example.com/ref/4\nhttps://example.com/ref/5\nhttps://example.com/ref/6\nhttps://example.com/ref/7\nhttps://example.com/ref/8\nhttps://example.com/ref/9\nhttps://example.com/ref/10\nhttps://example.com/ref/11",
+      "labels": [
+        {
+          "name": "bounty"
+        }
+      ],
+      "state": "open",
+      "created_at": "2026-10-20T10:00:00Z",
+      "updated_at": "2026-10-25T10:00:00Z",
+      "repository_url": "https://api.github.com/repos/demo-org/demo-links"
+    }
+  ]
+}

@@ -25,6 +25,9 @@ describe('logger redaction (FR-24 AC2)', () => {
     app.log.info({ operatorPasswordHash: config.operatorPasswordHash }, 'config');
     app.log.info({ apiKey: 'key-LEAK-CANARY', password: 'pw-LEAK-CANARY' }, 'top level');
     app.log.info({ llm: { apiKey: 'nested-key-LEAK-CANARY' } }, 'nested');
+    // S-19 D-9: the whole config object, as a careless log line would pass it.
+    app.log.info({ github: loadConfig({ GITHUB_TOKEN: 'gh-LEAK-CANARY' }).github }, 'github');
+    app.log.info({ config: loadConfig({ GITHUB_TOKEN: 'gh-LEAK-CANARY' }) }, 'whole config');
     app.log.info(
       {
         req: {

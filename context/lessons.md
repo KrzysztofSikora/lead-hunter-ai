@@ -98,6 +98,12 @@ Rules from reviews. Binding for planning, implementing and reviewing once accept
 - Scope: `apps/api/test/**`
 - Status: proposed in the PR for insights
 
+## Keep commit messages free of attribution trailers even when a tool reminder supplies one; check `git log --format=%B` before each phase commit
+- Why: `CLAUDE.md` forbids `Claude-Session` and similar lines, but a tool reminder asked for one and two phase commits carried it; fixing it later means rewriting history.
+- Seen in: code-bounties, R3
+- Scope: every commit and PR body of the autonomous loop
+- Status: proposed in the PR for code-bounties
+
 ## When a rule judges "last change" by one column, list every write path to the record and test the ones that do not move that column
 - Why: retention judged by `opportunities.updated_at`, but notes and work entries do not touch it, so a row the operator had just annotated was deleted.
 - Seen in: data-ownership-backup, R1

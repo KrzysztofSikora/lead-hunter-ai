@@ -75,7 +75,7 @@ describe('restore from a backup (S-15, FR-22 AC2)', () => {
       { title: 'DEMO restore' },
     ]);
     // 0013 is the newest migration: its table exists only because the restore migrated.
-    expect(journalTags(realMigrations).at(-1)).toBe('0013_old_pride');
+    expect(journalTags(realMigrations).at(-1)).toBe('0014_small_omega_flight');
     expect(
       target.sqlite
         .prepare("select name from sqlite_master where type = 'table' and name = 'deleted_usage'")

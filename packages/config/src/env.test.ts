@@ -27,6 +27,7 @@ describe('loadConfig', () => {
       backupDir: resolve('./data/backups'),
       backupKeep: 14,
       retentionDays: 90,
+      github: {},
     });
   });
 
@@ -51,6 +52,7 @@ describe('loadConfig', () => {
         BACKUP_DIR: '/mnt/copies',
         BACKUP_KEEP: '30',
         RETENTION_DAYS: '30',
+        GITHUB_TOKEN: ' ghp_ENV-TOKEN ',
         ...HASH,
       }),
     ).toEqual({
@@ -73,6 +75,7 @@ describe('loadConfig', () => {
       backupDir: '/mnt/copies',
       backupKeep: 30,
       retentionDays: 30,
+      github: { token: 'ghp_ENV-TOKEN' },
     });
   });
 
@@ -235,6 +238,17 @@ describe('loadConfig', () => {
     it.each(['127.0.0.1', '::1', 'localhost'])('accepts %s without a hash', (host) => {
       expect(loadConfig({ HOST: host }).host).toBe(host);
     });
+  });
+});
+
+describe('loadConfig: GITHUB_TOKEN (S-19 D-9)', () => {
+  it('is absent when unset or empty', () => {
+    expect(loadConfig({}).github).toEqual({});
+    expect(loadConfig({ GITHUB_TOKEN: '' }).github).toEqual({});
+  });
+
+  it('rejects a blank token', () => {
+    expect(() => loadConfig({ GITHUB_TOKEN: '   ' })).toThrow(ConfigError);
   });
 });
 

@@ -1,0 +1,1 @@
+ALTER TABLE `raw_signals` ADD `bounty_json` text;

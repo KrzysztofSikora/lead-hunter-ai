@@ -17,6 +17,8 @@ export const SourceType = z.enum([
   'rss',
   'bzp',
   'ted',
+  'github',
+  'opire',
 ]);
 export type SourceType = z.infer<typeof SourceType>;
 
@@ -157,6 +159,44 @@ export const TenderFacts = z
   })
   .strict();
 export type TenderFacts = z.infer<typeof TenderFacts>;
+
+/** S-19 D-2: GitHub name rules (owner, repo); also used to read a repository out of a URL. */
+export const GITHUB_OWNER_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
+export const GITHUB_REPO_PATTERN = /^[A-Za-z0-9._-]{1,100}$/;
+
+const BOUNTY_MINOR_MAX = 100_000_000_000;
+
+/** S-19 D-2: what a bounty issue states about itself; source facts, never inferred. */
+export const BountyFacts = z
+  .object({
+    platform: z.enum(['github', 'opire']),
+    repository: z.string().refine(
+      (value) => {
+        const parts = value.split('/');
+        const [owner, repo] = parts;
+        return (
+          parts.length === 2 &&
+          GITHUB_OWNER_PATTERN.test(owner ?? '') &&
+          GITHUB_REPO_PATTERN.test(repo ?? '') &&
+          repo !== '.' &&
+          repo !== '..'
+        );
+      },
+      { message: 'Repozytorium: owner/repo.' },
+    ),
+    issueNumber: z.number().int().min(1).max(1_000_000_000),
+    labels: z.array(z.string().min(1).max(50)).max(20),
+    reward: z
+      .object({
+        amountMinor: z.number().int().min(1).max(BOUNTY_MINOR_MAX),
+        currency: Currency,
+        quote: z.string().min(1).max(200),
+      })
+      .strict()
+      .nullable(),
+  })
+  .strict();
+export type BountyFacts = z.infer<typeof BountyFacts>;
 
 /** D-8: what the source said. Nothing here is inferred. */
 export const SourceFacts = z

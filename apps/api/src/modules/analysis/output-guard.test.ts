@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { analysis } from '../../../test/helpers/analysis.js';
-import { OpportunityAnalysis, type TenderFacts } from '@lead-hunter/contracts';
+import { type BountyFacts, OpportunityAnalysis, type TenderFacts } from '@lead-hunter/contracts';
 import { guardAnalysis } from './output-guard.js';
 
 const fixture = (name: string): string =>
@@ -416,5 +416,127 @@ describe('guardAnalysis: public tenders (S-18 D-3, D-6)', () => {
     };
     const { result } = guardAnalysis(insufficient, text, { sourceType: 'bzp', tender: tender() });
     expect(result).toEqual(insufficient);
+  });
+});
+
+describe('guardAnalysis: bounty issues (S-19 D-10, FR-27 AC1)', () => {
+  const facts = (reward: BountyFacts['reward'] = null, labels: string[] = []): BountyFacts => ({
+    platform: 'github',
+    repository: 'demo/widgets',
+    issueNumber: 7,
+    labels,
+    reward,
+  });
+  const reward = { amountMinor: 15_000, currency: 'USD', quote: '$150' } as const;
+  const origin = (bounty: BountyFacts | null, sourceType: 'github' | 'opire' = 'github') =>
+    ({ sourceType, tender: null, bounty }) as const;
+  const evidence = (r: OpportunityAnalysis) => (r.verdict === 'ANALYSED' ? r.evidenceLevel : null);
+  const category = (r: OpportunityAnalysis) => (r.verdict === 'ANALYSED' ? r.category : null);
+  const budget = (r: OpportunityAnalysis) => (r.verdict === 'ANALYSED' ? r.sourceBudget : null);
+  const plain = 'DEMO widgets\nRepozytorium: demo/widgets\nThe parser crashes on empty input.';
+
+  it('makes the stated reward the budget when the model gave none', () => {
+    const { result } = guardAnalysis(analysis(), `${plain}\nBounty: $150`, origin(facts(reward)));
+    expect(budget(result)).toEqual({
+      minMinor: 15_000,
+      maxMinor: 15_000,
+      currency: 'USD',
+      quote: '$150',
+    });
+  });
+
+  it('replaces a budget of the model with the stated reward', () => {
+    const invented = analysis({
+      sourceBudget: { minMinor: 1, maxMinor: 2, currency: 'USD', quote: '$1' },
+    });
+    const { result } = guardAnalysis(invented, `${plain}\nBounty: $150`, origin(facts(reward)));
+    expect(budget(result)?.minMinor).toBe(15_000);
+  });
+
+  it('gives null and a note when the issue states no reward, whatever the model quotes', () => {
+    const invented = analysis({
+      sourceBudget: { minMinor: 50_000, maxMinor: 50_000, currency: 'USD', quote: '$500' },
+    });
+    const { result, notes } = guardAnalysis(invented, `${plain}\nSome say $500`, origin(facts()));
+    expect(budget(result)).toBeNull();
+    expect(notes.join(' ')).toContain('nagrody');
+  });
+
+  it('keeps DIRECT_REQUEST for a stated reward without a cue in the text', () => {
+    const { result } = guardAnalysis(analysis(), plain, origin(facts(reward)));
+    expect(evidence(result)).toBe('DIRECT_REQUEST');
+    expect(category(result)).toBe('DIRECT_GIG');
+  });
+
+  it('downgrades without a reward or a cue, in both steps', () => {
+    const { result, notes } = guardAnalysis(
+      analysis({ category: 'DIRECT_GIG', evidenceLevel: 'DIRECT_REQUEST' }),
+      plain,
+      origin(facts()),
+    );
+    expect(evidence(result)).toBe('EXPLICIT_PROBLEM');
+    expect(category(result)).toBe('UNMET_NEED');
+    expect(notes).toHaveLength(2);
+  });
+
+  it('does not take a bounty label for an offer to pay', () => {
+    const text = `${plain}\nEtykiety: bounty, paid, 💎 Bounty`;
+    const { result } = guardAnalysis(analysis(), text, origin(facts(null, ['bounty', 'paid'])));
+    expect(evidence(result)).toBe('EXPLICIT_PROBLEM');
+    expect(category(result)).toBe('UNMET_NEED');
+  });
+
+  it('does not take a repository name for an offer to pay', () => {
+    const text = 'DEMO\nRepozytorium: demo/paid-tools\nIt crashes.';
+    const { result } = guardAnalysis(analysis(), text, origin(facts()));
+    expect(evidence(result)).toBe('EXPLICIT_PROBLEM');
+  });
+
+  it('keeps an explicit hiring cue the author wrote, without an amount', () => {
+    const text = `${plain}\nEtykiety: bounty\nI will pay for a fix.`;
+    const { result } = guardAnalysis(analysis(), text, origin(facts()));
+    expect(evidence(result)).toBe('DIRECT_REQUEST');
+  });
+
+  it('turns PUBLIC_TENDER into DIRECT_REQUEST and then checks it', () => {
+    const tender = analysis({ evidenceLevel: 'PUBLIC_TENDER' });
+    expect(evidence(guardAnalysis(tender, plain, origin(facts(reward))).result)).toBe(
+      'DIRECT_REQUEST',
+    );
+    expect(evidence(guardAnalysis(tender, plain, origin(facts())).result)).toBe('EXPLICIT_PROBLEM');
+  });
+
+  it('treats opire like github', () => {
+    const { result } = guardAnalysis(analysis(), plain, origin(facts(reward), 'opire'));
+    expect(budget(result)?.minMinor).toBe(15_000);
+  });
+
+  it('leaves RSS and BZP inputs unchanged', () => {
+    const invented = analysis({
+      sourceBudget: {
+        minMinor: 800_000,
+        maxMinor: 800_000,
+        currency: 'PLN',
+        quote: 'budżet 8000 PLN',
+      },
+    });
+    const text = 'Szukam programisty, budżet 8000 PLN. Etykiety: x';
+    const rss = guardAnalysis(invented, text, {
+      sourceType: 'rss',
+      tender: null,
+      bounty: facts(reward),
+    });
+    expect(budget(rss.result)?.minMinor).toBe(800_000);
+    expect(evidence(rss.result)).toBe('DIRECT_REQUEST');
+    const noOrigin = guardAnalysis(invented, text);
+    expect(budget(noOrigin.result)?.minMinor).toBe(800_000);
+  });
+
+  it('applies the cue rule to RSS text with an Etykiety line', () => {
+    const { result } = guardAnalysis(analysis(), 'Etykiety: paid', {
+      sourceType: 'rss',
+      tender: null,
+    });
+    expect(evidence(result)).toBe('DIRECT_REQUEST');
   });
 });

@@ -33,6 +33,7 @@ export const ENV_VARIABLES = [
   'BACKUP_DIR',
   'BACKUP_KEEP',
   'RETENTION_DAYS',
+  'GITHUB_TOKEN',
 ] as const;
 
 /** `scrypt:<log2 N>:<r>:<p>:<salt>:<key>`, salt 16 bytes and key 32 bytes in base64url (`pnpm auth:hash`). */
@@ -113,6 +114,7 @@ export const EnvSchema = z
     BACKUP_DIR: optional(z.string().trim().min(1)),
     BACKUP_KEEP: optional(z.coerce.number().int().min(1).max(365)),
     RETENTION_DAYS: optional(z.coerce.number().int().min(7).max(3650)),
+    GITHUB_TOKEN: optional(z.string().trim().min(1)),
   })
   .superRefine((env, ctx) => {
     const missing = (path: string, message: string) =>
@@ -192,6 +194,8 @@ export interface Config {
   backupKeep: number;
   /** Days a REJECTED or EXPIRED opportunity stays unchanged before the daily job deletes it (S-15 D-4). */
   retentionDays: number;
+  /** S-19 D-9: optional read-only token for api.github.com; raises the search limit. Secret. */
+  github: { token?: string };
 }
 
 export interface ConfigIssue {
@@ -288,6 +292,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     backupDir: resolve(v.BACKUP_DIR ?? join(v.DATA_DIR ?? './data', 'backups')),
     backupKeep: v.BACKUP_KEEP ?? 14,
     retentionDays: v.RETENTION_DAYS ?? 90,
+    github: v.GITHUB_TOKEN ? { token: v.GITHUB_TOKEN } : {},
     ...(llm ? { llm } : {}),
     ...(v.OPERATOR_PASSWORD_HASH ? { operatorPasswordHash: v.OPERATOR_PASSWORD_HASH } : {}),
   };

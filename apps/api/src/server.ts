@@ -121,6 +121,7 @@ async function main(): Promise<void> {
     clock,
     onSignalCreated: () => runner.kick(),
     logger: { info: (message) => logInfo(message), warn: (message) => logWarn(message) },
+    profile: { get: () => profileService.get().profile },
   });
   const opportunityDeps = {
     repository: createOpportunityRepository(db),
