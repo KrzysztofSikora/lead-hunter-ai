@@ -1,6 +1,6 @@
 import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
-import { rawSignals, sources } from '../src/infrastructure/db/schema.js';
+import { opportunities, rawSignals, sources } from '../src/infrastructure/db/schema.js';
 import type {
   AdapterOutcome,
   DiscoverContext,
@@ -213,5 +213,40 @@ describe('PATCH github settings (S-19 D-11)', () => {
       expect((await call('PATCH', `/api/sources/${id}`, { github })).statusCode).toBe(400);
     }
     expect((await call('GET', '/api/sources')).json().items[0].github).toEqual(GITHUB_CONFIG);
+  });
+});
+
+describe('analysis of bounty signals (S-19 D-10, FR-33 AC1, FR-27 AC1)', () => {
+  const stated = item(1, {
+    title: 'DEMO TypeScript parser fails [$200]',
+    text: 'DEMO TypeScript parser fails [$200]\nRepozytorium: demo/repo\nThe parser throws on every empty input and the stack trace points into the lexer.',
+  });
+  const unstated = item(2, {
+    title: 'DEMO TypeScript parser fails',
+    text: 'DEMO TypeScript parser fails\nRepozytorium: demo/repo\nWe have $500 of CI credit, and the parser throws on every empty input.',
+    bounty: facts(2, false),
+  });
+
+  it('sets the budget from the stated reward only, and keeps the request level', async () => {
+    const adapter = fakeAdapter([{ ok: true, items: [stated, unstated], skipped: 0 }]);
+    const { call, addSource, runner, db } = await setup(adapter);
+    const id = addSource('github', GITHUB_CONFIG, 'github');
+    await call('POST', `/api/sources/${id}/run`);
+    await runner.drain();
+
+    const rows = db().select().from(opportunities).orderBy(opportunities.id).all();
+    expect(rows).toHaveLength(2);
+    const [withReward, withoutReward] = rows;
+    const first = (await call('GET', `/api/opportunities/${withReward!.id}`)).json();
+    const second = (await call('GET', `/api/opportunities/${withoutReward!.id}`)).json();
+
+    expect(withReward).toMatchObject({ analysisStatus: 'COMPLETE', amountMaxMinor: 20_000 });
+    expect(first.latestAnalysis.result.sourceBudget).toMatchObject({
+      maxMinor: 20_000,
+      quote: '[$200]',
+    });
+    expect(withoutReward).toMatchObject({ analysisStatus: 'COMPLETE', amountMaxMinor: null });
+    expect(second.latestAnalysis.result.sourceBudget).toBeNull();
+    expect(second.analysis.evidenceLevel).not.toBe('DIRECT_REQUEST');
   });
 });

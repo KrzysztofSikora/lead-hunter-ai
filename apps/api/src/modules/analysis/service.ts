@@ -172,7 +172,10 @@ export function createAnalysisRunner(deps: AnalysisDeps): AnalysisRunner {
     answer: OpportunityAnalysis,
   ): string | null {
     const profile = deps.profile.get();
-    const guarded = guardAnalysis(answer, row.text);
+    const guarded = guardAnalysis(answer, row.text, {
+      sourceType: row.sourceType,
+      bounty: row.bounty,
+    });
     // The guard edits text; what is stored must still satisfy the contract (read side parses it).
     const checked = OpportunityAnalysis.safeParse(guarded.result);
     if (!checked.success) return 'invalid_output: guard';

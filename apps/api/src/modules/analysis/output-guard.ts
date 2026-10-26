@@ -1,4 +1,4 @@
-import type { OpportunityAnalysis } from '@lead-hunter/contracts';
+import type { BountyFacts, OpportunityAnalysis, SourceType } from '@lead-hunter/contracts';
 import { hasHiringCue } from './cues.js';
 
 export interface GuardedAnalysis {
@@ -7,6 +7,15 @@ export interface GuardedAnalysis {
 }
 
 const squash = (value: string): string => value.replace(/\s+/g, ' ').trim().toLowerCase();
+
+/** What the source adapter stated about a signal, outside the text (S-19 D-10). */
+export interface GuardOrigin {
+  sourceType: SourceType;
+  bounty: BountyFacts | null;
+}
+
+const isBountySource = (origin: GuardOrigin | undefined): origin is GuardOrigin =>
+  origin?.sourceType === 'github' || origin?.sourceType === 'opire';
 
 const PAID_CATEGORIES = new Set(['DIRECT_GIG', 'B2B_SUBCONTRACT']);
 
@@ -64,7 +73,11 @@ function quoteStates(budget: { minMinor: number; maxMinor: number; quote: string
  * D-14: provider-independent checks after schema validation. What the source did not say is
  * removed or downgraded, and every change is noted. Source text is only compared, never executed.
  */
-function guardAgainstSource(result: OpportunityAnalysis, sourceText: string): GuardedAnalysis {
+function guardAgainstSource(
+  result: OpportunityAnalysis,
+  sourceText: string,
+  origin?: GuardOrigin,
+): GuardedAnalysis {
   const notes: string[] = [];
   const haystack = squash(sourceText);
   const inSource = (value: string): boolean => {
@@ -97,8 +110,34 @@ function guardAgainstSource(result: OpportunityAnalysis, sourceText: string): Gu
     sourceBudget = null;
   }
 
+  // D-10: on a bounty source the budget is the reward the adapter parsed, whatever the model said.
+  let hiring = hasHiringCue(sourceText);
+  if (isBountySource(origin)) {
+    const reward = origin.bounty?.reward ?? null;
+    if (reward) {
+      const given = result.sourceBudget;
+      if (
+        given &&
+        (given.minMinor !== reward.amountMinor || given.maxMinor !== reward.amountMinor)
+      ) {
+        notes.push('Budżet ze źródła zastąpiono nagrodą podaną w zgłoszeniu.');
+      }
+      sourceBudget = {
+        minMinor: reward.amountMinor,
+        maxMinor: reward.amountMinor,
+        currency: reward.currency,
+        quote: reward.quote,
+      };
+      hiring = true;
+    } else {
+      if (result.sourceBudget) {
+        notes.push('Usunięto budżet ze źródła: zgłoszenie nie podaje nagrody.');
+      }
+      sourceBudget = null;
+    }
+  }
+
   let { evidenceLevel, category } = result;
-  const hiring = hasHiringCue(sourceText);
   if (evidenceLevel === 'DIRECT_REQUEST' && !hiring) {
     notes.push(
       'Poziom dowodu obniżony do EXPLICIT_PROBLEM: w tekście brak zlecenia lub płatności.',
@@ -164,8 +203,12 @@ export function removeInventedLinks(
  * text field (FR-08 AC4) and the buyer rule: a buyer or company the source does not name is a
  * model inference, never confirmed. Names in free prose are not detected.
  */
-export function guardAnalysis(result: OpportunityAnalysis, sourceText: string): GuardedAnalysis {
-  const base = guardAgainstSource(result, sourceText);
+export function guardAnalysis(
+  result: OpportunityAnalysis,
+  sourceText: string,
+  origin?: GuardOrigin,
+): GuardedAnalysis {
+  const base = guardAgainstSource(result, sourceText, origin);
   const notes = [...base.notes];
   const sourceLower = sourceText.toLowerCase();
   const removed: string[] = [];

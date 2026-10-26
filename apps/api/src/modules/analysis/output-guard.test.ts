@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { analysis } from '../../../test/helpers/analysis.js';
-import { OpportunityAnalysis } from '@lead-hunter/contracts';
+import { OpportunityAnalysis, type BountyFacts } from '@lead-hunter/contracts';
 import { guardAnalysis } from './output-guard.js';
 
 const fixture = (name: string): string =>
@@ -286,5 +286,100 @@ describe('guardAnalysis: invented links and buyer (FR-08 AC4, TR-01)', () => {
     const { result, notes } = guardAnalysis(base, text);
     expect(result).toMatchObject({ buyerOrAudience: 'Małe firmy', buyerConfirmed: false });
     expect(notes).toEqual([]);
+  });
+});
+
+describe('guardAnalysis: bounty sources (S-19 D-10, FR-27 AC1)', () => {
+  const reward = { amountMinor: 20_000, currency: 'USD', quote: '[$200]' } as const;
+  const facts = (withReward: boolean): BountyFacts => ({
+    platform: 'github',
+    repository: 'demo/repo',
+    issueNumber: 1,
+    labels: ['bounty'],
+    reward: withReward ? reward : null,
+  });
+  const origin = (withReward: boolean, sourceType: 'github' | 'opire' = 'github') => ({
+    sourceType,
+    bounty: facts(withReward),
+  });
+  const plain = 'DEMO [$200] Fix the parser\nThe parser throws on empty input.';
+  const verdict = (guarded: ReturnType<typeof guardAnalysis>) => {
+    if (guarded.result.verdict !== 'ANALYSED') throw new Error('expected an analysed result');
+    return guarded.result;
+  };
+
+  it('turns the parsed reward into the budget when the model gave none', () => {
+    const { result } = guardAnalysis(analysis({ sourceBudget: null }), plain, origin(true));
+    expect(verdict({ result, notes: [] }).sourceBudget).toEqual({
+      minMinor: 20_000,
+      maxMinor: 20_000,
+      currency: 'USD',
+      quote: '[$200]',
+    });
+  });
+
+  it('replaces a different budget of the model with the reward and says so', () => {
+    const modelBudget = {
+      minMinor: 90_000,
+      maxMinor: 90_000,
+      currency: 'USD',
+      quote: '$900',
+    } as const;
+    const guarded = guardAnalysis(
+      analysis({ sourceBudget: modelBudget }),
+      `${plain}\nAlso $900 of credit.`,
+      origin(true),
+    );
+    expect(verdict(guarded).sourceBudget?.maxMinor).toBe(20_000);
+    expect(guarded.notes.join(' ')).toContain('zastąpiono');
+  });
+
+  it('removes a budget the model invented when the issue states no reward', () => {
+    const text = 'DEMO Fix the parser\nWe have $500 of credit in the account.';
+    const guarded = guardAnalysis(
+      analysis({
+        sourceBudget: { minMinor: 50_000, maxMinor: 50_000, currency: 'USD', quote: '$500' },
+      }),
+      text,
+      origin(false),
+    );
+    expect(verdict(guarded).sourceBudget).toBeNull();
+    expect(guarded.notes.join(' ')).toContain('nie podaje nagrody');
+  });
+
+  it('keeps DIRECT_REQUEST and the paid category when a reward is stated, with no cue in the text', () => {
+    const { result } = guardAnalysis(analysis(), plain, origin(true, 'opire'));
+    const kept = verdict({ result, notes: [] });
+    expect([kept.evidenceLevel, kept.category]).toEqual(['DIRECT_REQUEST', 'DIRECT_GIG']);
+  });
+
+  it('downgrades both steps for a bounty without a reward or cue', () => {
+    const guarded = guardAnalysis(analysis(), 'DEMO Fix the parser\nIt throws.', origin(false));
+    const downgraded = verdict(guarded);
+    expect([downgraded.evidenceLevel, downgraded.category]).toEqual([
+      'EXPLICIT_PROBLEM',
+      'UNMET_NEED',
+    ]);
+  });
+
+  it('keeps DIRECT_REQUEST for a bounty without a reward when the text itself is a cue', () => {
+    const guarded = guardAnalysis(
+      analysis(),
+      'DEMO Fix the parser\nThis is a paid task.',
+      origin(false),
+    );
+    expect(verdict(guarded).evidenceLevel).toBe('DIRECT_REQUEST');
+  });
+
+  it('leaves other sources unchanged, even with facts attached', () => {
+    const budget = { minMinor: 20_000, maxMinor: 20_000, currency: 'USD', quote: '$200' } as const;
+    const text = 'Szukam kogoś, budżet $200 na poprawkę.';
+    const withoutOrigin = guardAnalysis(analysis({ sourceBudget: budget }), text);
+    const rss = guardAnalysis(analysis({ sourceBudget: budget }), text, {
+      sourceType: 'rss',
+      bounty: facts(false),
+    });
+    expect(rss).toEqual(withoutOrigin);
+    expect(verdict(rss).sourceBudget).toEqual(budget);
   });
 });

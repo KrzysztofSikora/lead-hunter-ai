@@ -1,5 +1,6 @@
 import type {
   AnalysisStatus,
+  BountyFacts,
   BusinessStatus,
   OperatorProfile,
   PrefilterRule,
@@ -104,6 +105,8 @@ export interface WaitingOpportunity {
   text: string;
   url: string | null;
   sourceType: SourceType;
+  /** S-19 D-2: validated on read; null for every signal without facts. */
+  bounty: BountyFacts | null;
   businessStatus: BusinessStatus;
   /** D-10: the operator asked for a new provider call, so no stored result may be reused. */
   force: boolean;

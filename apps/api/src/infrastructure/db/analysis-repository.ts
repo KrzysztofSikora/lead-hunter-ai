@@ -1,10 +1,7 @@
 import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { BountyFacts } from '@lead-hunter/contracts';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import type {
-  AnalysisRepository,
-  PendingOpportunity,
-  WaitingOpportunity,
-} from '../../modules/analysis/ports.js';
+import type { AnalysisRepository, PendingOpportunity } from '../../modules/analysis/ports.js';
 import { moveFromNew, recordSystemMove, statusOf } from './system-move.js';
 import { analyses, offerDrafts, opportunities, rawSignals } from './schema.js';
 
@@ -14,10 +11,27 @@ const selection = {
   text: rawSignals.snippet,
   url: rawSignals.sourceUrl,
   sourceType: rawSignals.sourceType,
+  bountyJson: rawSignals.bountyJson,
   businessStatus: opportunities.businessStatus,
   force: sql<number>`${opportunities.analysisForce} <> 0`.mapWith(Boolean),
   publishedAt: rawSignals.publishedAt,
 };
+
+type Row = Omit<PendingOpportunity, 'bounty'> & { bountyJson: string | null };
+
+/** S-19 D-2: stored facts are validated again on read; anything else reads as no facts. */
+function withBounty({ bountyJson, ...row }: Row): PendingOpportunity {
+  let bounty: BountyFacts | null = null;
+  if (bountyJson !== null) {
+    try {
+      const parsed = BountyFacts.safeParse(JSON.parse(bountyJson));
+      if (parsed.success) bounty = parsed.data;
+    } catch {
+      // unreadable JSON is treated as no facts
+    }
+  }
+  return { ...row, bounty };
+}
 
 /** Passed the pre-filter and still waiting for an analysis. */
 const waiting = and(
@@ -38,7 +52,8 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
       return joined()
         .where(and(eq(opportunities.analysisStatus, 'PENDING'), isNull(opportunities.prefilterAt)))
         .orderBy(asc(opportunities.id))
-        .all() as PendingOpportunity[];
+        .all()
+        .map((row) => withBounty(row as Row));
     },
     savePrefilter(id, result, at, moveTo) {
       db.transaction((tx) => {
@@ -69,7 +84,8 @@ export function createAnalysisRepository(db: BetterSQLite3Database): AnalysisRep
           asc(opportunities.id),
         )
         .limit(limit)
-        .all() as WaitingOpportunity[];
+        .all()
+        .map((row) => withBounty(row as Row));
     },
     countSince(at) {
       return (
