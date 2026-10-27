@@ -219,20 +219,23 @@ than building on it.
 - Size: L
 
 ### S-11 E-mail alerts over IMAP (`email-alerts`)
-- Goal: Useme job alerts in a dedicated IMAP folder become signals.
+- Goal: job alerts from Polish gig portals (Zleca.pl, Oferteo, Zlecenia3D.pl; Useme later) in a
+  dedicated IMAP folder become signals.
 - Covers: FR-05 AC1–AC6.
 - Depends on: S-10 (reuses its `SourceAdapter` contract, sources table and Sources view)
 - Acceptance: PRD FR-05 AC1–AC6; parser tests on anonymised real samples in
   `apps/api/test/fixtures/email/`. Human check: one run against the operator's mailbox.
-- Unknowns: Useme alert format (Q-02); Oferia format.
+- Unknowns: alert format of each portal (Q-02); Oferia format.
 - Decided up front:
-  - **Prerequisite (person):** the operator creates/enables Useme e-mail alerts and commits 2–3
-    anonymised `.eml` samples before this item starts; `ship` for this item is not run until they
-    are in the repo. Oferia is added only if a sample exists. (user)
+  - **Prerequisite (person):** the operator enables the portals' e-mail alerts and commits 2–3
+    anonymised `.eml` samples per portal before this item starts; `ship` for this item is not run
+    until at least one portal's samples are in the repo. Oferia is added only if a sample exists. (user)
+  - **Useme is out of scope for now** (2026-10-27): no Useme parser and no `@useme.com` default in
+    the sender allow-list until the operator asks for it. (user)
   - Zleca.pl, Oferteo and Zlecenia3D.pl alerts (no feeds, D-15) get a parser each when a sample
     `.eml` exists; senders added to the allow-list. (user)
   - IMAP via a dedicated mailbox or folder; read-only `EXAMINE`; sender allow-list in config
-    (default `@useme.com`). (D-04)
+    (no default sender; each parser adds its own). (D-04)
 - Size: L
 
 ### S-12 Scheduler and job runs (`scheduler-and-jobs`)
@@ -368,6 +371,7 @@ than building on it.
 - FR-29 Telegram notifications (P1; Q-04).
 - FR-30 CSV export, semantic grouping, multiple evidence per need (P1).
 - Oferia e-mail parser if no sample is available for S-11.
+- Useme e-mail parser (deferred by the operator on 2026-10-27).
 - English UI / i18n (NG-06).
 - Reddit (r/forhire `[Hiring]`) through the Data API, only if Reddit approves access for this
   use (Responsible Builder Policy); until then manual import (D-15).
