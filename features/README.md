@@ -8,6 +8,7 @@ GitHub issues), then each item through `ship`.
 | Brief | Status | Notes |
 |-------|--------|-------|
 | [cv-job-matching.md](cv-job-matching.md) | proposed, not shaped | Review notes below |
+| [osint-intelligence.md](osint-intelligence.md) | proposed, not shaped | Review notes below |
 
 ## Review notes: cv-job-matching (2026-10-30)
 
@@ -33,3 +34,32 @@ Points to settle in `/shape` before the roadmap. The brief itself is kept as wri
    the repository or logs.
 8. **PDF parsing on ARM64.** Use a pure-JS parser (no native build) so the image still builds on
    the Pi; scanned PDFs return `TEXT_EXTRACTION_FAILED` (OCR is out of scope).
+
+## Review notes: osint-intelligence (2026-10-31)
+
+The brief describes behaviour only (no architecture), so these points are for `/shape`.
+
+1. **Overlap with what exists.** PRD class 3 ("niezaspokojona potrzeba"), the Today section
+   "Pomysły produktowe / słabe sygnały" and FR-30 (grouping, several independent evidence items
+   for one need) already cover part of F-04/F-05. OSINT should extend them, not add a parallel
+   list; F-09 (signal to opportunity) reuses the existing card and pipeline.
+2. **Sources need a permitted channel each.** Tenders (S-18 BZP/TED) and GitHub (S-19) already
+   exist. New candidates: the Polish company register through its official KRS API, company news
+   and press releases through RSS where offered, and FR-28 (web search through a permitted API with
+   a budget) for wider discovery. Crawling company websites or career pages needs a robots.txt and
+   terms check per site; job postings overlap with the CV/Jobs brief and must stay a distinct use
+   (as the brief says in §6).
+3. **Organisation matching (F-03).** No vector database (PRD §17), so matching uses identifiers
+   that sources state (NIP, KRS, REGON, domain) and shows ambiguity instead of merging by name.
+4. **Personal data.** Registers and news name people (board members, founders). Keep only the
+   organisation and its public actions; store no personal profiles, contacts or private details
+   (brief §7–8, PRD §16).
+5. **Scoring stays deterministic.** Fit stays the existing 0–100 rules; reliability (fact,
+   inference, hypothesis, unverified) is a separate field, never folded into the score. Reprints
+   of one press release count as one source.
+6. **Notifications (F-08).** Today brief first; push needs FR-29 (Telegram), which is not built.
+7. **Cost.** Every article analysed by the LLM uses the daily limits (D-09); per-source limits and
+   a pre-filter on the watched organisations and topics come before analysis.
+8. **Size.** This is larger than one item. A first slice that needs no new crawler: a watch list of
+   organisations and topics, manual links, and correlation of the signals the app already collects
+   (tenders, bounties, imports) into one organisation timeline with a reliability label.
